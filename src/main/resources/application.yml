@@ -1,0 +1,35 @@
+spring:
+  profiles:
+    active: prod
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 15MB
+      max-request-size: 40MB
+      file-size-threshold: 2MB
+      location: ${UPLOAD_TMP_DIR:/tmp/deokive}
+      resolve-lazily: true
+
+server:
+  port: 8080
+  max-http-request-header-size: 8KB
+  tomcat:
+    max-part-count: 200
+    max-part-header-size: 4096
+
+    threads:
+      max: 200                # ?? 200 (CPU ?? ?*8~16 ?? ??)
+      min-spare: 20
+    accept-count: 100         # ? ?? ?? (??? ???)
+    max-connections: 8192     # ?? ??? ??
+    connection-timeout: 30s
+    keep-alive-timeout: 20s
+    max-keep-alive-requests: 100
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.type: trace
+
+file:
+  upload-dir: ${UPLOAD_DIR:./upload}
