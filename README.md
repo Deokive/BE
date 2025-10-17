@@ -20,6 +20,7 @@
 - **연령대:** 10대 후반 ~ 30대 초반
 - **특징:** 개인의 취향 활동을 디지털로 기록·관리하려는 세대
 - **소비 성향:** 굿즈 구매, 티켓 예매, SNS 활동에 적극적이며, 아날로그 기록 습관도 있지만 디지털 관리 욕구가 큼  
+  
   <br>
 
 ### ⚙️ 주요 기능 (Backend)
@@ -71,6 +72,8 @@
   ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
 - **깃허브 컨벤션** : [@Git-Convention](https://www.notion.so/hooby/Deokive-Git-Convention-28af6c063f3e80eab179f61d10616486)
 - **코드 컨벤션** : [@Code-Convention](https://www.notion.so/hooby/Deokive-Code-Convention-28af6c063f3e804582e5d106fe22a104$0)
+- **백엔드 문서 관리** : [@Backend-Docs](https://hooby.notion.site/DEPth-Main-Project-Deokive-28af6c063f3e8001b775f4f68c632844$0)
+  
   <br>
 
 ## 2. 개발 기간
