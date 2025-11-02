@@ -1,0 +1,41 @@
+spring:
+  config:
+    activate:
+      on-profile: dev # dev 프로필이 활성화될 때만 적용하겠다.
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/deokive
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: ${DB_PASSWORD}
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        show-sql: true
+
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_IAM_ACCESS_KEY} # // Only Local 환경에서만
+        secret-key: ${AWS_IAM_SECRET_KEY} # // Only Local 환경에서만
+
+  servlet:
+    multipart:
+      max-file-size: 16MB
+      max-request-size: 20MB
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.type: trace
+
+jwt:
+  secret: ${JWT_SECRET_KEY:ZGVva2l2ZXNlcnZlcnRlYW1hbmRvdGhlcnNmaWdodGluZw==}
+  atk-exp-min: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:30}
+  rtk-exp-week: ${JWT_REFRESH_TOKEN_EXPIRATION_WEEKS:2}
+
