@@ -3,6 +3,7 @@ package com.depth.deokive.domain.user.dto;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,6 +43,9 @@ public class UserDto {
     @AllArgsConstructor
     @Schema(description = "사용자 업데이트 요청 DTO")
     public static class UserUpdateRequest {
+        @Email(message = "올바른 이메일 형식이 아닙니다.") // Validation Dependency 필요
+        @Schema(description = "이메일", example = "user@email.com")
+        private String email;
         @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;

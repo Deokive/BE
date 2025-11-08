@@ -19,24 +19,24 @@ import java.util.Locale;
 @AllArgsConstructor
 @Getter
 @Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(name = "USER_USERNAME", columnNames = "username"),
         @UniqueConstraint(name = "USER_EMAIL", columnNames = "email")
 })
 public class User extends TimeBaseEntity {
-
-    // ---------- Main Fields ------------
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, updatable = false)
+    private String username; // Client에는 노출되지 않는 히든 필드임 (OAuth2와 일반 케이스를 모두 아우르려면 이게 깔끔)
+
     @Column(nullable = false)
-    private String email;
+    private String nickname;
 
     @Column // OAuth2의 경우라면 password가 nullable -> 그리고 이걸 RequestDTO에서 NotBlank로 설정하면 Login API 우회 불가
     private String password;
 
     @Column(nullable = false)
-    private String nickname;
-
-    // ----------- Sub Fields ------------
+    private String email;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -61,6 +61,7 @@ public class User extends TimeBaseEntity {
 
         this.nickname = nonBlankOrDefault(userUpdateRequest.getNickname(), this.nickname);
         this.password = nonBlankOrDefault(userUpdateRequest.getPassword(), this.password); // encoded password
+        this.email = nonBlankOrDefault(userUpdateRequest.getEmail(), this.email);
     }
 
     // OAuth2 사용자 정보 업데이트
@@ -72,5 +73,4 @@ public class User extends TimeBaseEntity {
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;
     }
-
 }
