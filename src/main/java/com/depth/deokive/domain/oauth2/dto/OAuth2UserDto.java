@@ -37,12 +37,12 @@ public class OAuth2UserDto {
                 .build();
     }
 
-    public User toUser() {
+    public User toUser(OAuth2Response oAuth2Response) {
         return User.builder()
                 .role(this.role)
                 .nickname(this.nickname)
                 .email(this.email)
-                .userType(UserType.OAUTH2)
+                .userType(getOAuth2UserType(oAuth2Response))
                 .build();
     }
 
@@ -55,5 +55,14 @@ public class OAuth2UserDto {
         String hashedId = hmacUtil.hmacSha256Base64(oAuth2Response.getProviderId());
 
         return "user_" + oAuth2Response.getProvider() + "_" + hashedId;
+    }
+
+    private static UserType getOAuth2UserType(OAuth2Response oAuth2Response){
+        return switch (oAuth2Response.getProvider()) {
+            case "google" -> UserType.OAUTH2_GOOGLE;
+            case "kakao" -> UserType.OAUTH2_KAKAO;
+            case "naver" -> UserType.OAUTH2_NAVER;
+            default -> throw new IllegalArgumentException("Invalid OAuth2 Provider");
+        };
     }
 }
