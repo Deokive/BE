@@ -9,14 +9,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
+@Builder @NoArgsConstructor @AllArgsConstructor @Data
 public class OAuth2UserDto {
     private Long userId;
     private Role role;
     private String nickname;
+    private String username;
     private String email;
 
     public static OAuth2UserDto of(Role role, OAuth2Response oAuth2Response, HmacUtil hmacUtil) {
@@ -24,6 +22,7 @@ public class OAuth2UserDto {
                 .userId(null) // OAuth2Response 엔 userId가 없음 -> user 등록 하고 해당 DTO update 해야 함.
                 .role(role)
                 .nickname(suggestNickname(oAuth2Response, hmacUtil))
+                .username(generateUsername(oAuth2Response, hmacUtil))
                 .email(oAuth2Response.getEmail())
                 .build();
     }
@@ -33,17 +32,24 @@ public class OAuth2UserDto {
                 .userId(user.getId()) // user 등록된 이후 DTO Update 됨
                 .role(user.getRole())
                 .nickname(user.getNickname())
+                .username(user.getUsername())
                 .email(user.getEmail())
                 .build();
     }
 
-    public User toUser(OAuth2Response oAuth2Response) {
+    public User toUser() {
         return User.builder()
                 .role(this.role)
                 .nickname(this.nickname)
+                .username(this.username)
                 .email(this.email)
-                .userType(getOAuth2UserType(oAuth2Response))
+                .userType(UserType.OAUTH2)
                 .build();
+    }
+
+    private static String generateUsername(OAuth2Response oAuth2Response, HmacUtil hmacUtil) {
+        String hashedId = hmacUtil.hmacSha256Base64(oAuth2Response.getProviderId());
+        return oAuth2Response.getProvider() + "_" + hashedId;
     }
 
     private static String suggestNickname(OAuth2Response oAuth2Response, HmacUtil hmacUtil) {
@@ -55,14 +61,5 @@ public class OAuth2UserDto {
         String hashedId = hmacUtil.hmacSha256Base64(oAuth2Response.getProviderId());
 
         return "user_" + oAuth2Response.getProvider() + "_" + hashedId;
-    }
-
-    private static UserType getOAuth2UserType(OAuth2Response oAuth2Response){
-        return switch (oAuth2Response.getProvider()) {
-            case "google" -> UserType.OAUTH2_GOOGLE;
-            case "kakao" -> UserType.OAUTH2_KAKAO;
-            case "naver" -> UserType.OAUTH2_NAVER;
-            default -> throw new IllegalArgumentException("Invalid OAuth2 Provider");
-        };
     }
 }

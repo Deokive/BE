@@ -27,14 +27,14 @@ public class UserPrincipal implements UserDetails, Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long userId; // OAuth2 User -> Nullable
-    private String email;
+    private String username;
     private String password; // OAuth2 User -> Nullable
     private Role role;
 
     public static UserPrincipal from(User u) { // Common User
         return UserPrincipal.builder()
                 .userId(u.getId())
-                .email(u.getEmail())
+                .username(u.getUsername())
                 .password(u.getPassword())
                 .role(u.getRole())
                 .build();
@@ -43,7 +43,7 @@ public class UserPrincipal implements UserDetails, Serializable {
     public static UserPrincipal toOAuth2(CustomOAuth2User customOAuth2User) {
         return UserPrincipal.builder()
                 .userId(customOAuth2User.getUserId())
-                .email(customOAuth2User.getEmail())
+                .username(customOAuth2User.getUsername())
                 .role(Objects.requireNonNull(customOAuth2User.getRole()))
                 .build();
     }
@@ -53,7 +53,7 @@ public class UserPrincipal implements UserDetails, Serializable {
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_"+role.name()));
     }
 
-    @Override public String getUsername() { return email; }
+    @Override public String getUsername() { return username; }
     @Override public String getPassword() { return password; }
 
     @Override

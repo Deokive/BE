@@ -131,7 +131,7 @@ public class TokenService {
             Long id = Long.valueOf(subject);
             return userLoadService.loadUserById(id).orElseThrow(JwtInvalidException::new);
         } catch (NumberFormatException nfe) {
-            return userLoadService.loadUserByEmail(subject).orElseThrow(JwtInvalidException::new);
+            return userLoadService.loadUserByUsername(subject).orElseThrow(JwtInvalidException::new);
         }
     }
 

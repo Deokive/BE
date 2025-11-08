@@ -26,6 +26,7 @@ public class CustomOAuth2User implements OAuth2User {
     }
 
     public String getNickname() { return oAuth2UserDto.getNickname(); } // User field 가 nickname 이라 일관성을 위해 설정
+    public String getUsername() { return oAuth2UserDto.getUsername(); }
     public String getEmail() { return oAuth2UserDto.getEmail(); }
     public Role getRole() { return oAuth2UserDto.getRole(); }
     public Long getUserId() { return oAuth2UserDto.getUserId(); }

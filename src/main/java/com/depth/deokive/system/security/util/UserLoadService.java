@@ -21,8 +21,8 @@ public class UserLoadService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<UserPrincipal> loadUserByEmail(String email) {
-        Optional<User> user = userRepository.findByEmail(email);
+    public Optional<UserPrincipal> loadUserByUsername(String username) {
+        Optional<User> user = userRepository.findByUsername(username);
         return user.map(UserPrincipal::from);
     }
 }

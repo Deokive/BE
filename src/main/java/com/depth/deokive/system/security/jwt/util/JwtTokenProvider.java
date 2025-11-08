@@ -77,7 +77,7 @@ public class JwtTokenProvider {
     }
 
     private String getSubject(UserPrincipal userPrincipal) {
-        // OAuth2 사용자의 경우 userId가 null이므로 email을 subject로 사용 (username이 email임)
+        // OAuth2 사용자의 경우 userId가 null이므로 username을 subject로 사용
         return userPrincipal.getUserId() != null
                 ? userPrincipal.getUserId().toString()
                 : userPrincipal.getUsername();
