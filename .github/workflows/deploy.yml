@@ -102,6 +102,16 @@ jobs:
             set -e
             cd /home/${{ secrets.EC2_USERNAME }}/deokive
             
+            # 메모리 최적화: 불필요한 Docker 리소스 정리
+            # Docker CLI 플러그인 프로세스가 메모리를 과도하게 사용하는 문제 해결
+            echo "Cleaning up Docker resources..."
+            # 사용하지 않는 컨테이너, 네트워크, 이미지 정리 (볼륨은 보존)
+            docker system prune -f || true
+            # 태그가 없는 이미지(dangling images)만 삭제
+            docker image prune -f || true
+            # 사용하지 않는 이미지 삭제 (최신 이미지 제외)
+            docker image prune -af --filter "until=24h" || true
+            
             # .env 생성(Secrets에서 안전하게 주입)
             cat > .env <<'EOF'
             AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
@@ -135,5 +145,10 @@ jobs:
             # 무중단에 가깝게 교체 (DB/Redis는 변경 없으면 pull 안 해도 OK)
             docker compose up -d --no-build --remove-orphans
             
-            # 헬스
+            # 배포 후 정리: 사용하지 않는 이미지 삭제
+            docker image prune -af || true
+            
+            # 헬스 체크 및 리소스 사용량 확인
             docker ps
+            echo "=== Memory Usage ==="
+            docker stats --no-stream --format "table {{.Container}}\t{{.MemUsage}}\t{{.MemPerc}}" || true
