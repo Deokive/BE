@@ -98,4 +98,16 @@ public class AuthController {
     public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(HttpServletRequest request, HttpServletResponse response) {
         return ResponseEntity.ok(authService.refreshTokens(request, response));
     }
+
+    // NO AUTH
+    @PostMapping("/is-blacklisted-rtk")
+    public boolean isRtkBlacklisted(@RequestParam("refreshToken") String refreshToken) {
+        return authService.isRtkBlacklisted(refreshToken);
+    }
+
+    // NO AUTH
+    @PostMapping("/is-blacklisted-atk")
+    public boolean isAtkBlacklisted(@RequestParam("accessToken") String accessToken) {
+        return authService.isAtkBlacklisted(accessToken);
+    }
 }
