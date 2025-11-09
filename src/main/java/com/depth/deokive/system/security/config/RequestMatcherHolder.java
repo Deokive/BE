@@ -35,6 +35,9 @@ public class RequestMatcherHolder {
             // test
             new RequestInfo(HttpMethod.GET, "/test", null),
 
+            // system
+            new RequestInfo(null, "/api/system/**", null),
+
             // static resources
             new RequestInfo(HttpMethod.GET,  "/docs/**", null),
             new RequestInfo(HttpMethod.GET,  "/*.ico", null),
