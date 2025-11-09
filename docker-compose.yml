@@ -9,8 +9,6 @@ services:
     restart: always
     ports:
         - "8080:8080"
-    # deploy.resources는 Docker Swarm 모드에서만 작동하므로 제거
-    # 메모리 제한은 JVM 레벨(-Xmx768m)에서만 적용
     environment:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
@@ -48,8 +46,6 @@ services:
     image: mysql:8.0.39
     platform: linux/arm64
     restart: always
-    # MySQL은 기본적으로 메모리를 효율적으로 사용하므로 별도 제한 없음
-    # 필요시 MySQL 설정 파일에서 제한 가능
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
@@ -68,9 +64,7 @@ services:
     image: redis:7.2-alpine
     platform: linux/arm64
     restart: always
-    # Redis는 내부적으로 maxmemory를 설정하여 메모리 사용량 제한
-    # 200MB로 여유있게 설정 (스왑 사용 고려)
-    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 200mb --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     healthcheck:
       test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 5s
