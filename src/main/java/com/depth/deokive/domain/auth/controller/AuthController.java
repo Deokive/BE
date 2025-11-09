@@ -6,6 +6,7 @@ import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.QueryParamValidator;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -100,12 +101,14 @@ public class AuthController {
     }
 
     // NO AUTH
+    @Hidden
     @PostMapping("/is-blacklisted-rtk")
     public boolean isRtkBlacklisted(@RequestParam("refreshToken") String refreshToken) {
         return authService.isRtkBlacklisted(refreshToken);
     }
 
     // NO AUTH
+    @Hidden
     @PostMapping("/is-blacklisted-atk")
     public boolean isAtkBlacklisted(@RequestParam("accessToken") String accessToken) {
         return authService.isAtkBlacklisted(accessToken);

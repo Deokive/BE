@@ -3,6 +3,7 @@ package com.depth.deokive.domain.user.controller;
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.service.UserService;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,6 +30,7 @@ public class UserController {
         return userService.retrieve(userPrincipal);
     }
 
+    @Hidden
     @PatchMapping("/me")
     @Operation(summary = "내 정보 수정", description = "현재 로그인된 사용자의 정보를 수정합니다.")
     @ApiResponse(responseCode = "200", description = "내 정보 수정 성공")
