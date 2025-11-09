@@ -129,33 +129,33 @@ jobs:
             HMAC_SECRET_KEY=${{ secrets.HMAC_SECRET_KEY }}
             EOF
             
-            # 1) 상태 확인 및 메모리 확보
-            echo "Before deployment memory check:"
+            echo "=== 1. 현재 메모리 상태 확인 ==="
             free -h
+
+            echo "=== 2. 기존 서비스 안전하게 종료 ==="
+            docker compose down --remove-orphans
             
-            # 2) 기존 컨테이너 중지 및 완전히 제거 (리소스 확실한 해제)
-            # down -v 옵션은 볼륨까지 날리니 주의! 여기선 사용하지 않음.
-            docker compose down --rmi local --remove-orphans
+            echo "=== 3. 잠시 대기 (OS 정리 시간) ==="
+            sleep 5
+
+            echo "=== 4. 최신 이미지 받기 ==="
+            docker compose pull
+
+            echo "=== 5. 서비스 순차 실행 ==="
+            # - 한꺼번에 'up' 하지 말고 무거운 순서대로 하나씩 켭니다.
             
-            # 3) 약간의 쿨다운 (OS가 캐시를 정리하고 안정화될 시간 부여)
-            sleep 10
-            
-            # 4) 이미지 미리 받기 (실행 단계의 부하 분산)
-            # 병렬 다운로드를 제한하여 I/O 스파이크 방지 시도
-            COMPOSE_PARALLEL_LIMIT=2 docker compose pull
-            
-            # 5) 순차적 실행 (중요)
-            # DB 먼저 띄워서 안정화된 후 백엔드 실행
-            docker compose up -d mysql redis
-            
-            # DB가 완전히 준비될 때까지 대기 (healthcheck가 있지만 안전장치 추가)
-            echo "Waiting for DB & Redis to be ready..."
-            sleep 15
-            
-            # 백엔드 실행
+            # (1) DB 먼저 실행
+            docker compose up -d mysql
+            echo "Waiting for MySQL to warm up..."
+            sleep 20  # DB가 완전히 켜질 시간을 줍니다.
+
+            # (2) Redis 실행
+            docker compose up -d redis
+            sleep 5
+
+            # (3) Backend 실행
             docker compose up -d backend
             
-            # 최종 확인
-            sleep 5
+            echo "=== 6. 최종 배포 확인 ==="
             docker ps
             free -h
