@@ -29,7 +29,7 @@ public class JwtTokenValidator {
         String allowedRtk = tokenRedisRepository.getAllowedRtk(payload.getSubject());
 
         if (allowedRtk == null || !allowedRtk.equals(submittedUuid)) throw new JwtInvalidException();
-        if (tokenRedisRepository.isRtkBlacklisted(submittedUuid)) throw new JwtInvalidException();
+        if (tokenRedisRepository.isRtkBlacklisted(submittedUuid)) throw new JwtBlacklistException();
     }
 
     public void validateAtk(JwtDto.TokenPayload payload) {
