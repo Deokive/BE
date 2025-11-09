@@ -8,7 +8,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQL8Dialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update # 개발 단계에서는 한시적으로 허용하고, 운영 단계에서는 validate 또는 none으로 변경하는 것을 권장.
 
 logging:
   level:
