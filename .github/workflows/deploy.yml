@@ -40,25 +40,20 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Docker Build : t4g(ARM) 호환을 위해 ARM64 이미지로 푸시
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
+      # Docker Build : t3(x86) 호환을 위해 AMD64 이미지로 푸시
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & Push arm64
+      - name: Build & Push amd64 (for t3)
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest
-          cache-from: type=gha # Docker Layer 캐시 활용 -> 이미지 빌드 속도 향상
+          cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # ------------------- Server Deployment ------------------ #
 
       # [0]. Add known host (보안 및 안정성)
       - name: Add EC2 host to known_hosts
@@ -109,7 +104,7 @@ jobs:
             DB_HOST=${{ secrets.DB_HOST }}
             DB_PORT=${{ secrets.DB_PORT }}
             DB_NAME=${{ secrets.DB_NAME }}
-            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_USERNAME=${{ secrets.ECR_REPO }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             REDIS_HOST=${{ secrets.REDIS_HOST }}
             REDIS_PORT=${{ secrets.REDIS_PORT }}
@@ -142,8 +137,6 @@ jobs:
             docker compose pull
 
             echo "=== 5. 서비스 순차 실행 ==="
-            # - 한꺼번에 'up' 하지 말고 무거운 순서대로 하나씩 켭니다.
-            
             # (1) DB 먼저 실행
             docker compose up -d mysql
             echo "Waiting for MySQL to warm up..."
