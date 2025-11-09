@@ -27,6 +27,8 @@ public class RequestMatcherHolder {
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/login", null),
             new RequestInfo(HttpMethod.GET, "/api/v1/auth/email-exist", null),
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/refresh", null),
+            new RequestInfo(HttpMethod.POST, "/api/v1/auth//is-blacklisted-rtk", null),
+            new RequestInfo(HttpMethod.POST, "/api/v1/auth//is-blacklisted-atk", null),
 
             // user
 
