@@ -105,6 +105,14 @@ public class AuthService {
         return JwtDto.TokenExpiresInfo.of(tokenInfo);
     }
 
+    public boolean isRtkBlacklisted(String refreshToken) {
+        return tokenService.isRtkBlacklisted(refreshToken);
+    }
+
+    public boolean isAtkBlacklisted(String accessToken) {
+        return tokenService.isAtkBlacklisted(accessToken);
+    }
+
     // OAuth2의 경우 Email이 nullable 할 수도 있음 -> 그럼 다른 유저라고 생각하자.
     private void validateAlreadyUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
