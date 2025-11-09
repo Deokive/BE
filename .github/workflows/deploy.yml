@@ -124,31 +124,11 @@ jobs:
             HMAC_SECRET_KEY=${{ secrets.HMAC_SECRET_KEY }}
             EOF
             
-            echo "=== 1. 현재 메모리 상태 확인 ==="
-            free -h
-
-            echo "=== 2. 기존 서비스 안전하게 종료 ==="
-            docker compose down --remove-orphans
+            echo "최신 이미지 풀(EC2에는 ECR Credential Helper 필요)"
+            docker compose pull backend
             
-            echo "=== 3. 잠시 대기 (OS 정리 시간) ==="
-            sleep 5
-
-            echo "=== 4. 최신 이미지 받기 ==="
-            docker compose pull
-
-            echo "=== 5. 서비스 순차 실행 ==="
-            # (1) DB 먼저 실행
-            docker compose up -d mysql
-            echo "Waiting for MySQL to warm up..."
-            sleep 20  # DB가 완전히 켜질 시간을 줍니다.
-
-            # (2) Redis 실행
-            docker compose up -d redis
-            sleep 5
-
-            # (3) Backend 실행
-            docker compose up -d backend
+            echo "무중단에 가깝게 교체 (DB/Redis는 변경 없으면 pull 안 해도 OK)"
+            docker compose up -d --no-build --remove-orphans
             
-            echo "=== 6. 최종 배포 확인 ==="
+            # 헬스
             docker ps
-            free -h
