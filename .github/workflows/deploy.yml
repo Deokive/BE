@@ -111,6 +111,9 @@ jobs:
             DB_NAME=${{ secrets.DB_NAME }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME }}
             MAX_FILE_SIZE=${{ secrets.MAX_FILE_SIZE }}
             MAX_REQUEST_SIZE=${{ secrets.MAX_REQUEST_SIZE }}
