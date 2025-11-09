@@ -126,6 +126,20 @@ public class TokenService {
         tokenRedisRepository.clearAllowedRtk(subject);
     }
 
+    public boolean isRtkBlacklisted(String refreshToken) {
+        var rtkPayload = jwtTokenResolver.resolveToken(refreshToken);
+        String submittedUuid = rtkPayload.getRefreshUuid();
+
+        return tokenRedisRepository.isRtkBlacklisted(submittedUuid);
+    }
+
+    public boolean isAtkBlacklisted(String accessToken) {
+        var atkPayload = jwtTokenResolver.resolveToken(accessToken);
+        String submittedUuid = atkPayload.getRefreshUuid();
+
+        return tokenRedisRepository.isAtkBlacklisted(submittedUuid);
+    }
+
     private UserPrincipal resolveUser(String subject) {
         try {
             Long id = Long.valueOf(subject);
