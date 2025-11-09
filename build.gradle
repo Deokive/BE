@@ -29,7 +29,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
     // Security
-//    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
 
     // DB
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
@@ -41,8 +41,6 @@ dependencies {
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-
-    // QueryDSL
 
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
@@ -60,6 +58,9 @@ dependencies {
 //    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 //    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
 //    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+    // OAuth2 Client
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
