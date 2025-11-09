@@ -129,10 +129,16 @@ jobs:
             HMAC_SECRET_KEY=${{ secrets.HMAC_SECRET_KEY }}
             EOF
             
-            # 최신 이미지 풀(EC2에는 ECR Credential Helper 필요)
+            # 0) 상태 확인(선택)
+            free -h || true
+        
+            # 1) 기존 중지 (겹침 제거)
+            docker compose down || true
+            
+            # 2). 이미지 갱신: 최신 이미지 풀(EC2에는 ECR Credential Helper 필요)
             docker compose pull backend
             
-            # 무중단에 가깝게 교체 (DB/Redis는 변경 없으면 pull 안 해도 OK)
+            # 3). 재기동
             docker compose up -d --no-build --remove-orphans
             
             # 헬스
