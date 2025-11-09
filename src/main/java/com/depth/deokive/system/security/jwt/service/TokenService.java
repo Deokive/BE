@@ -135,9 +135,9 @@ public class TokenService {
 
     public boolean isAtkBlacklisted(String accessToken) {
         var atkPayload = jwtTokenResolver.resolveToken(accessToken);
-        String submittedUuid = atkPayload.getRefreshUuid();
+        String jti = atkPayload.getJti();
 
-        return tokenRedisRepository.isAtkBlacklisted(submittedUuid);
+        return tokenRedisRepository.isAtkBlacklisted(jti);
     }
 
     private UserPrincipal resolveUser(String subject) {
