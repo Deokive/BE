@@ -7,10 +7,12 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -36,6 +38,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserDto.UserResponse retrieve(UserPrincipal userPrincipal) {
+        log.info("💡 Called retrieve api");
+
         User foundUser = userRepository.findById(userPrincipal.getUserId())
                 .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
 
