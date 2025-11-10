@@ -28,6 +28,6 @@ app:
     secure: true
     cookie-atk: "ATK"
     cookie-rtk: "RTK"
-    same-site: "Lax"
+    same-site: "None"  # 크로스 사이트 쿠키 전송을 위해 None으로 설정 (Secure=true와 함께 사용)
     atk-apply-path: "/"
     rtk-apply-path: "/api/v1/auth"  # refresh와 logout 엔드포인트 모두에서 접근 가능하도록 변경
