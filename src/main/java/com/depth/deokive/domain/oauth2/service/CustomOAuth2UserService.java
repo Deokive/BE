@@ -38,12 +38,14 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         final OAuth2UserDto oAuth2UserDto = OAuth2UserDto.of(Role.USER, oAuth2Response, hmacUtil);
 
         // 기존 OAuth2 유저 있으면 사용, 없으면 생성 -> 기존 회원이거나 새로 등록된 회원
+        log.info("⭐️ find or save OAuth2 user in loadUser");
         User user = userRepository.findByUsername(oAuth2UserDto.getUsername())
                 .orElseGet(() -> {
                     if(userRepository.existsByEmail(oAuth2UserDto.getEmail())) {
                         throw new OAuth2AuthenticationException(ErrorCode.OAUTH_USER_ALREADY_EXIST.getMessage());
                     }
 
+                    log.info("⭐️ save new OAuth2 user");
                     return userRepository.save(oAuth2UserDto.toUser());
                 });
 

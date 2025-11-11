@@ -19,10 +19,10 @@ import java.util.UUID;
 public class JwtTokenProvider {
     private final SecretKey secretKey;
 
-    @Value("${jwt.access-token-expiration-minutes}")
+    @Value("${jwt.atk-exp-min}")
     private int accessTokenExpirationMinutes;
 
-    @Value("${jwt.refresh-token-expiration-weeks}")
+    @Value("${jwt.rtk-exp-week}")
     private int refreshTokenExpirationWeeks;
 
     public JwtDto.TokenData createRefreshToken(UserPrincipal userPrincipal, String refreshUuid) {

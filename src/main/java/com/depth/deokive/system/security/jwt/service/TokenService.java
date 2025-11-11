@@ -32,6 +32,7 @@ public class TokenService {
     private final CookieUtils cookieUtils;
 
     public JwtDto.TokenInfo issueTokens(UserPrincipal userPrincipal) {
+        log.info("🔥 Issue Tokens");
         JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(userPrincipal);
         String subject = userPrincipal.getUserId() != null
                 ? userPrincipal.getUserId().toString()
@@ -43,6 +44,7 @@ public class TokenService {
     }
 
     public JwtDto.TokenInfo rotateByRtkWithValidation(HttpServletRequest request, HttpServletResponse response) {
+        log.info("✅ Rotate Tokens");
         // 1) 쿠키에서 ATK/RTK 파싱
         String accessToken = jwtTokenResolver.parseTokenFromRequest(request)
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
@@ -57,6 +59,8 @@ public class TokenService {
         var payload = jwtTokenResolver.resolveToken(refreshToken);
         String subject = payload.getSubject();
         UserPrincipal principal = resolveUser(subject);
+
+        log.info("🔥 UserPrincipal resolved for token rotation");
 
         // 4) 새 토큰 페어 생성
         JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(principal);
