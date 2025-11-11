@@ -36,7 +36,7 @@ jobs:
         run: ./gradlew clean build -x test
 
       - name: Modify Jar File Name & Path
-        run: mv ./build/libs/*.jar ./deokive.jar
+        run: mv ./build/libs/*SNAPSHOT.jar ./deokive.jar
 
       # Assemble deployment files
       - name: Collect deployment files
