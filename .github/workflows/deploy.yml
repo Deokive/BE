@@ -26,10 +26,10 @@ jobs:
 
       # For Build File Creation
       - name: Create application.yml
-        run: echo "${{ secrets.APPLICATION_YML }}" > ./src/main/resources/application.yml
+        run: echo '${{ secrets.APPLICATION_YML }}' > ./src/main/resources/application.yml
 
       - name: Create .env for Docker Compose
-        run: echo "${{ secrets.DOCKER_COMPOSE_ENV }}" > .env
+        run: echo '${{ secrets.DOCKER_COMPOSE_ENV }}' > .env
 
       # Build
       - name: Build JAR
