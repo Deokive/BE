@@ -57,7 +57,7 @@ public class User extends TimeBaseEntity {
     @PreUpdate  // UPDATE 되기 전 실행 (기존 User 수정 시)
     private void normalize() {
         if (this.nickname != null) this.nickname = this.nickname.trim(); // "hades " 같은 공백 포함 문자열 방지
-        if (this.email != null) this.email = this.email.trim().toLowerCase(Locale.ROOT);
+        if (this.email != null && !this.email.equals("DELETE")) this.email = this.email.trim().toLowerCase(Locale.ROOT);
     }
 
     // JPA Dirty Checking
@@ -73,12 +73,13 @@ public class User extends TimeBaseEntity {
         this.password = nonBlankOrDefault(request.getPassword(), this.password);
     }
 
-    public void softDelete() {
-        // 중요 정보들만 지움
-        this.username = "DELETE"; // 이 방식이 괜찮은게, Validation으로 막힘
-        this.email = "DELETE";
-        this.nickname = "(알 수 없음)";
-        this.password = "DELETE";
+    public void softDelete(AuthDto.SoftDeleteDto dto) {
+        if (dto == null) return;
+
+        this.username = dto.getUsername();
+        this.email = dto.getEmail();
+        this.nickname = dto.getNickname();
+        this.password = dto.getPassword(); // Validation 에서 막힘
     }
 
     // OAuth2 사용자 정보 업데이트

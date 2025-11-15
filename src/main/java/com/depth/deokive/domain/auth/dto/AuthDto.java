@@ -14,6 +14,8 @@ import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 
 public class AuthDto {
@@ -135,7 +137,29 @@ public class AuthDto {
         public static ExistResponse ofNickname(boolean exist, String nickname) { return of(exist, nickname); }
     }
 
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class SoftDeleteDto {
+        private String username;
+        private String nickname;
+        private String email;
+        private String password;
+
+        public static AuthDto.SoftDeleteDto of(User user) {
+            return AuthDto.SoftDeleteDto.builder()
+                    .username(generateBase64(user.getId().toString(), user.getUsername()))
+                    .nickname("(알 수 없음)")
+                    .email(generateBase64(user.getId().toString(), user.getEmail()))
+                    .password("DELETE")
+                    .build();
+        }
+    }
+
     private static String usernameGenerator(String email){
         return email + "_" + UUID.randomUUID().toString();
     }
+    private static String generateBase64(String s1, String s2) {
+        String combined = s1 + ":" + s2;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(combined.getBytes(StandardCharsets.UTF_8));
+    }
+
 }

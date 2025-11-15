@@ -81,7 +81,7 @@ public class AuthService {
         tokenService.clearTokensByAtkWithValidation(accessToken, refreshToken);
 
         // Soft Delete 처리
-        foundUser.softDelete();
+        foundUser.softDelete(AuthDto.SoftDeleteDto.of(foundUser));
 
         clearCookies(response);
     }
