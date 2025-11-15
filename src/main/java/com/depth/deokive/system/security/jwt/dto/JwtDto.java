@@ -53,9 +53,9 @@ public class JwtDto {
         private String accessToken;
         @Schema(description = "Refresh Token", example = "refreshTokenContent")
         private String refreshToken;
-        @Schema(description = "Access Token 만료 시간", example = "ISO DateTime")
+        @Schema(description = "Access Token 만료 시간", example = "KST DateTime")
         private LocalDateTime accessTokenExpiresAt;
-        @Schema(description = "Refresh Token 만료 시간", example = "ISO DateTime")
+        @Schema(description = "Refresh Token 만료 시간", example = "KST DateTime")
         private LocalDateTime refreshTokenExpiresAt;
 
         public static TokenInfo of(JwtDto.TokenPair tokenPair) {
@@ -71,9 +71,9 @@ public class JwtDto {
     @Builder @AllArgsConstructor @NoArgsConstructor @Getter
     @Schema(description = "토큰 만료시간 정보 발행 DTO")
     public static class TokenExpiresInfo {
-        @Schema(description = "Access Token 만료 시간", example = "ISO DateTime")
+        @Schema(description = "Access Token 만료 시간", example = "KST DateTime")
         private LocalDateTime accessTokenExpiresAt;
-        @Schema(description = "Refresh Token 만료 시간", example = "ISO DateTime")
+        @Schema(description = "Refresh Token 만료 시간", example = "KST DateTime")
         private LocalDateTime refreshTokenExpiresAt;
 
         public static TokenExpiresInfo of(JwtDto.TokenInfo tokenInfo) {

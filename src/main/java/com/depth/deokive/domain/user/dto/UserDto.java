@@ -3,13 +3,14 @@ package com.depth.deokive.domain.user.dto;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.LocalDateTime;
 
 public class UserDto {
     @Data
@@ -26,6 +27,10 @@ public class UserDto {
         private Role role;
         @Schema(description = "사용자 닉네임", example = "hades")
         private String nickname;
+        @Schema(description = "계정 생성 시간", example = "KST Datetime")
+        private LocalDateTime createdAt;
+        @Schema(description = "마지막 정보 수정 시간", example = "KST Datetime")
+        private LocalDateTime lastModifiedAt;
 
         public static UserResponse from(User user) {
             return UserResponse.builder()
@@ -33,6 +38,8 @@ public class UserDto {
                     .email(user.getEmail())
                     .role(user.getRole())
                     .nickname(user.getNickname())
+                    .createdAt(user.getCreatedAt())
+                    .lastModifiedAt(LocalDateTime.now())
                     .build();
         }
     }
