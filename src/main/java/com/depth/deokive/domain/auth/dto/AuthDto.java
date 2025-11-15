@@ -7,6 +7,7 @@ import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -37,7 +38,8 @@ public class AuthDto {
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
-        @NotBlank(message = "이메일 인증을 완료해줏요.")
+        @AssertTrue(message = "이메일 인증을 완료해주세요.")
+        @JsonProperty("isEmailVerified")
         @Schema(description = "이메일 인증 여부", example = "true")
         private boolean isEmailVerified;
 
@@ -85,6 +87,29 @@ public class AuthDto {
                     .user(user)
                     .tokenExpiresInfo(tokenExpiresInfo)
                     .build();
+        }
+    }
+
+    @Builder @AllArgsConstructor @NoArgsConstructor @Getter
+    @Schema(description = "비밀번호 재설정 요청 DTO")
+    public static class ResetPasswordRequest {
+        @NotBlank(message = "이메일 형식으로 입력해주세요.")
+        @Email(message = "올바른 이메일 형식이 아닙니다.")
+        @Schema(description = "이메일", example = "user@email.com")
+        private String email;
+
+        @NotBlank(message = "대소문자 영문자와 숫자를 포함한 8자리 이상의 비밀번호를 입력해주세요.")
+        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
+        @Schema(description = "사용자 비밀번호", example = "password content")
+        private String password;
+
+        @AssertTrue(message = "이메일 인증을 완료해주세요.")
+        @JsonProperty("isEmailVerified")
+        @Schema(description = "이메일 인증 여부", example = "true")
+        private boolean isEmailVerified;
+
+        public void encodePassword(PasswordEncoder passwordEncoder) {
+            this.password = passwordEncoder.encode(this.password);
         }
     }
 

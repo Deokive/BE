@@ -57,6 +57,7 @@ public class AuthController {
     }
 
     // NO AUTH
+    @Hidden
     @GetMapping("/username-exist")
     @Operation(summary = "사용자 아이디 중복 확인", description = "입력된 사용자 아이디의 사용 가능 여부를 확인합니다.")
     @ApiResponse(responseCode = "200", description = "사용자 아이디 확인 성공")
@@ -116,5 +117,15 @@ public class AuthController {
     @PostMapping("/is-blacklisted-atk")
     public boolean isAtkBlacklisted(@RequestParam("accessToken") String accessToken) {
         return authService.isAtkBlacklisted(accessToken);
+    }
+
+    // NO AUTH
+    @PostMapping("/reset-pw")
+    @Operation(summary = "비밀번호 재설정", description = "비밀번호를 재설정 합니다.")
+    @ApiResponse(responseCode = "200", description = "비밀번호 재설정 성공")
+    public ResponseEntity<String> resetPassword(@RequestBody @Valid AuthDto.ResetPasswordRequest request)
+    {
+        authService.resetPassword(request);
+        return ResponseEntity.ok("Successful Reset Password!");
     }
 }

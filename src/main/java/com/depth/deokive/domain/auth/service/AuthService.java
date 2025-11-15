@@ -111,6 +111,17 @@ public class AuthService {
         return JwtDto.TokenExpiresInfo.of(tokenInfo);
     }
 
+    @Transactional
+    public void resetPassword(AuthDto.ResetPasswordRequest request) {
+        if (!request.isEmailVerified()) throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RestException(ErrorCode.AUTH_USER_NOT_FOUND));
+
+        request.encodePassword(passwordEncoder);
+        user.resetPassword(request);
+    }
+
     // Helper Methods
     public boolean isRtkBlacklisted(String refreshToken) {
         return tokenService.isRtkBlacklisted(refreshToken);

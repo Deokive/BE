@@ -30,7 +30,6 @@ public class UserController {
         return userService.retrieve(userPrincipal);
     }
 
-    @Hidden
     @PatchMapping("/me")
     @Operation(summary = "내 정보 수정", description = "현재 로그인된 사용자의 정보를 수정합니다.")
     @ApiResponse(responseCode = "200", description = "내 정보 수정 성공")

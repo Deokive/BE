@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.user.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.domain.auth.dto.AuthDto;
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
@@ -60,11 +61,16 @@ public class User extends TimeBaseEntity {
     }
 
     // JPA Dirty Checking
-    public void update(UserDto.UserUpdateRequest userUpdateRequest) {
-        if (userUpdateRequest == null) return;
+    public void update(UserDto.UserUpdateRequest request) {
+        if (request == null) return;
 
-        this.nickname = nonBlankOrDefault(userUpdateRequest.getNickname(), this.nickname);
-        this.password = nonBlankOrDefault(userUpdateRequest.getPassword(), this.password); // encoded password
+        this.nickname = nonBlankOrDefault(request.getNickname(), this.nickname);
+        this.password = nonBlankOrDefault(request.getPassword(), this.password); // encoded password
+    }
+
+    public void resetPassword(AuthDto.ResetPasswordRequest request) {
+        if (request == null) return;
+        this.password = nonBlankOrDefault(request.getPassword(), this.password);
     }
 
     public void softDelete() {
