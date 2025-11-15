@@ -60,6 +60,10 @@ public class AuthDto {
         @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
+
+        @Schema(description = "자동 로그인", example = "true")
+        @Builder.Default
+        private boolean rememberMe = false;
     }
 
     @Builder @AllArgsConstructor @NoArgsConstructor @Getter
