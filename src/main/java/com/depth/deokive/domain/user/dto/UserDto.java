@@ -3,16 +3,17 @@ package com.depth.deokive.domain.user.dto;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 public class UserDto {
     @Data
     @Builder
@@ -54,13 +55,17 @@ public class UserDto {
         @Pattern(regexp = "^[가-힣a-zA-Z0-9-_]{2,10}$", message = "닉네임 조건에 충족되지 않습니다.")
         @Schema(description = "사용자 닉네임", example = "hades")
         private String nickname;
-        @NotBlank(message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
         @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?])[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$", message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
         public void encodePassword(PasswordEncoder passwordEncoder) {
-            this.password = passwordEncoder.encode(this.password);
+            try {
+                this.password = passwordEncoder.encode(this.password);
+            } catch (Exception e) {
+                log.info("🔴 Null Password -> Passing this Loop & will Check in the User Entity");
+            }
+
         }
     }
 }
