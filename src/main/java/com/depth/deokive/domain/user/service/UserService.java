@@ -30,7 +30,6 @@ public class UserService {
         User foundUser = userRepository.findById(userPrincipal.getUserId())
                 .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
 
-        validateDuplication(request ,foundUser);
         request.encodePassword(passwordEncoder);
         foundUser.update(request);
         return UserDto.UserResponse.from(foundUser);
@@ -44,13 +43,5 @@ public class UserService {
                 .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
 
         return UserDto.UserResponse.from(foundUser);
-    }
-
-    private void validateDuplication(UserDto.UserUpdateRequest request, User foundUser) {
-        if (request.getEmail() != null &&
-                !foundUser.getEmail().equals(request.getEmail()) &&
-                userRepository.existsByEmail(request.getEmail())) {
-            throw new RestException(ErrorCode.USER_USERNAME_ALREADY_EXISTS);
-        }
     }
 }

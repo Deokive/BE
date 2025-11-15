@@ -65,7 +65,6 @@ public class User extends TimeBaseEntity {
 
         this.nickname = nonBlankOrDefault(userUpdateRequest.getNickname(), this.nickname);
         this.password = nonBlankOrDefault(userUpdateRequest.getPassword(), this.password); // encoded password
-        this.email = nonBlankOrDefault(userUpdateRequest.getEmail(), this.email); // TODO: Email is not updatable
     }
 
     // OAuth2 사용자 정보 업데이트

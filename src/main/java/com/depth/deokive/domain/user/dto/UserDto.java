@@ -43,15 +43,12 @@ public class UserDto {
     @AllArgsConstructor
     @Schema(description = "사용자 업데이트 요청 DTO")
     public static class UserUpdateRequest {
-        @Email(message = "올바른 이메일 형식이 아닙니다.") // Validation Dependency 필요
-        @Schema(description = "이메일", example = "user@email.com")
-        private String email;
-        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
-        @Schema(description = "사용자 비밀번호", example = "password content")
-        private String password;
         @Pattern(regexp = "^[ㄱ-ㅎ가-힣a-zA-Z0-9-_]{2,10}$", message = "닉네임 조건에 충족되지 않습니다.")
         @Schema(description = "사용자 닉네임", example = "hades")
         private String nickname;
+        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
+        @Schema(description = "사용자 비밀번호", example = "password content")
+        private String password;
 
         public void encodePassword(PasswordEncoder passwordEncoder) {
             this.password = passwordEncoder.encode(this.password);
