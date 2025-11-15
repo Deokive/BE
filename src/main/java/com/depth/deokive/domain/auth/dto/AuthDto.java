@@ -37,12 +37,17 @@ public class AuthDto {
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
+        @NotBlank(message = "이메일 인증을 완료해줏요.")
+        @Schema(description = "이메일 인증 여부", example = "true")
+        private boolean isEmailVerified;
+
         public User toEntity(PasswordEncoder encoder) {
             return User.builder()
                     .email(email)
                     .nickname(nickname)
                     .username(usernameGenerator(email))
                     .password(encoder.encode(password))
+                    .isEmailVerified(isEmailVerified)
                     .role(Role.USER)
                     .build();
         }

@@ -29,7 +29,7 @@ public class AuthService {
 
     @Transactional
     public UserDto.UserResponse signUp(AuthDto.SignUpRequest request) {
-        validateAlreadyUser(request);
+        validateUser(request);
         User savedUser = userRepository.save(request.toEntity(passwordEncoder));
         return UserDto.UserResponse.from(savedUser);
     }
@@ -120,10 +120,10 @@ public class AuthService {
         return tokenService.isAtkBlacklisted(accessToken);
     }
 
-    // OAuth2의 경우 Email이 nullable 할 수도 있음 -> 그럼 다른 유저라고 생각하자.
-    private void validateAlreadyUser(AuthDto.SignUpRequest request) {
+    private void validateUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
         if (isAlreadyUser) throw new RestException(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
+        if (!request.isEmailVerified()) throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
     }
 
     private User getValidatedLoginUser(AuthDto.LoginRequest request, PasswordEncoder passwordEncoder) {
