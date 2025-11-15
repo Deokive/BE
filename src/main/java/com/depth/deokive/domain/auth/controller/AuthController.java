@@ -89,7 +89,7 @@ public class AuthController {
             HttpServletResponse response
     ) {
         authService.delete(userPrincipal, request, response);
-        return ResponseEntity.ok("Delete User Successful");
+        return ResponseEntity.ok("Soft Delete User Successful");
     }
 
     // NO AUTH

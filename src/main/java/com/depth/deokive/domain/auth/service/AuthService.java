@@ -80,7 +80,8 @@ public class AuthService {
 
         tokenService.clearTokensByAtkWithValidation(accessToken, refreshToken);
 
-        userRepository.delete(foundUser);
+        // Soft Delete 처리
+        foundUser.softDelete();
 
         clearCookies(response);
     }

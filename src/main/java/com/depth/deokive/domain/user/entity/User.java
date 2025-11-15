@@ -67,6 +67,14 @@ public class User extends TimeBaseEntity {
         this.password = nonBlankOrDefault(userUpdateRequest.getPassword(), this.password); // encoded password
     }
 
+    public void softDelete() {
+        // 중요 정보들만 지움
+        this.username = "DELETE";
+        this.email = "DELETE";
+        this.nickname = "DELETE";
+        this.password = "DELETE";
+    }
+
     // OAuth2 사용자 정보 업데이트
     public void updateOAuth2Info(String nickname, String email) {
         this.nickname = nonBlankOrDefault(nickname, this.nickname);
