@@ -77,7 +77,7 @@ public class User extends TimeBaseEntity {
         // 중요 정보들만 지움
         this.username = "DELETE"; // 이 방식이 괜찮은게, Validation으로 막힘
         this.email = "DELETE";
-        this.nickname = "DELETE";
+        this.nickname = "(알 수 없음)";
         this.password = "DELETE";
     }
 
