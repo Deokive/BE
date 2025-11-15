@@ -26,7 +26,7 @@ public class User extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private String username; // Client에는 노출되지 않는 히든 필드임 (OAuth2와 일반 케이스를 모두 아우르려면 이게 깔끔)
 
     @Column(nullable = false)
@@ -69,7 +69,7 @@ public class User extends TimeBaseEntity {
 
     public void softDelete() {
         // 중요 정보들만 지움
-        this.username = "DELETE";
+        this.username = "DELETE"; // 이 방식이 괜찮은게, Validation으로 막힘
         this.email = "DELETE";
         this.nickname = "DELETE";
         this.password = "DELETE";
