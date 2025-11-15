@@ -3,6 +3,8 @@ package com.depth.deokive.system.security.jwt.dto;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -87,11 +89,27 @@ public class JwtDto {
     public static class TokenOptionWrapper {
         private UserPrincipal userPrincipal;
         private boolean rememberMe;
+        private HttpServletRequest httpServletRequest;
+        private HttpServletResponse httpServletResponse;
 
         // 만약 어떤 패러미터가 추가되어야 한다고 해도, 여기에 필드만 처리하면 레거시 상태여도 유연히 대응 가능
 
         public static JwtDto.TokenOptionWrapper from(UserPrincipal userPrincipal, boolean rememberMe) {
             return JwtDto.TokenOptionWrapper.builder()
+                    .userPrincipal(userPrincipal)
+                    .rememberMe(rememberMe)
+                    .build();
+        }
+
+        public static JwtDto.TokenOptionWrapper from(
+                HttpServletRequest httpServletRequest,
+                HttpServletResponse httpServletResponse,
+                UserPrincipal userPrincipal,
+                boolean rememberMe) {
+
+            return TokenOptionWrapper.builder()
+                    .httpServletRequest(httpServletRequest)
+                    .httpServletResponse(httpServletResponse)
                     .userPrincipal(userPrincipal)
                     .rememberMe(rememberMe)
                     .build();
