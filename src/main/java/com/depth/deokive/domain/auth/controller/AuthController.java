@@ -34,8 +34,6 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "회원가입 성공")
     public UserDto.UserResponse signUp(@RequestBody @Valid AuthDto.SignUpRequest request) {
         return authService.signUp(request);
-
-        // TODO : Multipart 도입할 때는 @RequestBody -> @ModelAttribute 로 둔다.
     }
 
     // NO AUTH
@@ -57,6 +55,7 @@ public class AuthController {
     }
 
     // NO AUTH
+    @Hidden
     @GetMapping("/username-exist")
     @Operation(summary = "사용자 아이디 중복 확인", description = "입력된 사용자 아이디의 사용 가능 여부를 확인합니다.")
     @ApiResponse(responseCode = "200", description = "사용자 아이디 확인 성공")
@@ -89,15 +88,19 @@ public class AuthController {
             HttpServletResponse response
     ) {
         authService.delete(userPrincipal, request, response);
-        return ResponseEntity.ok("Delete User Successful");
+        return ResponseEntity.ok("Soft Delete User Successful");
     }
 
     // NO AUTH
     @PostMapping("/refresh")
     @Operation(summary = "리프레시 토큰", description = "리프레시 토큰으로 새로운 액세스 토큰과 리프레시 토큰을 발급받습니다.")
     @ApiResponse(responseCode = "200", description = "리프레시 토큰 성공")
-    public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(HttpServletRequest request, HttpServletResponse response) {
-        return ResponseEntity.ok(authService.refreshTokens(request, response));
+    public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(
+            @RequestParam(value = "rememberMe", defaultValue = "false") boolean rememberMe,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+        return ResponseEntity.ok(authService.refreshTokens(request, response, rememberMe));
     }
 
     // NO AUTH
@@ -112,5 +115,15 @@ public class AuthController {
     @PostMapping("/is-blacklisted-atk")
     public boolean isAtkBlacklisted(@RequestParam("accessToken") String accessToken) {
         return authService.isAtkBlacklisted(accessToken);
+    }
+
+    // NO AUTH
+    @PostMapping("/reset-pw")
+    @Operation(summary = "비밀번호 재설정", description = "비밀번호를 재설정 합니다.")
+    @ApiResponse(responseCode = "200", description = "비밀번호 재설정 성공")
+    public ResponseEntity<String> resetPassword(@RequestBody @Valid AuthDto.ResetPasswordRequest request)
+    {
+        authService.resetPassword(request);
+        return ResponseEntity.ok("Successful Reset Password!");
     }
 }

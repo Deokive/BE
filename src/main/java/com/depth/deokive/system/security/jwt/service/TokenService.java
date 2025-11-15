@@ -11,8 +11,6 @@ import com.depth.deokive.system.security.jwt.util.JwtTokenValidator;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.CookieUtils;
 import com.depth.deokive.system.security.util.UserLoadService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,9 +29,11 @@ public class TokenService {
     private final JwtTokenValidator jwtTokenValidator;
     private final CookieUtils cookieUtils;
 
-    public JwtDto.TokenInfo issueTokens(UserPrincipal userPrincipal) {
+    public JwtDto.TokenInfo issueTokens(JwtDto.TokenOptionWrapper tokenOptions) {
         log.info("🔥 Issue Tokens");
-        JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(userPrincipal);
+        JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(tokenOptions);
+
+        UserPrincipal userPrincipal = tokenOptions.getUserPrincipal();
         String subject = userPrincipal.getUserId() != null
                 ? userPrincipal.getUserId().toString()
                 : userPrincipal.getUsername();
@@ -43,13 +43,13 @@ public class TokenService {
         return JwtDto.TokenInfo.of(tokenPair);
     }
 
-    public JwtDto.TokenInfo rotateByRtkWithValidation(HttpServletRequest request, HttpServletResponse response) {
+    public JwtDto.TokenInfo rotateByRtkWithValidation(JwtDto.TokenOptionWrapper tokenOption) {
         log.info("✅ Rotate Tokens");
         // 1) 쿠키에서 ATK/RTK 파싱
-        String accessToken = jwtTokenResolver.parseTokenFromRequest(request)
+        String accessToken = jwtTokenResolver.parseTokenFromRequest(tokenOption.getHttpServletRequest())
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
 
-        String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(request)
+        String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(tokenOption.getHttpServletRequest())
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
 
         // 2) 파싱/검증 및 기존 Tokens 제거
@@ -62,8 +62,11 @@ public class TokenService {
 
         log.info("🔥 UserPrincipal resolved for token rotation");
 
+        JwtDto.TokenOptionWrapper newTokenOption
+                = JwtDto.TokenOptionWrapper.from(principal, tokenOption.isRememberMe());
+
         // 4) 새 토큰 페어 생성
-        JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(principal);
+        JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(newTokenOption);
 
         // 5) 이전 RTK UUID 블랙리스트로 이동 (남은 TTL만큼)
         Duration oldRtTtl = Duration.between(LocalDateTime.now(), payload.getExpiredAt());
@@ -75,12 +78,12 @@ public class TokenService {
 
         // 7) 새 ATK/RTK 쿠키로 재설정
         cookieUtils.addAccessTokenCookie(
-                response,
+                tokenOption.getHttpServletResponse(),
                 tokenPair.getAccessToken().getToken(),
                 tokenPair.getAccessToken().getExpiredAt()
         );
         cookieUtils.addRefreshTokenCookie(
-                response,
+                tokenOption.getHttpServletResponse(),
                 tokenPair.getRefreshToken().getToken(),
                 tokenPair.getRefreshToken().getExpiredAt()
         );

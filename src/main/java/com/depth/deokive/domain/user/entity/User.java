@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.user.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.domain.auth.dto.AuthDto;
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
@@ -26,7 +27,7 @@ public class User extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private String username; // Client에는 노출되지 않는 히든 필드임 (OAuth2와 일반 케이스를 모두 아우르려면 이게 깔끔)
 
     @Column(nullable = false)
@@ -48,20 +49,37 @@ public class User extends TimeBaseEntity {
     @Builder.Default
     private UserType userType = UserType.COMMON;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isEmailVerified = false;
+
     @PrePersist // INSERT 되기 전 실행 (새로운 User 저장 시)
     @PreUpdate  // UPDATE 되기 전 실행 (기존 User 수정 시)
     private void normalize() {
         if (this.nickname != null) this.nickname = this.nickname.trim(); // "hades " 같은 공백 포함 문자열 방지
-        if (this.email != null) this.email = this.email.trim().toLowerCase(Locale.ROOT);
+        if (this.email != null && !this.email.equals("DELETE")) this.email = this.email.trim().toLowerCase(Locale.ROOT);
     }
 
     // JPA Dirty Checking
-    public void update(UserDto.UserUpdateRequest userUpdateRequest) {
-        if (userUpdateRequest == null) return;
+    public void update(UserDto.UserUpdateRequest request) {
+        if (request == null) return;
 
-        this.nickname = nonBlankOrDefault(userUpdateRequest.getNickname(), this.nickname);
-        this.password = nonBlankOrDefault(userUpdateRequest.getPassword(), this.password); // encoded password
-        this.email = nonBlankOrDefault(userUpdateRequest.getEmail(), this.email);
+        this.nickname = nonBlankOrDefault(request.getNickname(), this.nickname);
+        this.password = nonBlankOrDefault(request.getPassword(), this.password); // encoded password
+    }
+
+    public void resetPassword(AuthDto.ResetPasswordRequest request) {
+        if (request == null) return;
+        this.password = nonBlankOrDefault(request.getPassword(), this.password);
+    }
+
+    public void softDelete(AuthDto.SoftDeleteDto dto) {
+        if (dto == null) return;
+
+        this.username = dto.getUsername();
+        this.email = dto.getEmail();
+        this.nickname = dto.getNickname();
+        this.password = dto.getPassword(); // Validation 에서 막힘
     }
 
     // OAuth2 사용자 정보 업데이트

@@ -29,7 +29,7 @@ public class AuthService {
 
     @Transactional
     public UserDto.UserResponse signUp(AuthDto.SignUpRequest request) {
-        validateAlreadyUser(request);
+        validateUser(request);
         User savedUser = userRepository.save(request.toEntity(passwordEncoder));
         return UserDto.UserResponse.from(savedUser);
     }
@@ -37,7 +37,11 @@ public class AuthService {
     @Transactional
     public AuthDto.LoginResponse login(AuthDto.LoginRequest request, HttpServletResponse response) {
         User validatedUser = getValidatedLoginUser(request, passwordEncoder);
-        JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(UserPrincipal.from(validatedUser));
+
+        JwtDto.TokenOptionWrapper tokenOption
+                = JwtDto.TokenOptionWrapper.from(UserPrincipal.from(validatedUser), request.isRememberMe());
+
+        JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(tokenOption);
 
         // Cookie Setup
         setCookies(response, tokenInfo);
@@ -76,7 +80,8 @@ public class AuthService {
 
         tokenService.clearTokensByAtkWithValidation(accessToken, refreshToken);
 
-        userRepository.delete(foundUser);
+        // Soft Delete 처리
+        foundUser.softDelete(AuthDto.SoftDeleteDto.of(foundUser));
 
         clearCookies(response);
     }
@@ -88,23 +93,36 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public AuthDto.ExistResponse checkNicknameExist(String nickname) {
-        boolean exists = userRepository.existsByNickname(nickname);
-        return AuthDto.ExistResponse.ofNickname(exists, nickname);
-    }
-
-    @Transactional(readOnly = true)
     public AuthDto.ExistResponse checkUsernameExist(String username) {
         boolean exists = userRepository.existsByUsername(username);
         return AuthDto.ExistResponse.ofUsername(exists, username);
     }
 
     @Transactional
-    public JwtDto.TokenExpiresInfo refreshTokens(HttpServletRequest request, HttpServletResponse response) {
-        JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(request, response);
+    public JwtDto.TokenExpiresInfo refreshTokens(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            boolean rememberMe) {
+
+        // 소셜 로그인을 위한 처리 -> 자동 로그인이면 QueryParam으로 입력받는다.
+        JwtDto.TokenOptionWrapper tokenOption =
+                JwtDto.TokenOptionWrapper.from(request, response, rememberMe);
+        JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(tokenOption);
         return JwtDto.TokenExpiresInfo.of(tokenInfo);
     }
 
+    @Transactional
+    public void resetPassword(AuthDto.ResetPasswordRequest request) {
+        if (!request.isEmailVerified()) throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RestException(ErrorCode.AUTH_USER_NOT_FOUND));
+
+        request.encodePassword(passwordEncoder);
+        user.resetPassword(request);
+    }
+
+    // Helper Methods
     public boolean isRtkBlacklisted(String refreshToken) {
         return tokenService.isRtkBlacklisted(refreshToken);
     }
@@ -113,10 +131,10 @@ public class AuthService {
         return tokenService.isAtkBlacklisted(accessToken);
     }
 
-    // OAuth2의 경우 Email이 nullable 할 수도 있음 -> 그럼 다른 유저라고 생각하자.
-    private void validateAlreadyUser(AuthDto.SignUpRequest request) {
+    private void validateUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
         if (isAlreadyUser) throw new RestException(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
+        if (!request.isEmailVerified()) throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
     }
 
     private User getValidatedLoginUser(AuthDto.LoginRequest request, PasswordEncoder passwordEncoder) {

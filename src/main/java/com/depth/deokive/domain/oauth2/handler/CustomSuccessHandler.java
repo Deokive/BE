@@ -43,7 +43,8 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         UserPrincipal userPrincipal = UserPrincipal.toOAuth2(oauth2);
 
         // 2) TokenService로 토큰 페어 발급(+Redis 화이트리스트 등록)
-        JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(userPrincipal);
+        JwtDto.TokenOptionWrapper tokenOption = JwtDto.TokenOptionWrapper.from(userPrincipal, false);
+        JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(tokenOption);
 
         log.info("🟢 Issued Tokens - ATK: {}, RTK: {}", tokenInfo.getAccessToken(), tokenInfo.getRefreshToken());
 
