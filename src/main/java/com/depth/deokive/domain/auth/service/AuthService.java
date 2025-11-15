@@ -92,12 +92,6 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public AuthDto.ExistResponse checkNicknameExist(String nickname) {
-        boolean exists = userRepository.existsByNickname(nickname);
-        return AuthDto.ExistResponse.ofNickname(exists, nickname);
-    }
-
-    @Transactional(readOnly = true)
     public AuthDto.ExistResponse checkUsernameExist(String username) {
         boolean exists = userRepository.existsByUsername(username);
         return AuthDto.ExistResponse.ofUsername(exists, username);
@@ -116,6 +110,7 @@ public class AuthService {
         return JwtDto.TokenExpiresInfo.of(tokenInfo);
     }
 
+    // Helper Methods
     public boolean isRtkBlacklisted(String refreshToken) {
         return tokenService.isRtkBlacklisted(refreshToken);
     }
