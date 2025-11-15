@@ -35,8 +35,8 @@ public class AuthDto {
         @Schema(description = "사용자 닉네임", example = "user nickname")
         private String nickname;
 
-        @NotBlank(message = "대소문자 영문자와 숫자를 포함한 8자리 이상의 비밀번호를 입력해주세요.")
-        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
+        @NotBlank(message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
+        @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?])[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$", message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
@@ -65,8 +65,8 @@ public class AuthDto {
         @Schema(description = "이메일", example = "user@email.com")
         private String email;
 
-        @NotBlank(message = "대소문자 영문자와 숫자를 포함한 8자리 이상의 비밀번호를 입력해주세요.")
-        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
+        @NotBlank(message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
+        @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?])[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$", message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
@@ -100,8 +100,8 @@ public class AuthDto {
         @Schema(description = "이메일", example = "user@email.com")
         private String email;
 
-        @NotBlank(message = "대소문자 영문자와 숫자를 포함한 8자리 이상의 비밀번호를 입력해주세요.")
-        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
+        @NotBlank(message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
+        @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?])[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$", message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 

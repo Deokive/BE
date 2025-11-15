@@ -34,8 +34,6 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "회원가입 성공")
     public UserDto.UserResponse signUp(@RequestBody @Valid AuthDto.SignUpRequest request) {
         return authService.signUp(request);
-
-        // TODO : Multipart 도입할 때는 @RequestBody -> @ModelAttribute 로 둔다.
     }
 
     // NO AUTH

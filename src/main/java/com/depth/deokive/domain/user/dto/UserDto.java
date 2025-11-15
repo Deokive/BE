@@ -3,6 +3,7 @@ package com.depth.deokive.domain.user.dto;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -50,10 +51,11 @@ public class UserDto {
     @AllArgsConstructor
     @Schema(description = "사용자 업데이트 요청 DTO")
     public static class UserUpdateRequest {
-        @Pattern(regexp = "^[ㄱ-ㅎ가-힣a-zA-Z0-9-_]{2,10}$", message = "닉네임 조건에 충족되지 않습니다.")
+        @Pattern(regexp = "^[가-힣a-zA-Z0-9-_]{2,10}$", message = "닉네임 조건에 충족되지 않습니다.")
         @Schema(description = "사용자 닉네임", example = "hades")
         private String nickname;
-        @Pattern(regexp = "(?=.*[0-9])(?=.*[a-zA-Z]).{8,}", message = "비밀번호 조건에 충족되지 않습니다.")
+        @NotBlank(message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
+        @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?])[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]{8,16}$", message = "비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.")
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
