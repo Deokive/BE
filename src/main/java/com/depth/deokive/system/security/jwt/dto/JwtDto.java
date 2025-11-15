@@ -114,5 +114,17 @@ public class JwtDto {
                     .rememberMe(rememberMe)
                     .build();
         }
+
+        public static JwtDto.TokenOptionWrapper from(
+                HttpServletRequest httpServletRequest,
+                HttpServletResponse httpServletResponse,
+                boolean rememberMe) {
+
+            return TokenOptionWrapper.builder()
+                    .httpServletRequest(httpServletRequest)
+                    .httpServletResponse(httpServletResponse)
+                    .rememberMe(rememberMe)
+                    .build();
+        }
     }
 }

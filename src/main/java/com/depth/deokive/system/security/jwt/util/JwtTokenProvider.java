@@ -25,12 +25,16 @@ public class JwtTokenProvider {
     @Value("${jwt.rtk-exp-week}")
     private int refreshTokenExpirationWeeks;
 
-    public JwtDto.TokenData createRefreshToken(UserPrincipal userPrincipal, String refreshUuid) {
+    public JwtDto.TokenData createRefreshToken(JwtDto.TokenOptionWrapper tokenOptions, String refreshUuid) {
         String jti = UUID.randomUUID().toString();
-        LocalDateTime exp = LocalDateTime.now().plusWeeks(refreshTokenExpirationWeeks);
+
+        // 자동 로그인이면 RTK를 6개월로 상정한다.
+        int rtkExpWeeks = tokenOptions.isRememberMe() ? 24 : refreshTokenExpirationWeeks;
+
+        LocalDateTime exp = LocalDateTime.now().plusWeeks(rtkExpWeeks);
 
         String token = Jwts.builder()
-                .subject(getSubject(userPrincipal))
+                .subject(getSubject(tokenOptions.getUserPrincipal()))
                 .claim("refreshUuid", refreshUuid)
                 .claim("type", TokenType.REFRESH.name())
                 .id(jti)
@@ -46,13 +50,13 @@ public class JwtTokenProvider {
                 .build();
     }
 
-    public JwtDto.TokenData createAccessToken(UserPrincipal userPrincipal, String refreshUuid) {
+    public JwtDto.TokenData createAccessToken(JwtDto.TokenOptionWrapper tokenOption, String refreshUuid) {
         String jti = UUID.randomUUID().toString();
         LocalDateTime exp = LocalDateTime.now().plusMinutes(accessTokenExpirationMinutes);
 
         String token = Jwts.builder()
-                .subject(getSubject(userPrincipal))
-                .claim("role", userPrincipal.getRole().name())
+                .subject(getSubject(tokenOption.getUserPrincipal()))
+                .claim("role", tokenOption.getUserPrincipal().getRole().name())
                 .claim("refreshUuid", refreshUuid)
                 .claim("type", TokenType.ACCESS.name())
                 .id(jti)
@@ -68,10 +72,10 @@ public class JwtTokenProvider {
                 .build();
     }
 
-    public JwtDto.TokenPair createTokenPair(UserPrincipal userPrincipal) {
+    public JwtDto.TokenPair createTokenPair(JwtDto.TokenOptionWrapper tokenOption) {
         String refreshUuid = UUID.randomUUID().toString();
-        JwtDto.TokenData accessToken = createAccessToken(userPrincipal, refreshUuid);
-        JwtDto.TokenData refreshToken = createRefreshToken(userPrincipal, refreshUuid);
+        JwtDto.TokenData accessToken = createAccessToken(tokenOption, refreshUuid);
+        JwtDto.TokenData refreshToken = createRefreshToken(tokenOption, refreshUuid);
 
         return JwtDto.TokenPair.of(refreshToken, accessToken);
     }

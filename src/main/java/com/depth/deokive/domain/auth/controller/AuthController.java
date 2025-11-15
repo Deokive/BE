@@ -96,8 +96,12 @@ public class AuthController {
     @PostMapping("/refresh")
     @Operation(summary = "리프레시 토큰", description = "리프레시 토큰으로 새로운 액세스 토큰과 리프레시 토큰을 발급받습니다.")
     @ApiResponse(responseCode = "200", description = "리프레시 토큰 성공")
-    public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(HttpServletRequest request, HttpServletResponse response) {
-        return ResponseEntity.ok(authService.refreshTokens(request, response));
+    public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(
+            @RequestParam(value = "rememberMe", defaultValue = "false") boolean rememberMe,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+        return ResponseEntity.ok(authService.refreshTokens(request, response, rememberMe));
     }
 
     // NO AUTH

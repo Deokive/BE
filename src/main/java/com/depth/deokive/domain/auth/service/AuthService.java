@@ -38,10 +38,10 @@ public class AuthService {
     public AuthDto.LoginResponse login(AuthDto.LoginRequest request, HttpServletResponse response) {
         User validatedUser = getValidatedLoginUser(request, passwordEncoder);
 
-        // TODO: 자동 로그인 여부 체크
+        JwtDto.TokenOptionWrapper tokenOption
+                = JwtDto.TokenOptionWrapper.from(UserPrincipal.from(validatedUser), request.isRememberMe());
 
-        // TODO: 자동 로그인이면, RefreshToken 기간을 6개월로 잡는다.
-        JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(UserPrincipal.from(validatedUser));
+        JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(tokenOption);
 
         // Cookie Setup
         setCookies(response, tokenInfo);
@@ -104,8 +104,15 @@ public class AuthService {
     }
 
     @Transactional
-    public JwtDto.TokenExpiresInfo refreshTokens(HttpServletRequest request, HttpServletResponse response) {
-        JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(request, response);
+    public JwtDto.TokenExpiresInfo refreshTokens(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            boolean rememberMe) {
+
+        // 소셜 로그인을 위한 처리 -> 자동 로그인이면 QueryParam으로 입력받는다.
+        JwtDto.TokenOptionWrapper tokenOption =
+                JwtDto.TokenOptionWrapper.from(request, response, rememberMe);
+        JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(tokenOption);
         return JwtDto.TokenExpiresInfo.of(tokenInfo);
     }
 
