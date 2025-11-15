@@ -48,6 +48,10 @@ public class User extends TimeBaseEntity {
     @Builder.Default
     private UserType userType = UserType.COMMON;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isEmailVerified = false;
+
     @PrePersist // INSERT 되기 전 실행 (새로운 User 저장 시)
     @PreUpdate  // UPDATE 되기 전 실행 (기존 User 수정 시)
     private void normalize() {
@@ -61,7 +65,7 @@ public class User extends TimeBaseEntity {
 
         this.nickname = nonBlankOrDefault(userUpdateRequest.getNickname(), this.nickname);
         this.password = nonBlankOrDefault(userUpdateRequest.getPassword(), this.password); // encoded password
-        this.email = nonBlankOrDefault(userUpdateRequest.getEmail(), this.email);
+        this.email = nonBlankOrDefault(userUpdateRequest.getEmail(), this.email); // TODO: Email is not updatable
     }
 
     // OAuth2 사용자 정보 업데이트
