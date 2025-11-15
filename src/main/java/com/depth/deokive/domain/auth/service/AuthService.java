@@ -37,6 +37,10 @@ public class AuthService {
     @Transactional
     public AuthDto.LoginResponse login(AuthDto.LoginRequest request, HttpServletResponse response) {
         User validatedUser = getValidatedLoginUser(request, passwordEncoder);
+
+        // TODO: 자동 로그인 여부 체크
+
+        // TODO: 자동 로그인이면, RefreshToken 기간을 6개월로 잡는다.
         JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(UserPrincipal.from(validatedUser));
 
         // Cookie Setup

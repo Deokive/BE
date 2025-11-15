@@ -69,7 +69,7 @@ public class JwtTokenProvider {
     }
 
     public JwtDto.TokenPair createTokenPair(UserPrincipal userPrincipal) {
-        String refreshUuid = java.util.UUID.randomUUID().toString();
+        String refreshUuid = UUID.randomUUID().toString();
         JwtDto.TokenData accessToken = createAccessToken(userPrincipal, refreshUuid);
         JwtDto.TokenData refreshToken = createRefreshToken(userPrincipal, refreshUuid);
 

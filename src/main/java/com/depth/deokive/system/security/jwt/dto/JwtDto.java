@@ -1,6 +1,7 @@
 package com.depth.deokive.system.security.jwt.dto;
 
 import com.depth.deokive.domain.user.entity.enums.Role;
+import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -77,6 +78,22 @@ public class JwtDto {
             return TokenExpiresInfo.builder()
                     .accessTokenExpiresAt(tokenInfo.getAccessTokenExpiresAt())
                     .refreshTokenExpiresAt(tokenInfo.getRefreshTokenExpiresAt())
+                    .build();
+        }
+    }
+
+    // 어떤 요구사항의 변동이 와도 유연하게 토큰처리하기 하기 위한 Wrapper DTO
+    @Builder @AllArgsConstructor @NoArgsConstructor @Getter
+    public static class TokenOptionWrapper {
+        private UserPrincipal userPrincipal;
+        private boolean rememberMe;
+
+        // 만약 어떤 패러미터가 추가되어야 한다고 해도, 여기에 필드만 처리하면 레거시 상태여도 유연히 대응 가능
+
+        public static JwtDto.TokenOptionWrapper from(UserPrincipal userPrincipal, boolean rememberMe) {
+            return JwtDto.TokenOptionWrapper.builder()
+                    .userPrincipal(userPrincipal)
+                    .rememberMe(rememberMe)
                     .build();
         }
     }
