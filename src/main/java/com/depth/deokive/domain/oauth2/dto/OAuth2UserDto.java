@@ -43,7 +43,7 @@ public class OAuth2UserDto {
                 .nickname(this.nickname)
                 .username(this.username)
                 .email(this.email)
-                .userType(UserType.OAUTH2)
+                .userType(UserType.SOCIAL)
                 .build();
     }
 
