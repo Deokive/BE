@@ -39,7 +39,23 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER NOT FOUND", "존재하지 않는 사용자입니다."),
     USER_USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER USERNAME ALREADY EXISTS", "중복되는 아이디입니다."),
     // USER_NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER NICKNAME ALREADY EXISTS", "중복되는 닉네임입니다."),
-    USER_EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER EMAIL ALREADY EXISTS", "중복되는 이메일입니다.");
+    USER_EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER EMAIL ALREADY EXISTS", "중복되는 이메일입니다."),
+
+    // REDIS Errors
+    REDIS_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "REDIS_CONNECTION_FAILED", "Redis 서버에 연결할 수 없습니다."),
+    REDIS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_ERROR", "Redis 처리 중 오류가 발생했습니다."),
+    REDIS_COMMAND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_COMMAND_FAILED", "Redis 명령 실행 중 오류가 발생했습니다."),
+    REDIS_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "REDIS_TIMEOUT", "Redis 서버 응답 시간이 초과되었습니다."),
+
+    // DB Errors
+    DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),
+    DB_QUERY_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "DB QUERY TIMEOUT", "쿼리 실행 시간이 초과되었습니다."),
+    DB_DEADLOCK(HttpStatus.CONFLICT, "DB DEADLOCK", "데드락이 발생했습니다."),
+    DB_OPTIMISTIC_LOCK_FAILED(HttpStatus.CONFLICT, "DB OPTIMISTIC LOCK FAILED", "낙관적 락 실패"),
+    DB_PESSIMISTIC_LOCK_FAILED(HttpStatus.CONFLICT, "DB PESSIMISTIC LOCK FAILED", "비관적 락 실패"),
+    DB_INCORRECT_RESULT_SIZE(HttpStatus.INTERNAL_SERVER_ERROR, "DB INCORRECT RESULT SIZE", "결과 크기 불일치"),
+    DB_TRANSACTION_SERIALIZATION_FAILED(HttpStatus.CONFLICT, "DB TRANSACTION SERIALIZATION FAILED", "트랜잭션 직렬화 실패"),
+    DB_DATA_ACCESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB DATA ACCESS ERROR", "데이터 접근 오류");
 
     private final HttpStatus status;
     private final String error;
