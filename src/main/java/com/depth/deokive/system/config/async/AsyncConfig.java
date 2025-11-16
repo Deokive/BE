@@ -20,6 +20,7 @@ public class AsyncConfig implements AsyncConfigurer {
     @Override
     @Bean(name = "mailTaskExecutor")
     public Executor getAsyncExecutor() {
+        // int coreCount = 2; // 실제 서버 환경의 CPU Core
         int coreCount = Runtime.getRuntime().availableProcessors();
         int nThreads = coreCount * 2; // I/O Bound : Core Count * (2 ~ 4)
         int queueSize = nThreads * 10;
