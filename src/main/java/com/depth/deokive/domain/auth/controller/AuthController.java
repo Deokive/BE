@@ -2,6 +2,7 @@ package com.depth.deokive.domain.auth.controller;
 
 import com.depth.deokive.domain.auth.dto.AuthDto;
 import com.depth.deokive.domain.auth.service.AuthService;
+import com.depth.deokive.domain.auth.service.EmailService;
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Auth", description = "인증/인가 API")
 public class AuthController {
     private final AuthService authService;
+    private final EmailService emailService;
 
     // NO AUTH
     @PostMapping("/register")
@@ -125,5 +127,19 @@ public class AuthController {
     {
         authService.resetPassword(request);
         return ResponseEntity.ok("Successful Reset Password!");
+    }
+
+    // NO AUTH
+    @PostMapping("/email/send")
+    public ResponseEntity<String> sendEmail(@RequestParam String email) {
+        emailService.sendEmail(email);
+        return ResponseEntity.ok("이메일이 발송되었습니다.");
+    }
+
+    // NO AUTH
+    @PostMapping("/email/verify")
+    public ResponseEntity<String> verifyEmail(@RequestBody @Valid AuthDto.VerifyEmailRequest request) {
+        emailService.verifyEmailCode(request.getEmail(), request.getCode(), request.getPurpose());
+        return ResponseEntity.ok("이메일 인증이 완료되었습니다.");
     }
 }
