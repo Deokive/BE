@@ -2,6 +2,7 @@ package com.depth.deokive.domain.auth.service;
 
 import com.depth.deokive.domain.auth.dto.EmailPurpose;
 import com.depth.deokive.domain.auth.repository.EmailRedisRepository;
+import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import jakarta.mail.MessagingException;
@@ -37,6 +38,7 @@ public class EmailService {
     @Value("${spring.mail.username}") private String mailUsername;
     @Value("${spring.mail.group}") private String mailGroup;
 
+    @ExecutionTime("이메일 발송")
     @Async("mailTaskExecutor")
     public void sendEmail(String receiverEmail) {
         String normalizedEmail = emailNormalize(receiverEmail);
@@ -82,6 +84,7 @@ public class EmailService {
         }
     }
 
+    @ExecutionTime("인증코드 검증")
     public void verifyEmailCode(String email, String code, EmailPurpose purpose) {
         try {
             log.info("🟡 Trying to verify Email to {}", email);
