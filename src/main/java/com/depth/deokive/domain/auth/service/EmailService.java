@@ -84,7 +84,6 @@ public class EmailService {
         }
     }
 
-    @ExecutionTime("인증코드 검증")
     public void verifyEmailCode(String email, String code, EmailPurpose purpose) {
         try {
             log.info("🟡 Trying to verify Email to {}", email);
