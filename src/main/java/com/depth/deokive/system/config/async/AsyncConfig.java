@@ -22,8 +22,8 @@ public class AsyncConfig implements AsyncConfigurer {
     public Executor getAsyncExecutor() {
         int coreCount = 2; // 실제 서버 환경의 CPU Core
         // int coreCount = Runtime.getRuntime().availableProcessors(); // 운영단에선 유연하게 처리하도록 이렇게 함
-        int nThreads = coreCount * 2; // I/O Bound : Core Count * (2 ~ 4)
-        int queueSize = nThreads * 10; // Best 8 || 10 (지금은 10이 더 빠른 듯. 12는 느림)
+        int nThreads = coreCount * 3; // I/O Bound : Core Count * (2 ~ 4)
+        int queueSize = 150; // Best 8 || 10 (지금은 10이 더 빠른 듯. 12는 느림)
 
         // TODO: 실제 운영 서버에서, 서비스 이전 MailHog로 테스트하면서 1차 튜닝하고, Gmail로 전환하여 2차 튜닝한다.
         // 그 이유는 MailHog는 전송 제한이 없는데, Gmail은 전송제한이 있음. 그리고 유의미한 메일이어야 함
