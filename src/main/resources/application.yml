@@ -7,6 +7,22 @@ spring:
   profiles:
     active: dev # 개발할 때는 dev, 배포할 때는 prod
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME}
+    password: ${SMTP_PWD}
+    group: ${MAIL_GROUP}
+    properties:
+      mail:
+        smtp:
+          debug: true
+          auth: true                    # SMTP 인증 사용 여부 (Gmail은 필요함)
+          starttls.enable: true         # 일반 연결을 암호화된 연결로 업그레이드 -> Gmail이면 필수
+          connectiontimeout: 5000       # SMTP 서버 연결 타임아웃 (Ms)
+          timeout: 15000                # SMTP 명령 응답 대기 타임아웃 (Ms)
+          writetimeout: 15000           # 이메일 본문 전송 시 대기 시간 (Ms)
+
   datasource:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}
     driver-class-name: com.mysql.cj.jdbc.Driver

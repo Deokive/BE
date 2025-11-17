@@ -31,6 +31,8 @@ public enum ErrorCode {
     AUTH_FORBIDDEN(HttpStatus.FORBIDDEN, "AUTH FORBIDDEN", "접근 권한이 없습니다."),
     AUTH_PASSWORD_NOT_MATCH(HttpStatus.UNAUTHORIZED, "AUTH PASSWORD NOT MATCH", "비밀번호가 올바르지 않습니다."),
     AUTH_EMAIL_NOT_VERIFIED(HttpStatus.UNAUTHORIZED, "AUTH_EMAIL_NOT_VERIFIED", "이메일 인증이 완료되지 않았습니다."),
+    AUTH_EMAIL_CODE_INVALID(HttpStatus.BAD_REQUEST, "AUTH_EMAIL_CODE_INVALID", "이메일 인증코드가 올바르지 않거나, 만료되었습니다."),
+    AUTH_EMAIL_CODE_NOT_MATCHED(HttpStatus.BAD_REQUEST, "AUTH_EMAIL_CODE_NOT_MATCHED", "이메일 인증코드가 일치하지 않습니다."),
 
     // OAUTH
     OAUTH_BAD_REQUEST(HttpStatus.BAD_REQUEST, "OAUTH BAD REQUEST", "OAUTH에 대해 잘못된 요청입니다."),

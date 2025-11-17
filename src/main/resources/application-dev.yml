@@ -3,6 +3,22 @@ spring:
     activate:
       on-profile: dev # dev 프로필이 활성화될 때만 적용하겠다.
 
+  mail:
+    host: localhost
+    port: 1025
+    username: test@deokive.local  # MailHog용 테스트 이메일 주소 (실제 전송 안됨)
+    password: ""                  # MailHog는 인증 불필요
+    group: Test
+    properties:
+      mail:
+        smtp:
+          debug: true
+          auth: false                    # SMTP 인증 사용 여부 (Gmail은 필요함)
+          starttls.enable: false         # 일반 연결을 암호화된 연결로 업그레이드 -> Gmail이면 필수
+          connectiontimeout: 5000        # SMTP 서버 연결 타임아웃 (Ms)
+          timeout: 15000                 # SMTP 명령 응답 대기 타임아웃 (Ms)
+          writetimeout: 15000            # 이메일 본문 전송 시 대기 시간 (Ms)
+
   datasource:
     url: jdbc:mysql://localhost:3306/deokive
     driver-class-name: com.mysql.cj.jdbc.Driver

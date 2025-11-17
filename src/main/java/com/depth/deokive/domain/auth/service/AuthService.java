@@ -26,11 +26,17 @@ public class AuthService {
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final CookieUtils cookieUtils;
+    private final EmailService emailService;
 
     @Transactional
     public UserDto.UserResponse signUp(AuthDto.SignUpRequest request) {
+        validateVerifiedEmailForSignUp(request);
         validateUser(request);
+
         User savedUser = userRepository.save(request.toEntity(passwordEncoder));
+
+        emailService.clearVerifiedForSignup(request.getEmail());
+
         return UserDto.UserResponse.from(savedUser);
     }
 
@@ -113,13 +119,15 @@ public class AuthService {
 
     @Transactional
     public void resetPassword(AuthDto.ResetPasswordRequest request) {
-        if (!request.isEmailVerified()) throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
+        validateVerifiedEmailForResetPassword(request);
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RestException(ErrorCode.AUTH_USER_NOT_FOUND));
 
         request.encodePassword(passwordEncoder);
         user.resetPassword(request);
+
+        emailService.clearVerifiedForPasswordReset(request.getEmail());
     }
 
     // Helper Methods
@@ -134,7 +142,6 @@ public class AuthService {
     private void validateUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
         if (isAlreadyUser) throw new RestException(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
-        if (!request.isEmailVerified()) throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
     }
 
     private User getValidatedLoginUser(AuthDto.LoginRequest request, PasswordEncoder passwordEncoder) {
@@ -156,5 +163,17 @@ public class AuthService {
     private void setCookies(HttpServletResponse response, JwtDto.TokenInfo tokenInfo) {
         cookieUtils.addAccessTokenCookie(response, tokenInfo.getAccessToken(), tokenInfo.getAccessTokenExpiresAt());
         cookieUtils.addRefreshTokenCookie(response, tokenInfo.getRefreshToken(), tokenInfo.getRefreshTokenExpiresAt());
+    }
+
+    private void validateVerifiedEmailForSignUp(AuthDto.SignUpRequest request) {
+        if (!emailService.hasVerifiedForSignup(request.getEmail())) {
+            throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
+        }
+    }
+
+    private void validateVerifiedEmailForResetPassword(AuthDto.ResetPasswordRequest request) {
+        if (!emailService.hasVerifiedForPasswordReset(request.getEmail())) {
+            throw new RestException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
+        }
     }
 }

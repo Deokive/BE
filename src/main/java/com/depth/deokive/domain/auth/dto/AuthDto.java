@@ -7,7 +7,6 @@ import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -40,19 +39,14 @@ public class AuthDto {
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
-        @AssertTrue(message = "이메일 인증을 완료해주세요.")
-        @JsonProperty("isEmailVerified")
-        @Schema(description = "이메일 인증 여부", example = "true")
-        private boolean isEmailVerified;
-
         public User toEntity(PasswordEncoder encoder) {
             return User.builder()
                     .email(email)
                     .nickname(nickname)
                     .username(usernameGenerator(email))
                     .password(encoder.encode(password))
-                    .isEmailVerified(isEmailVerified)
                     .role(Role.USER)
+                    .isEmailVerified(true)
                     .build();
         }
     }
@@ -105,11 +99,6 @@ public class AuthDto {
         @Schema(description = "사용자 비밀번호", example = "password content")
         private String password;
 
-        @AssertTrue(message = "이메일 인증을 완료해주세요.")
-        @JsonProperty("isEmailVerified")
-        @Schema(description = "이메일 인증 여부", example = "true")
-        private boolean isEmailVerified;
-
         public void encodePassword(PasswordEncoder passwordEncoder) {
             this.password = passwordEncoder.encode(this.password);
         }
@@ -154,6 +143,22 @@ public class AuthDto {
         }
     }
 
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "이메일 인증 요청 DTO")
+    public static class VerifyEmailRequest {
+        @NotBlank @Email
+        @Schema(description = "이메일", example = "user@email.com")
+        private String email;
+
+        @NotBlank
+        @Schema(description = "인증 코드", example = "123456")
+        @Pattern(regexp = "^[0-9]{6}$")
+        private String code;
+
+        private EmailPurpose purpose; // SIGNUP 또는 PASSWORD_RESET
+    }
+
+    // Helper Methods
     private static String usernameGenerator(String email){
         return email + "_" + UUID.randomUUID().toString();
     }
