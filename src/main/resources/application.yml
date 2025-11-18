@@ -110,9 +110,9 @@ app:
     atk-apply-path: "/"
     rtk-apply-path: "/api/v1/auth"  # refresh와 logout 엔드포인트 모두에서 접근 가능하도록 변경
 
-  front-redirect-uri: "${FRONT_REDIRECT_URI:http://localhost:3000/oauth/callback}"
-  front-base-url: "${FRONT_BASE_URL:http://localhost:3000}"
-  allowed-origins: "${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}"
+  front-redirect-uri: "${FRONT_REDIRECT_URI:http://localhost:5173/oauth/callback}"
+  front-base-url: "${FRONT_BASE_URL:http://localhost:5173}"
+  allowed-origins: "${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}"
 
 hmac:
   secret: ${HMAC_SECRET_KEY} # at least 32 characters long
