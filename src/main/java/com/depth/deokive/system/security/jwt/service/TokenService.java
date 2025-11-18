@@ -135,6 +135,17 @@ public class TokenService {
         return JwtDto.TokenExpiresInfo.of(validatedPayloadPair.getAtkPayload(), validatedPayloadPair.getRtkPayload());
     }
 
+    public boolean validateTokens(HttpServletRequest request) {
+        try {
+            JwtDto.TokenStringPair tokenStringPair = jwtTokenResolver.resolveTokenStringPair(request);
+            JwtDto.TokenOptionWrapper validated
+                    = validatedPayloadPair(tokenStringPair.getAccessToken(), tokenStringPair.getRefreshToken());
+            return validated != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     // Helper Methods
     private UserPrincipal resolveUser(String subject) {
         try {
