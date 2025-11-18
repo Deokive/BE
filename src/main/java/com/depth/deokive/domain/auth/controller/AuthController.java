@@ -123,6 +123,8 @@ public class AuthController {
     }
 
     @PostMapping("/is-token-active")
+    @Operation(summary = "TokenPair 유효성 검증", description = "ATK와 RTK의 유효성을 검증합니다.")
+    @ApiResponse(responseCode = "200", description = "TokenPair 유효성 검증")
     public boolean isTokenActive(HttpServletRequest request) {
         return authService.isTokenActive(request);
     }
