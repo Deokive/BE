@@ -45,7 +45,7 @@ public class AuthService {
         User validatedUser = getValidatedLoginUser(request, passwordEncoder);
 
         JwtDto.TokenOptionWrapper tokenOption
-                = JwtDto.TokenOptionWrapper.from(UserPrincipal.from(validatedUser), request.isRememberMe());
+                = JwtDto.TokenOptionWrapper.of(UserPrincipal.from(validatedUser), request.isRememberMe());
 
         JwtDto.TokenInfo tokenInfo = tokenService.issueTokens(tokenOption);
 
@@ -54,7 +54,7 @@ public class AuthService {
 
         return AuthDto.LoginResponse.of(
                 UserDto.UserResponse.from(validatedUser),
-                JwtDto.TokenExpiresInfo.of(tokenInfo)
+                JwtDto.TokenExpiresInfo.from(tokenInfo)
         );
     }
 
@@ -112,9 +112,9 @@ public class AuthService {
 
         // 소셜 로그인을 위한 처리 -> 자동 로그인이면 QueryParam으로 입력받는다.
         JwtDto.TokenOptionWrapper tokenOption =
-                JwtDto.TokenOptionWrapper.from(request, response, rememberMe);
+                JwtDto.TokenOptionWrapper.of(request, response, rememberMe);
         JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(tokenOption);
-        return JwtDto.TokenExpiresInfo.of(tokenInfo);
+        return JwtDto.TokenExpiresInfo.from(tokenInfo);
     }
 
     @Transactional
@@ -128,6 +128,19 @@ public class AuthService {
         user.resetPassword(request);
 
         emailService.clearVerifiedForPasswordReset(request.getEmail());
+    }
+
+    @Transactional(readOnly = true)
+    public AuthDto.LoginResponse socialRetrieve(UserPrincipal userPrincipal, HttpServletRequest request) {
+        User foundUser = userRepository.findById(userPrincipal.getUserId())
+                .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
+
+        JwtDto.TokenExpiresInfo tokenExpiresInfo = tokenService.getTokenExpiresInfo(request);
+
+        return AuthDto.LoginResponse.of(
+                UserDto.UserResponse.from(foundUser),
+                tokenExpiresInfo
+        );
     }
 
     // Helper Methods
