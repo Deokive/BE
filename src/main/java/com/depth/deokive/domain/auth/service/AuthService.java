@@ -152,6 +152,10 @@ public class AuthService {
         return tokenService.isAtkBlacklisted(accessToken);
     }
 
+    public boolean isTokenActive(HttpServletRequest request) {
+        return tokenService.validateTokens(request);
+    }
+
     private void validateUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
         if (isAlreadyUser) throw new RestException(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
