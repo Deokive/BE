@@ -47,17 +47,14 @@ public class TokenService {
     public JwtDto.TokenInfo rotateByRtkWithValidation(JwtDto.TokenOptionWrapper tokenOption) {
         log.info("✅ Rotate Tokens");
         // 1) 쿠키에서 ATK/RTK 파싱
-        String accessToken = jwtTokenResolver.parseTokenFromRequest(tokenOption.getHttpServletRequest())
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
-
-        String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(tokenOption.getHttpServletRequest())
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
+        JwtDto.TokenStringPair tokenStringPair
+                = jwtTokenResolver.resolveTokenStringPair(tokenOption.getHttpServletRequest());
 
         // 2) 파싱/검증 및 기존 Tokens 제거
-        clearTokensByAtkWithValidation(accessToken, refreshToken);
+        clearTokensByAtkWithValidation(tokenStringPair.getAccessToken(), tokenStringPair.getRefreshToken());
 
         // 3) 사용자 로드
-        var payload = jwtTokenResolver.resolveToken(refreshToken);
+        var payload = jwtTokenResolver.resolveToken(tokenStringPair.getRefreshToken());
         String subject = payload.getSubject();
         UserPrincipal principal = resolveUser(subject);
 
@@ -127,14 +124,12 @@ public class TokenService {
 
     public JwtDto.TokenExpiresInfo getTokenExpiresInfo(HttpServletRequest request) {
         // 1). Parse Token from Cookies
-        String accessToken = jwtTokenResolver.parseTokenFromRequest(request)
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
-
-        String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(request)
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
+        JwtDto.TokenStringPair tokenStringPair
+                = jwtTokenResolver.resolveTokenStringPair(request);
 
         // 2). Validation & Get Payloads
-        JwtDto.TokenOptionWrapper validatedPayloadPair = validatedPayloadPair(accessToken, refreshToken);
+        JwtDto.TokenOptionWrapper validatedPayloadPair
+                = validatedPayloadPair(tokenStringPair.getAccessToken(), tokenStringPair.getRefreshToken());
         if (validatedPayloadPair == null) return null;
 
         return JwtDto.TokenExpiresInfo.of(validatedPayloadPair.getAtkPayload(), validatedPayloadPair.getRtkPayload());
@@ -154,6 +149,7 @@ public class TokenService {
         var payload = jwtTokenResolver.resolveToken(tokenPair.getRefreshToken().getToken());
         return payload.getRefreshUuid();
     }
+
     private JwtDto.TokenOptionWrapper validatedPayloadPair(String accessToken, String refreshToken) {
         // 1) ATK 파싱/검증
         var atkPayload = jwtTokenResolver.resolveToken(accessToken);
