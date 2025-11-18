@@ -131,6 +131,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/email/send")
+    @Operation(summary = "이메일 전송", description = "이메일을 전송합니다.")
+    @ApiResponse(responseCode = "200", description = "이메일 전송 성공")
     public ResponseEntity<String> sendEmail(@RequestParam String email) {
         emailService.sendEmail(email);
         return ResponseEntity.ok("이메일이 발송되었습니다.");
@@ -138,6 +140,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/email/verify")
+    @Operation(summary = "이메일 검증", description = "이메일을 검증합니다.")
+    @ApiResponse(responseCode = "200", description = "이메일 검증 성공")
     public ResponseEntity<String> verifyEmail(@RequestBody @Valid AuthDto.VerifyEmailRequest request) {
         emailService.verifyEmailCode(request.getEmail(), request.getCode(), request.getPurpose());
         return ResponseEntity.ok("이메일 인증이 완료되었습니다.");
