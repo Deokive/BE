@@ -46,7 +46,7 @@ public class TokenService {
 
     public JwtDto.TokenInfo rotateByRtkWithValidation(JwtDto.TokenOptionWrapper tokenOption) {
         log.info("✅ Rotate Tokens");
-        // 1) 쿠키에서 ATK/RTK 파싱
+        // 1) 쿠키에서 ATK/RTK 파싱 // ATK는 만료여도 괜찮음 -> 쿠키 생명을 RTK만큼 부여해야함
         JwtDto.TokenStringPair tokenStringPair
                 = jwtTokenResolver.resolveTokenStringPair(tokenOption.getHttpServletRequest());
 
@@ -78,7 +78,7 @@ public class TokenService {
         cookieUtils.addAccessTokenCookie(
                 tokenOption.getHttpServletResponse(),
                 tokenPair.getAccessToken().getToken(),
-                tokenPair.getAccessToken().getExpiredAt()
+                tokenPair.getRefreshToken().getExpiredAt()
         );
         cookieUtils.addRefreshTokenCookie(
                 tokenOption.getHttpServletResponse(),
