@@ -1,6 +1,8 @@
 package com.depth.deokive.system.security.jwt.util;
 
 import com.depth.deokive.domain.user.entity.enums.Role;
+import com.depth.deokive.system.exception.model.ErrorCode;
+import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.jwt.dto.TokenType;
 import com.depth.deokive.system.security.util.CookieUtils;
@@ -76,5 +78,15 @@ public class JwtTokenResolver {
                 .refreshUuid(payload.get("refreshUuid", String.class))
                 .jti(payload.getId())
                 .build();
+    }
+
+    public JwtDto.TokenStringPair resolveTokenStringPair(HttpServletRequest request) {
+        String accessToken = parseTokenFromRequest(request)
+                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
+
+        String refreshToken = parseRefreshTokenFromRequest(request)
+                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
+
+        return JwtDto.TokenStringPair.of(accessToken, refreshToken);
     }
 }
