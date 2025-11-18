@@ -58,7 +58,7 @@ public class JwtDto {
         @Schema(description = "Refresh Token 만료 시간", example = "KST DateTime")
         private LocalDateTime refreshTokenExpiresAt;
 
-        public static TokenInfo of(JwtDto.TokenPair tokenPair) {
+        public static TokenInfo from(JwtDto.TokenPair tokenPair) {
             return TokenInfo.builder()
                     .accessToken(tokenPair.getAccessToken().getToken())
                     .refreshToken(tokenPair.getRefreshToken().getToken())
@@ -76,10 +76,17 @@ public class JwtDto {
         @Schema(description = "Refresh Token 만료 시간", example = "KST DateTime")
         private LocalDateTime refreshTokenExpiresAt;
 
-        public static TokenExpiresInfo of(JwtDto.TokenInfo tokenInfo) {
+        public static TokenExpiresInfo from(JwtDto.TokenInfo tokenInfo) {
             return TokenExpiresInfo.builder()
                     .accessTokenExpiresAt(tokenInfo.getAccessTokenExpiresAt())
                     .refreshTokenExpiresAt(tokenInfo.getRefreshTokenExpiresAt())
+                    .build();
+        }
+
+        public static TokenExpiresInfo of(JwtDto.TokenPayload atkPayload, JwtDto.TokenPayload rtkPayload) {
+            return TokenExpiresInfo.builder()
+                    .accessTokenExpiresAt(atkPayload.getExpiredAt())
+                    .refreshTokenExpiresAt(rtkPayload.getExpiredAt())
                     .build();
         }
     }
@@ -92,16 +99,22 @@ public class JwtDto {
         private HttpServletRequest httpServletRequest;
         private HttpServletResponse httpServletResponse;
 
+        private JwtDto.TokenPayload atkPayload;
+        private JwtDto.TokenPayload rtkPayload;
+
+        private String allowedRtkUuid;
+        private String subject;
+
         // 만약 어떤 패러미터가 추가되어야 한다고 해도, 여기에 필드만 처리하면 레거시 상태여도 유연히 대응 가능
 
-        public static JwtDto.TokenOptionWrapper from(UserPrincipal userPrincipal, boolean rememberMe) {
+        public static JwtDto.TokenOptionWrapper of(UserPrincipal userPrincipal, boolean rememberMe) {
             return JwtDto.TokenOptionWrapper.builder()
                     .userPrincipal(userPrincipal)
                     .rememberMe(rememberMe)
                     .build();
         }
 
-        public static JwtDto.TokenOptionWrapper from(
+        public static JwtDto.TokenOptionWrapper of(
                 HttpServletRequest httpServletRequest,
                 HttpServletResponse httpServletResponse,
                 UserPrincipal userPrincipal,
@@ -115,7 +128,7 @@ public class JwtDto {
                     .build();
         }
 
-        public static JwtDto.TokenOptionWrapper from(
+        public static JwtDto.TokenOptionWrapper of(
                 HttpServletRequest httpServletRequest,
                 HttpServletResponse httpServletResponse,
                 boolean rememberMe) {
@@ -124,6 +137,16 @@ public class JwtDto {
                     .httpServletRequest(httpServletRequest)
                     .httpServletResponse(httpServletResponse)
                     .rememberMe(rememberMe)
+                    .build();
+        }
+
+        public static JwtDto.TokenOptionWrapper of(
+            JwtDto.TokenPayload atkPayload,
+            JwtDto.TokenPayload rtkPayload
+        ) {
+            return TokenOptionWrapper.builder()
+                    .atkPayload(atkPayload)
+                    .rtkPayload(rtkPayload)
                     .build();
         }
     }

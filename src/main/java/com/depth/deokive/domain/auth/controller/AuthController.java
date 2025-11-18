@@ -18,10 +18,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/auth")
@@ -145,5 +148,15 @@ public class AuthController {
     public ResponseEntity<String> verifyEmail(@RequestBody @Valid AuthDto.VerifyEmailRequest request) {
         emailService.verifyEmailCode(request.getEmail(), request.getCode(), request.getPurpose());
         return ResponseEntity.ok("이메일 인증이 완료되었습니다.");
+    }
+
+    @GetMapping("/social/me")
+    @Operation(summary = "소셜 유저 및 토큰 만료기간 정보 조회", description = "소셜 로그인된 사용자의 정보 및 토큰 만료기간을 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "소셜 유저 및 토큰 만료기간 정보 조회 성공")
+    public AuthDto.LoginResponse socialRetrieve(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            HttpServletRequest request
+    ) {
+        return authService.socialRetrieve(userPrincipal, request);
     }
 }
