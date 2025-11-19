@@ -52,10 +52,19 @@ public class TokenService {
         String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(tokenOption.getHttpServletRequest())
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
         
-        var rtkPayload = jwtTokenResolver.resolveToken(refreshToken);
+        // 2) RTK 파싱 및 만료 검증 (만료된 RTK는 refresh 불가)
+        JwtDto.TokenPayload rtkPayload;
+        try {
+            rtkPayload = jwtTokenResolver.resolveToken(refreshToken);
+        } catch (JwtExpiredException e) {
+            log.warn("⚠️ Refresh token has expired, cannot rotate tokens");
+            throw new RestException(ErrorCode.JWT_EXPIRED);
+        }
+        
+        // 3) RTK 유효성 검증 (타입, 블랙리스트 등)
         jwtTokenValidator.validateRtk(rtkPayload);
         
-        // 2) ATK가 있으면 기존 Tokens 제거 (ATK 없으면 RTK만 처리)
+        // 4) ATK가 있으면 기존 Tokens 제거 (ATK 없으면 RTK만 처리)
         var nullableAtk = jwtTokenResolver.parseTokenFromRequest(tokenOption.getHttpServletRequest());
         if (nullableAtk.isPresent()) {
             try {
@@ -75,7 +84,7 @@ public class TokenService {
             }
         }
 
-        // 3) 사용자 로드
+        // 5) 사용자 로드
         String subject = rtkPayload.getSubject();
         UserPrincipal principal = resolveUser(subject);
 
@@ -84,14 +93,14 @@ public class TokenService {
         JwtDto.TokenOptionWrapper newTokenOption
                 = JwtDto.TokenOptionWrapper.of(principal, tokenOption.isRememberMe());
 
-        // 4) 새 토큰 페어 생성
+        // 6) 새 토큰 페어 생성
         JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(newTokenOption);
 
-        // 5) 새 RTK 화이트리스트 등록
+        // 7) 새 RTK 화이트리스트 등록
         Duration newRtTtl = Duration.between(LocalDateTime.now(), tokenPair.getRefreshToken().getExpiredAt());
         tokenRedisRepository.allowRtk(subject, extractRefreshUuid(tokenPair), newRtTtl);
 
-        // 6) 새 ATK/RTK 쿠키로 재설정
+        // 8) 새 ATK/RTK 쿠키로 재설정
         cookieUtils.addAccessTokenCookie(
                 tokenOption.getHttpServletResponse(),
                 tokenPair.getAccessToken().getToken(),
