@@ -28,8 +28,8 @@ public class JwtTokenProvider {
     public JwtDto.TokenData createRefreshToken(JwtDto.TokenOptionWrapper tokenOptions, String refreshUuid) {
         String jti = UUID.randomUUID().toString();
 
-        // 자동 로그인이면 RTK를 6개월로 상정한다.
-        int rtkExpWeeks = tokenOptions.isRememberMe() ? 24 : refreshTokenExpirationWeeks;
+        // 자동 로그인이면 RTK를 3개월로 상정한다.
+        int rtkExpWeeks = tokenOptions.isRememberMe() ? 12 : refreshTokenExpirationWeeks;
 
         LocalDateTime exp = LocalDateTime.now().plusWeeks(rtkExpWeeks);
 
@@ -37,6 +37,7 @@ public class JwtTokenProvider {
                 .subject(getSubject(tokenOptions.getUserPrincipal()))
                 .claim("refreshUuid", refreshUuid)
                 .claim("type", TokenType.REFRESH.name())
+                .claim("rememberMe", tokenOptions.isRememberMe()) // 자동 로그인 여부를 RTK Claims에 포함
                 .id(jti)
                 .issuedAt(new Date())
                 .expiration(Date.from(exp.atZone(ZoneId.systemDefault()).toInstant()))
