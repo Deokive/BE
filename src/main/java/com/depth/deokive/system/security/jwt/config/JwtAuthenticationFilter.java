@@ -51,6 +51,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // 디버깅: 쿠키가 없을 때만 상세 로그 출력
+        if (request.getCookies() == null || request.getCookies().length == 0) {
+            log.warn("⚠️ No cookies in request - URI: {}, Method: {}, Origin: {}, Cookie Header: {}", 
+                    request.getRequestURI(), 
+                    request.getMethod(),
+                    request.getHeader("Origin"),
+                    request.getHeader("Cookie"));
+        }
+
         try {
             // Parse Token From Request
             var nullableToken = jwtTokenResolver.parseTokenFromRequest(request);
