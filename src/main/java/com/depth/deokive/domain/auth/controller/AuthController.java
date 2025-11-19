@@ -122,6 +122,13 @@ public class AuthController {
         return authService.isAtkBlacklisted(accessToken);
     }
 
+    @PostMapping("/is-token-active")
+    @Operation(summary = "TokenPair 유효성 검증", description = "ATK와 RTK의 유효성을 검증합니다.")
+    @ApiResponse(responseCode = "200", description = "TokenPair 유효성 검증")
+    public boolean isTokenActive(HttpServletRequest request) {
+        return authService.isTokenActive(request);
+    }
+
     // NO AUTH
     @PostMapping("/reset-pw")
     @Operation(summary = "비밀번호 재설정", description = "비밀번호를 재설정 합니다.")

@@ -25,13 +25,26 @@ public class JwtDto {
 
     @Builder @AllArgsConstructor @NoArgsConstructor @Getter
     public static class TokenPair {
-        JwtDto.TokenData refreshToken;
-        JwtDto.TokenData accessToken;
+        private JwtDto.TokenData refreshToken;
+        private JwtDto.TokenData accessToken;
 
         public static TokenPair of(JwtDto.TokenData refreshToken, JwtDto.TokenData accessToken) {
             return TokenPair.builder()
                     .refreshToken(refreshToken)
                     .accessToken(accessToken)
+                    .build();
+        }
+    }
+
+    @Builder @AllArgsConstructor @NoArgsConstructor @Getter
+    public static class TokenStringPair {
+        private String accessToken;
+        private String refreshToken;
+
+        public static TokenStringPair of (String accessToken, String refreshToken) {
+            return TokenStringPair.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
                     .build();
         }
     }
@@ -44,6 +57,7 @@ public class JwtDto {
         private TokenType tokenType;
         private String refreshUuid;
         private String jti;
+        private Boolean rememberMe; // RTK에 포함된 자동 로그인 여부
     }
 
     @Builder @AllArgsConstructor @NoArgsConstructor @Getter

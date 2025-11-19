@@ -3,6 +3,7 @@ package com.depth.deokive.system.security.jwt.service;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
+import com.depth.deokive.system.security.jwt.exception.JwtExpiredException;
 import com.depth.deokive.system.security.jwt.exception.JwtInvalidException;
 import com.depth.deokive.system.security.jwt.repository.TokenRedisRepository;
 import com.depth.deokive.system.security.jwt.util.JwtTokenProvider;
@@ -46,19 +47,36 @@ public class TokenService {
 
     public JwtDto.TokenInfo rotateByRtkWithValidation(JwtDto.TokenOptionWrapper tokenOption) {
         log.info("✅ Rotate Tokens");
-        // 1) 쿠키에서 ATK/RTK 파싱
-        String accessToken = jwtTokenResolver.parseTokenFromRequest(tokenOption.getHttpServletRequest())
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
-
+        
+        // 1) RTK 파싱 (ATK는 없어도 가능)
         String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(tokenOption.getHttpServletRequest())
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
-
-        // 2) 파싱/검증 및 기존 Tokens 제거
-        clearTokensByAtkWithValidation(accessToken, refreshToken);
+        
+        var rtkPayload = jwtTokenResolver.resolveToken(refreshToken);
+        jwtTokenValidator.validateRtk(rtkPayload);
+        
+        // 2) ATK가 있으면 기존 Tokens 제거 (ATK 없으면 RTK만 처리)
+        var nullableAtk = jwtTokenResolver.parseTokenFromRequest(tokenOption.getHttpServletRequest());
+        if (nullableAtk.isPresent()) {
+            try {
+                clearTokensByAtkWithValidation(nullableAtk.get(), refreshToken);
+            } catch (Exception e) {
+                // ATK가 만료되었거나 유효하지 않아도 RTK만으로 Refresh 가능
+                log.debug("⚠️ Failed to clear old tokens, but continuing with refresh: {}", e.getMessage());
+            }
+        } else {
+            // ATK가 없으면 이전 RTK만 블랙리스트 처리
+            Duration rtTtl = Duration.between(LocalDateTime.now(), rtkPayload.getExpiredAt());
+            if (rtTtl.isPositive()) {
+                tokenRedisRepository.setBlacklistRtk(rtkPayload.getRefreshUuid(), rtTtl);
+            } else {
+                Duration minTtl = Duration.ofMinutes(1);
+                tokenRedisRepository.setBlacklistRtk(rtkPayload.getRefreshUuid(), minTtl);
+            }
+        }
 
         // 3) 사용자 로드
-        var payload = jwtTokenResolver.resolveToken(refreshToken);
-        String subject = payload.getSubject();
+        String subject = rtkPayload.getSubject();
         UserPrincipal principal = resolveUser(subject);
 
         log.info("🔥 UserPrincipal resolved for token rotation");
@@ -69,19 +87,15 @@ public class TokenService {
         // 4) 새 토큰 페어 생성
         JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(newTokenOption);
 
-        // 5) 이전 RTK UUID 블랙리스트로 이동 (남은 TTL만큼)
-        Duration oldRtTtl = Duration.between(LocalDateTime.now(), payload.getExpiredAt());
-        tokenRedisRepository.setBlacklistRtk(payload.getRefreshUuid(), oldRtTtl);
-
-        // 6) 새 RTK 화이트리스트 등록
+        // 5) 새 RTK 화이트리스트 등록
         Duration newRtTtl = Duration.between(LocalDateTime.now(), tokenPair.getRefreshToken().getExpiredAt());
         tokenRedisRepository.allowRtk(subject, extractRefreshUuid(tokenPair), newRtTtl);
 
-        // 7) 새 ATK/RTK 쿠키로 재설정
+        // 6) 새 ATK/RTK 쿠키로 재설정
         cookieUtils.addAccessTokenCookie(
                 tokenOption.getHttpServletResponse(),
                 tokenPair.getAccessToken().getToken(),
-                tokenPair.getAccessToken().getExpiredAt()
+                tokenPair.getRefreshToken().getExpiredAt()
         );
         cookieUtils.addRefreshTokenCookie(
                 tokenOption.getHttpServletResponse(),
@@ -101,13 +115,26 @@ public class TokenService {
 
         Duration atTtl = Duration.between(LocalDateTime.now(), atkPayload.getExpiredAt());
         Duration rtTtl = Duration.between(LocalDateTime.now(), rtkPayload.getExpiredAt());
-        if (rtTtl.isNegative() || rtTtl.isZero()) {
-            rtTtl = atTtl; // RTK가 이미 만료 상태면 ATK TTL 정도로 보수적으로 묶어준다
+        
+        // ATK 블랙리스트 등록: 만료되지 않은 경우에만 등록
+        // 만료된 ATK는 이미 사용 불가능하므로 블랙리스트에 등록할 필요 없음
+        if (atTtl.isPositive()) {
+            tokenRedisRepository.setBlacklistAtkJti(atkPayload.getJti(), atTtl);
+        } else {
+            log.debug("⚠️ ATK already expired, skipping blacklist registration for jti: {}", atkPayload.getJti());
         }
-
-        // 6) 블랙리스트 등록 및 허용 RTK 제거
-        tokenRedisRepository.setBlacklistAtkJti(atkPayload.getJti(), atTtl);
-        tokenRedisRepository.setBlacklistRtk(rtkPayload.getRefreshUuid(), rtTtl);
+        
+        // RTK 블랙리스트 등록: 유효한 경우에만 등록
+        if (rtTtl.isPositive()) {
+            tokenRedisRepository.setBlacklistRtk(rtkPayload.getRefreshUuid(), rtTtl);
+        } else {
+            // RTK가 이미 만료된 경우, 최소 TTL로 등록 (보수적 처리)
+            Duration minTtl = Duration.ofMinutes(1);
+            tokenRedisRepository.setBlacklistRtk(rtkPayload.getRefreshUuid(), minTtl);
+            log.debug("⚠️ RTK already expired, using minimum TTL for blacklist: {}", rtkPayload.getRefreshUuid());
+        }
+        
+        // 허용 RTK 제거
         tokenRedisRepository.clearAllowedRtk(atkPayload.getSubject());
     }
 
@@ -127,17 +154,27 @@ public class TokenService {
 
     public JwtDto.TokenExpiresInfo getTokenExpiresInfo(HttpServletRequest request) {
         // 1). Parse Token from Cookies
-        String accessToken = jwtTokenResolver.parseTokenFromRequest(request)
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
-
-        String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(request)
-                .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
+        JwtDto.TokenStringPair tokenStringPair
+                = jwtTokenResolver.resolveTokenStringPair(request);
 
         // 2). Validation & Get Payloads
-        JwtDto.TokenOptionWrapper validatedPayloadPair = validatedPayloadPair(accessToken, refreshToken);
+        JwtDto.TokenOptionWrapper validatedPayloadPair
+                = validatedPayloadPair(tokenStringPair.getAccessToken(), tokenStringPair.getRefreshToken());
         if (validatedPayloadPair == null) return null;
 
         return JwtDto.TokenExpiresInfo.of(validatedPayloadPair.getAtkPayload(), validatedPayloadPair.getRtkPayload());
+    }
+
+    public boolean validateTokens(HttpServletRequest request) {
+        try {
+            JwtDto.TokenStringPair tokenStringPair = jwtTokenResolver.resolveTokenStringPair(request);
+            JwtDto.TokenOptionWrapper validated
+                    = validatedPayloadPair(tokenStringPair.getAccessToken(), tokenStringPair.getRefreshToken());
+            return validated != null;
+        } catch (Exception e) {
+            log.error("🔴validateTokens {}",e.getMessage(), e);
+            return false;
+        }
     }
 
     // Helper Methods
@@ -154,9 +191,17 @@ public class TokenService {
         var payload = jwtTokenResolver.resolveToken(tokenPair.getRefreshToken().getToken());
         return payload.getRefreshUuid();
     }
+
     private JwtDto.TokenOptionWrapper validatedPayloadPair(String accessToken, String refreshToken) {
-        // 1) ATK 파싱/검증
-        var atkPayload = jwtTokenResolver.resolveToken(accessToken);
+        // 1) ATK 파싱/검증 (만료되어도 파싱 가능)
+        JwtDto.TokenPayload atkPayload;
+        try {
+            atkPayload = jwtTokenResolver.resolveToken(accessToken);
+        } catch (JwtExpiredException e) {
+            // ATK가 만료되어도 정보 추출 가능 (자동 로그인 지원)
+            atkPayload = jwtTokenResolver.resolveExpiredToken(accessToken);
+        }
+        // 블랙리스트 검증 (만료 여부와 무관하게 검증)
         jwtTokenValidator.validateAtk(atkPayload);
 
         // 2) RTK 파싱/검증

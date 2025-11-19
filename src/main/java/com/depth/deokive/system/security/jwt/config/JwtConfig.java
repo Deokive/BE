@@ -2,6 +2,7 @@ package com.depth.deokive.system.security.jwt.config;
 
 import com.depth.deokive.system.security.config.RequestMatcherHolder;
 import com.depth.deokive.system.security.jwt.repository.TokenRedisRepository;
+import com.depth.deokive.system.security.jwt.service.TokenService;
 import com.depth.deokive.system.security.jwt.util.JwtTokenProvider;
 import com.depth.deokive.system.security.jwt.util.JwtTokenResolver;
 import com.depth.deokive.system.security.jwt.util.JwtTokenValidator;
@@ -75,8 +76,9 @@ public class JwtConfig {
             UserLoadService userLoadService,
             JwtTokenValidator jwtTokenValidator,
             RequestMatcherHolder requestMatcherHolder,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            TokenService tokenService
     ) {
-        return new JwtAuthenticationFilter(jwtTokenResolver, userLoadService, jwtTokenValidator, requestMatcherHolder, objectMapper);
+        return new JwtAuthenticationFilter(jwtTokenResolver, userLoadService, jwtTokenValidator, requestMatcherHolder, objectMapper, tokenService);
     }
 }

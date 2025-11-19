@@ -143,7 +143,7 @@ public class AuthService {
         );
     }
 
-    // Helper Methods
+
     public boolean isRtkBlacklisted(String refreshToken) {
         return tokenService.isRtkBlacklisted(refreshToken);
     }
@@ -152,6 +152,11 @@ public class AuthService {
         return tokenService.isAtkBlacklisted(accessToken);
     }
 
+    public boolean isTokenActive(HttpServletRequest request) {
+        return tokenService.validateTokens(request);
+    }
+
+    // Helper Methods
     private void validateUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
         if (isAlreadyUser) throw new RestException(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
@@ -174,7 +179,7 @@ public class AuthService {
     }
 
     private void setCookies(HttpServletResponse response, JwtDto.TokenInfo tokenInfo) {
-        cookieUtils.addAccessTokenCookie(response, tokenInfo.getAccessToken(), tokenInfo.getAccessTokenExpiresAt());
+        cookieUtils.addAccessTokenCookie(response, tokenInfo.getAccessToken(), tokenInfo.getRefreshTokenExpiresAt());
         cookieUtils.addRefreshTokenCookie(response, tokenInfo.getRefreshToken(), tokenInfo.getRefreshTokenExpiresAt());
     }
 

@@ -5,6 +5,7 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.security.config.RequestMatcherHolder;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.jwt.exception.*;
+import com.depth.deokive.system.security.jwt.service.TokenService;
 import com.depth.deokive.system.security.jwt.util.JwtTokenResolver;
 import com.depth.deokive.system.security.jwt.util.JwtTokenValidator;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -35,6 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenValidator jwtTokenValidator;
     private final RequestMatcherHolder requestMatcherHolder;
     private final ObjectMapper objectMapper;
+    private final TokenService tokenService;
 
 
     @Override
@@ -52,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             // Parse Token From Request
             var nullableToken = jwtTokenResolver.parseTokenFromRequest(request);
-            if (nullableToken.isEmpty()) { filterChain.doFilter(request, response); return; }
+            if (nullableToken.isEmpty()) { throw new JwtMissingException(); }
 
             // Extract JWT Payload with Validation (Token 자체의 유효성 검증)
             JwtDto.TokenPayload payload = jwtTokenResolver.resolveToken(nullableToken.get());
@@ -82,10 +84,63 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             writeErrorResponse(response, ErrorCode.JWT_MISSING);
             return;
         } catch (JwtExpiredException e) {
-            log.warn("⚠️ JWT token has expired", e);
-            SecurityContextHolder.clearContext();
-            writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
-            return;
+            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e);
+            
+            // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
+            try {
+                // 1. RTK 존재 여부 확인 (ATK는 없어도 RTK만 있으면 자동 Refresh 가능)
+                var nullableRtk = jwtTokenResolver.parseRefreshTokenFromRequest(request);
+                if (nullableRtk.isEmpty()) {
+                    log.debug("⚪ No refresh token found, cannot auto-refresh");
+                    SecurityContextHolder.clearContext();
+                    writeErrorResponse(response, ErrorCode.JWT_MISSING);
+                    return;
+                }
+                
+                // 2. RTK 파싱 및 검증
+                JwtDto.TokenPayload rtkPayload = jwtTokenResolver.resolveToken(nullableRtk.get());
+                jwtTokenValidator.validateRtk(rtkPayload);
+                
+                // 3. RTK가 유효하면 자동 Refresh 처리
+                log.info("🟢 Valid refresh token found, performing auto-refresh");
+                try {
+                    boolean rememberMe = rtkPayload.getRememberMe() != null && rtkPayload.getRememberMe();
+                    
+                    // TokenService를 통해 자동 Refresh
+                    JwtDto.TokenOptionWrapper tokenOption = JwtDto.TokenOptionWrapper.of(request, response, rememberMe);
+                    JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(tokenOption);
+                    
+                    // 새로 발급된 RTK를 request attribute에 저장 (같은 요청에서 사용하기 위해)
+                    request.setAttribute("NEW_REFRESH_TOKEN", tokenInfo.getRefreshToken());
+                    
+                    // 새로 발급된 ATK를 직접 사용 (쿠키에서 읽지 않음 - 같은 요청에서는 쿠키가 반영되지 않음)
+                    String newAccessToken = tokenInfo.getAccessToken();
+                    JwtDto.TokenPayload newPayload = jwtTokenResolver.resolveToken(newAccessToken);
+                    jwtTokenValidator.validateAtk(newPayload);
+                    
+                    UserPrincipal userPrincipal = userLoadService.loadUserById(Long.valueOf(newPayload.getSubject()))
+                            .orElseThrow(JwtInvalidException::new);
+                    
+                    Authentication authentication = createAuthentication(userPrincipal);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    
+                    log.info("🟢 Auto-refresh successful, new authentication set for user: {}", userPrincipal.getUsername());
+                    filterChain.doFilter(request, response);
+                    return;
+                } catch (Exception refreshException) {
+                    log.error("⚠️ Auto-refresh failed: {}", refreshException.getMessage(), refreshException);
+                    SecurityContextHolder.clearContext();
+                    writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
+                    return;
+                }
+                
+            } catch (Exception rtkException) {
+                // RTK 검증 실패 또는 기타 예외
+                log.warn("⚠️ Refresh token validation failed: {}", rtkException.getMessage());
+                SecurityContextHolder.clearContext();
+                writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
+                return;
+            }
         } catch (JwtMalformedException e) {
             log.error("⚠️ JWT token is malformed", e);
             SecurityContextHolder.clearContext();
