@@ -51,3 +51,6 @@ test-scenario/
 
 ### swp files ###
 .swp
+
+### Frontend ### 
+frontend/
