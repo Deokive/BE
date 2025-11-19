@@ -57,6 +57,7 @@ public class JwtDto {
         private TokenType tokenType;
         private String refreshUuid;
         private String jti;
+        private Boolean rememberMe; // RTK에 포함된 자동 로그인 여부
     }
 
     @Builder @AllArgsConstructor @NoArgsConstructor @Getter
