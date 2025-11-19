@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -38,12 +40,21 @@ public class JwtTokenResolver {
             // 2. Cookie에서 토큰 읽기 (브라우저용)
             String atkFromCookie = cookieUtils.getCookieValue(request, cookieAtkKey);
             if (atkFromCookie != null && !atkFromCookie.isBlank()) {
-                log.debug("🟢 Cookie Token found in JwtTokenResolver");
+                log.debug("🟢 Cookie Token found in JwtTokenResolver - Key: {}, Value length: {}", cookieAtkKey, atkFromCookie.length());
                 return Optional.of(atkFromCookie);
             }
 
+            // 디버깅: 쿠키를 찾지 못한 경우 상세 로그 출력
+            log.warn("⚠️ Access Token Cookie not found - Key: {}, Request URI: {}, Available cookies: {}", 
+                    cookieAtkKey, 
+                    request.getRequestURI(),
+                    request.getCookies() != null ? Arrays.stream(request.getCookies())
+                            .map(c -> c.getName() + "=" + (c.getValue().length() > 20 ? c.getValue().substring(0, 20) + "..." : c.getValue()))
+                            .collect(Collectors.joining(", ")) : "null");
+            
             return Optional.empty();
         } catch (Exception e) {
+            log.error("⚠️ Exception while parsing token from request: {}", e.getMessage(), e);
             return Optional.empty();
         }
     }

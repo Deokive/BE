@@ -79,7 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             writeErrorResponse(response, ErrorCode.JWT_INVALID);
             return;
         } catch (JwtMissingException e) {
-            log.debug("⚪ No JWT token found in request");
+            log.warn("⚠️ No JWT token found in request - URI: {}, Method: {}", request.getRequestURI(), request.getMethod());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_MISSING);
             return;
