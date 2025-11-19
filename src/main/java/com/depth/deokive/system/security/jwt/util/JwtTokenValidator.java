@@ -49,4 +49,17 @@ public class JwtTokenValidator {
             throw new JwtExpiredException(e);
         }
     }
+
+    public Claims parseExpiredTokenClaims(String token) {
+        try {
+            return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();
+        } catch (SecurityException | UnsupportedJwtException | IllegalArgumentException e) {
+            throw new JwtInvalidException(e);
+        } catch (MalformedJwtException e) {
+            throw new JwtMalformedException(e);
+        } catch (ExpiredJwtException e) {
+            // 만료되어도 Claims는 반환 (정보 추출용)
+            return e.getClaims();
+        }
+    }
 }
