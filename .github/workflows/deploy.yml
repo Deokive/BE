@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main", "cicd-test" ]
+    branches: [ "main", "cicd-test", "DEOK-17-HOTFIX-토큰처리-오류" ]
 
 env:
   AWS_REGION: ap-northeast-2
