@@ -21,6 +21,7 @@ public class CookieUtils {
     @Value("${app.cookie.same-site}") private String cookieSameSite;
     @Value("${app.cookie.atk-apply-path}") private String cookieAtkApplyPath;
     @Value("${app.cookie.rtk-apply-path}") private String cookieRtkApplyPath;
+    @Value("${app.cookie.domain:}") private String cookieDomain;
 
     public void addCookie(
             HttpServletResponse res,
@@ -41,6 +42,11 @@ public class CookieUtils {
                 .secure(cookieSecureOnHttps)
                 .path(path)
                 .maxAge(maxAgeSeconds);
+
+        // Domain 설정 추가
+        if (cookieDomain != null && !cookieDomain.isEmpty()) {
+            cookieBuilder.domain(cookieDomain);
+        }
 
         // SameSite 설정 (Spring Boot 3.x에서는 문자열을 직접 사용)
         if (normalizedSameSite != null && !normalizedSameSite.isEmpty()) {
