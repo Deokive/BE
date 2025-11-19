@@ -143,7 +143,7 @@ public class AuthService {
         );
     }
 
-    // Helper Methods
+
     public boolean isRtkBlacklisted(String refreshToken) {
         return tokenService.isRtkBlacklisted(refreshToken);
     }
@@ -156,6 +156,7 @@ public class AuthService {
         return tokenService.validateTokens(request);
     }
 
+    // Helper Methods
     private void validateUser(AuthDto.SignUpRequest request) {
         boolean isAlreadyUser = userRepository.existsByEmail(request.getEmail());
         if (isAlreadyUser) throw new RestException(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
