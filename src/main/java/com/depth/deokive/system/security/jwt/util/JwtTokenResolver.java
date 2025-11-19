@@ -50,10 +50,17 @@ public class JwtTokenResolver {
 
     public Optional<String> parseRefreshTokenFromRequest(HttpServletRequest request) {
         try {
-            // Cookie Util 사용
+            // 1. Request Attribute 우선 확인 (자동 Refresh 직후 같은 요청에서 사용)
+            String newRtk = (String) request.getAttribute("NEW_REFRESH_TOKEN");
+            if (newRtk != null && !newRtk.isBlank()) {
+                log.debug("🟢 New RefreshToken from request attribute (auto-refresh)");
+                return Optional.of(newRtk);
+            }
+            
+            // 2. Cookie에서 읽기
             String rtkFromCookie = cookieUtils.getCookieValue(request, cookieRtkKey);
             if (rtkFromCookie != null && !rtkFromCookie.isBlank()) {
-                log.info("🟢 Cookie RefreshToken found in JwtTokenResolver: {}", rtkFromCookie);
+                log.debug("🟢 Cookie RefreshToken found in JwtTokenResolver");
                 return Optional.of(rtkFromCookie);
             }
 
@@ -69,6 +76,7 @@ public class JwtTokenResolver {
 
         String type = payload.get("type", String.class);
         String role = payload.get("role", String.class);
+        Boolean rememberMe = payload.get("rememberMe", Boolean.class);
 
         return JwtDto.TokenPayload.builder()
                 .subject(payload.getSubject())
@@ -77,6 +85,28 @@ public class JwtTokenResolver {
                 .role(role == null ? null : Role.valueOf(role))
                 .refreshUuid(payload.get("refreshUuid", String.class))
                 .jti(payload.getId())
+                .rememberMe(rememberMe)
+                .build();
+    }
+
+    public JwtDto.TokenPayload resolveExpiredToken(String token) {
+        Claims payload = jwtTokenValidator.parseExpiredTokenClaims(token);
+        LocalDateTime exp = payload.getExpiration() != null
+                ? payload.getExpiration().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
+                : null;
+
+        String type = payload.get("type", String.class);
+        String role = payload.get("role", String.class);
+        Boolean rememberMe = payload.get("rememberMe", Boolean.class);
+
+        return JwtDto.TokenPayload.builder()
+                .subject(payload.getSubject())
+                .expiredAt(exp)
+                .tokenType(type == null ? null : TokenType.valueOf(type))
+                .role(role == null ? null : Role.valueOf(role))
+                .refreshUuid(payload.get("refreshUuid", String.class))
+                .jti(payload.getId())
+                .rememberMe(rememberMe)
                 .build();
     }
 
