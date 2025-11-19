@@ -69,7 +69,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             // Parse Token From Request
             var nullableToken = jwtTokenResolver.parseTokenFromRequest(request);
-            if (nullableToken.isEmpty()) { throw new JwtMissingException(); }
+            // if (nullableToken.isEmpty()) { throw new JwtMissingException(); }
+            if (nullableToken.isEmpty()) { filterChain.doFilter(request, response); return; }
 
             // Extract JWT Payload with Validation (Token 자체의 유효성 검증)
             JwtDto.TokenPayload payload = jwtTokenResolver.resolveToken(nullableToken.get());
