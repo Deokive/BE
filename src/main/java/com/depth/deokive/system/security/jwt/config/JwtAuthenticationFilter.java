@@ -26,7 +26,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -53,11 +55,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 디버깅: 쿠키가 없을 때만 상세 로그 출력
         if (request.getCookies() == null || request.getCookies().length == 0) {
-            log.warn("⚠️ No cookies in request - URI: {}, Method: {}, Origin: {}, Cookie Header: {}", 
+            log.warn("⚠️ No cookies in request - URI: {}, Method: {}, Origin: {}, Referer: {}, Cookie Header: {}, All Headers: {}", 
                     request.getRequestURI(), 
                     request.getMethod(),
                     request.getHeader("Origin"),
-                    request.getHeader("Cookie"));
+                    request.getHeader("Referer"),
+                    request.getHeader("Cookie"),
+                    Collections.list(request.getHeaderNames()).stream()
+                            .map(name -> name + "=" + request.getHeader(name))
+                            .collect(Collectors.joining(", ")));
         }
 
         try {
