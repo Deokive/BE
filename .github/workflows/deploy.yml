@@ -6,6 +6,7 @@ on:
 
 env:
   AWS_REGION: ap-northeast-2
+  AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
 
 jobs:
   deploy:
@@ -15,6 +16,30 @@ jobs:
       # Default Setup
       - name: Github Repository File Checkout
         uses: actions/checkout@v4
+
+      # Get Github Action Public IP
+      - name: Get Github Action Public IP
+        id: ip
+        uses: haythem/public-ip@v1.2
+
+      # Setup AWS credentials
+      - name: Setup AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Inbound IP whitelist에 GitHub Runner IP 임시 등록
+      - name: Authorize GitHub Action IP to EC2 SG
+        run: |
+          echo "🟢 Authorize IP"
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ env.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+      # ------------------------------------------------------
 
       # For Java Build
       - name: Setup JDK 21
@@ -138,3 +163,14 @@ jobs:
             rm -rf $HOME/deokive/tobe
             
             exit 1
+
+      # IP 제거 (보안그룹에서 즉시 삭제)
+      - name: Remove IP from Security Group
+        if: always() # 실패해도 반드시 지움
+        run: |
+          echo "🔥 Revoke IP: ${{ steps.ip.outputs.ipv4 }}"
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32
