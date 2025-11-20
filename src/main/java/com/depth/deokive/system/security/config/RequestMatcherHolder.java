@@ -35,9 +35,6 @@ public class RequestMatcherHolder {
 
             // user
 
-            // test
-            new RequestInfo(HttpMethod.GET, "/test", null),
-
             // system
             new RequestInfo(null, "/api/system/**", null),
 
@@ -50,16 +47,9 @@ public class RequestMatcherHolder {
             new RequestInfo(HttpMethod.GET,  "/v3/api-docs/**", null),
             new RequestInfo(HttpMethod.GET,  "/", null),
 
-            // robots, metadata (JWT 미적용 / permitAll)
-            new RequestInfo(HttpMethod.GET, "/robots.txt", null),
-            new RequestInfo(HttpMethod.GET, "/latest/meta-data/**", null),
+            // robots (JWT 미적용 / permitAll)
+            new RequestInfo(HttpMethod.GET, "/robots.txt", null)
 
-            // bot/scanner common paths (pattern-based to cover all variations)
-            new RequestInfo(null, "/.well-known/**", null),           // security.txt, apple-app-site-association, etc.
-            new RequestInfo(null, "/*.txt", null),                    // robots.txt, security.txt, etc.
-            new RequestInfo(null, "/sitemap*.xml", null),            // sitemap.xml, sitemap_index.xml, sitemap1.xml, etc.
-            new RequestInfo(null, "/*accesspolicy.xml", null),       // clientaccesspolicy.xml, crossdomain.xml, etc.
-            new RequestInfo(null, "/security.txt", null)             // security.txt (root level)
     );
 
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
@@ -84,7 +74,7 @@ public class RequestMatcherHolder {
      */
     public RequestMatcher getApiRequestMatcher() {
         return reqMatcherCacheMap.computeIfAbsent("API_PREFIX", k -> {
-            final PathPattern apiPattern = PARSER.parse("/api/**");
+            final PathPattern apiPattern = PARSER.parse("/api/v1/**");
             return (HttpServletRequest request) -> {
                 String uri = request.getRequestURI();
                 String contextPath = request.getContextPath();
