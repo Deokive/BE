@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -121,8 +122,46 @@ public class GlobalExceptionHandler {
         return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, String.join(", ", messages));
     }
 
+    // 정적 리소스를 찾을 수 없을 때 처리 (봇/스캐너 요청 포함)
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
+        String resourcePath = e.getResourcePath();
+        
+        // 봇/스캐너가 요청하는 일반적인 경로는 DEBUG 레벨로 처리
+        if (isCommonBotOrScannerPath(resourcePath)) {
+            log.debug("🔍 Bot/scanner requested non-existent resource: {}", resourcePath);
+            // 404 응답 반환 (봇/스캐너는 404를 정상적으로 처리함)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+        }
+        
+        // 일반적인 리소스 요청은 WARN 레벨
+        log.warn("⚠️ Resource not found: {}", resourcePath);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
+        // 정적 리소스 관련 예외인지 확인 (NoResourceFoundException이 잡히지 않은 경우 대비)
+        String message = e.getMessage();
+        if (message != null && message.contains("No static resource")) {
+            // 예외 메시지에서 경로 추출 시도
+            String resourcePath = extractResourcePathFromMessage(message);
+            
+            // 봇/스캐너가 요청하는 일반적인 경로는 DEBUG 레벨로 처리
+            if (isCommonBotOrScannerPath(resourcePath)) {
+                log.debug("🔍 Bot/scanner requested non-existent resource: {}", resourcePath != null ? resourcePath : message);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+            }
+            
+            // 일반적인 리소스 요청은 WARN 레벨
+            log.warn("⚠️ Resource not found: {}", resourcePath != null ? resourcePath : message);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+        }
+        
         log.error("[INTERNAL ERROR] {}", e.getMessage(), e);
         return createErrorResponse(ErrorCode.GLOBAL_INTERNAL_SERVER_ERROR);
     }
@@ -247,5 +286,64 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ErrorResponse> createErrorResponse(ErrorCode errorCode, String customMessage) {
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode, customMessage));
+    }
+
+    /**
+     * 예외 메시지에서 리소스 경로 추출
+     * "No static resource /path" 형식에서 경로를 추출
+     */
+    private String extractResourcePathFromMessage(String message) {
+        if (message == null || message.isEmpty()) {
+            return null;
+        }
+        
+        // "No static resource " 이후의 경로 추출
+        String prefix = "No static resource ";
+        int index = message.indexOf(prefix);
+        if (index >= 0) {
+            String path = message.substring(index + prefix.length()).trim();
+            // 빈 문자열이나 "."인 경우 null 반환
+            if (path.isEmpty() || path.equals(".")) {
+                return null;
+            }
+            return path;
+        }
+        
+        return null;
+    }
+
+    /**
+     * 일반적인 봇/스캐너가 요청하는 경로인지 확인
+     * @param path 요청 경로
+     * @return 봇/스캐너 경로면 true
+     */
+    private boolean isCommonBotOrScannerPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return false;
+        }
+
+        String lowerPath = path.toLowerCase();
+
+        // .well-known 경로 (RFC 8615)
+        if (lowerPath.startsWith("/.well-known/")) {
+            return true;
+        }
+
+        // 확장자 기반 체크
+        if (lowerPath.endsWith(".txt") ||
+            lowerPath.endsWith("accesspolicy.xml") ||
+            (lowerPath.contains("sitemap") && lowerPath.endsWith(".xml"))) {
+            return true;
+        }
+
+        // 특정 파일명 패턴
+        if (lowerPath.equals("/security.txt") ||
+            lowerPath.equals("/robots.txt") ||
+            lowerPath.equals("/favicon.ico") ||
+            (lowerPath.startsWith("/sitemap") && lowerPath.endsWith(".xml"))) {
+            return true;
+        }
+
+        return false;
     }
 }
