@@ -141,7 +141,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             log.debug("🟢 JWT authentication successful for user: {}", userPrincipal.getUsername());
         } catch (JwtInvalidException e) {
-            log.error("⚠️ JWT authentication failed", e);
+            log.error("⚠️ JWT authentication failed: {}", e.getMessage());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_INVALID);
             return;
@@ -157,7 +157,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             writeErrorResponse(response, ErrorCode.JWT_MISSING);
             return;
         } catch (JwtExpiredException e) {
-            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e);
+            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login: {}", e.getMessage());
             
             // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
             try {
@@ -215,17 +215,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
         } catch (JwtMalformedException e) {
-            log.error("⚠️ JWT token is malformed", e);
+            log.error("⚠️ JWT token is malformed: {}", e.getMessage());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_MALFORMED);
             return;
         } catch (JwtBlacklistException e) {
-            log.error("⚠️ JWT token is blacklisted", e);
+            log.error("⚠️ JWT token is blacklisted: {}", e.getMessage());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_BLACKLIST);
             return;
         } catch (Exception e) {
-            log.error("⚠️ Unexpected error during JWT authentication", e);
+            log.error("⚠️ Unexpected error during JWT authentication: {}", e.getMessage());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.GLOBAL_INTERNAL_SERVER_ERROR);
             return;
