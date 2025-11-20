@@ -58,36 +58,57 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 일반적인 봇/스캐너가 요청하는 경로인지 확인
+     * 일반적인 봇/스캐너가 요청하는 경로인지 확인 (하이브리드 접근)
      * @param uri 요청 URI
-     * @return 봇/스캐너 경로면 true
+     * @return 봇/스캐너 경로면 true (필터 스킵)
      */
     private boolean isCommonBotOrScannerPath(String uri) {
         if (uri == null || uri.isEmpty()) {
             return false;
         }
 
-        // .well-known 경로 (RFC 8615)
-        if (uri.startsWith("/.well-known/")) {
-            return true;
-        }
-
-        // 확장자 기반 체크
         String lowerUri = uri.toLowerCase();
-        if (lowerUri.endsWith(".txt") || 
+
+        // 1. 정상적인 애플리케이션 경로는 제외 (필터 통과)
+        if (lowerUri.startsWith("/api/") ||
+            lowerUri.startsWith("/swagger-ui") ||
+            lowerUri.startsWith("/v3/api-docs") ||
+            lowerUri.startsWith("/docs") ||
+            lowerUri.equals("/") ||
+            lowerUri.equals("/error")) {
+            return false; // 정상 경로는 필터 통과
+        }
+
+        // 2. 알려진 정상 봇 경로 (필터 스킵)
+        if (lowerUri.startsWith("/.well-known/") ||
+            lowerUri.endsWith(".txt") ||
+            (lowerUri.contains("sitemap") && lowerUri.endsWith(".xml")) ||
             lowerUri.endsWith("accesspolicy.xml") ||
-            lowerUri.contains("sitemap") && lowerUri.endsWith(".xml")) {
-            return true;
+            lowerUri.equals("/favicon.ico")) {
+            return true; // 필터 스킵
         }
 
-        // 특정 파일명 패턴
-        if (lowerUri.equals("/security.txt") ||
-            lowerUri.equals("/robots.txt") ||
-            lowerUri.equals("/favicon.ico") ||
-            lowerUri.startsWith("/sitemap") && lowerUri.endsWith(".xml")) {
-            return true;
+        // 3. 악성 스캐너 패턴 (Java 애플리케이션이므로 불필요한 경로들)
+        String[] maliciousPatterns = {
+            // PHP 관련
+            ".php", "phpunit", "eval-stdin",
+            // PHP 프레임워크/라이브러리
+            "vendor", "laravel", "yii", "zend", "drupal", "symfony",
+            // 다른 프레임워크/서비스
+            "containers", "wp-", "adminer", "phpmyadmin", "wordpress",
+            // 일반적인 스캐너가 시도하는 디렉토리
+            "/lib/", "/www/", "/public/", "/app/", "/admin/", "/backup/",
+            "/test/", "/demo/", "/cms/", "/crm/", "/panel/", "/blog/",
+            "/workspace/", "/apps/", "/v2/", "/ws/"
+        };
+
+        for (String pattern : maliciousPatterns) {
+            if (lowerUri.contains(pattern)) {
+                return true; // 필터 스킵
+            }
         }
 
+        // 4. 알 수 없는 경로는 보수적으로 필터 통과 (정상 사용자일 수 있음)
         return false;
     }
 
@@ -141,7 +162,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             log.debug("🟢 JWT authentication successful for user: {}", userPrincipal.getUsername());
         } catch (JwtInvalidException e) {
-            log.error("⚠️ JWT authentication failed: {}", e.getMessage());
+            log.error("⚠️ JWT authentication failed", e);
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_INVALID);
             return;
@@ -157,7 +178,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             writeErrorResponse(response, ErrorCode.JWT_MISSING);
             return;
         } catch (JwtExpiredException e) {
-            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login: {}", e.getMessage());
+            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e.getMessage());
             
             // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
             try {
@@ -215,17 +236,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
         } catch (JwtMalformedException e) {
-            log.error("⚠️ JWT token is malformed: {}", e.getMessage());
+            log.error("⚠️ JWT token is malformed", e);
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_MALFORMED);
             return;
         } catch (JwtBlacklistException e) {
-            log.error("⚠️ JWT token is blacklisted: {}", e.getMessage());
+            log.error("⚠️ JWT token is blacklisted", e);
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_BLACKLIST);
             return;
         } catch (Exception e) {
-            log.error("⚠️ Unexpected error during JWT authentication: {}", e.getMessage());
+            log.error("⚠️ Unexpected error during JWT authentication", e);
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.GLOBAL_INTERNAL_SERVER_ERROR);
             return;
