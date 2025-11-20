@@ -29,10 +29,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // Request 기반으로 OAuth2User 정의
         OAuth2User oAuth2User = super.loadUser(userRequest);
-        log.info("🟢 OAuth2 User: {}",oAuth2User.getAttributes());
 
         // OAuth2User + Request 기반으로 Response 생성
         OAuth2Response oAuth2Response = getOAuth2Response(userRequest, oAuth2User);
+        log.info("🟢 OAuth2 User nickname: {}", oAuth2Response.getNickname());
 
         // Response 할 DTO
         final OAuth2UserDto oAuth2UserDto = OAuth2UserDto.of(Role.USER, oAuth2Response, hmacUtil);

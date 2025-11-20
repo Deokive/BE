@@ -35,9 +35,6 @@ public class RequestMatcherHolder {
 
             // user
 
-            // test
-            new RequestInfo(HttpMethod.GET, "/test", null),
-
             // system
             new RequestInfo(null, "/api/system/**", null),
 
@@ -48,7 +45,11 @@ public class RequestMatcherHolder {
             new RequestInfo(HttpMethod.GET,  "/error", null),
             new RequestInfo(HttpMethod.GET,  "/swagger-ui/**", null),
             new RequestInfo(HttpMethod.GET,  "/v3/api-docs/**", null),
-            new RequestInfo(HttpMethod.GET,  "/", null)
+            new RequestInfo(HttpMethod.GET,  "/", null),
+
+            // robots (JWT 미적용 / permitAll)
+            new RequestInfo(HttpMethod.GET, "/robots.txt", null)
+
     );
 
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
@@ -64,6 +65,24 @@ public class RequestMatcherHolder {
                     .map(this::toRequestMatcher)     // ← PathPattern 기반 매처로 변환
                     .toArray(RequestMatcher[]::new);
             return new OrRequestMatcher(matchers);
+        });
+    }
+
+    /**
+     * /api/**로 시작하는 모든 경로에 대한 RequestMatcher 반환 (캐시)
+     * @return /api/**로 시작하는 경로면 true
+     */
+    public RequestMatcher getApiRequestMatcher() {
+        return reqMatcherCacheMap.computeIfAbsent("API_PREFIX", k -> {
+            final PathPattern apiPattern = PARSER.parse("/api/v1/**");
+            return (HttpServletRequest request) -> {
+                String uri = request.getRequestURI();
+                String contextPath = request.getContextPath();
+                if (contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)) {
+                    uri = uri.substring(contextPath.length());
+                }
+                return apiPattern.matches(PathContainer.parsePath(uri));
+            };
         });
     }
 

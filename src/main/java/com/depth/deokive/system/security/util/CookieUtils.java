@@ -21,6 +21,7 @@ public class CookieUtils {
     @Value("${app.cookie.same-site}") private String cookieSameSite;
     @Value("${app.cookie.atk-apply-path}") private String cookieAtkApplyPath;
     @Value("${app.cookie.rtk-apply-path}") private String cookieRtkApplyPath;
+    @Value("${app.cookie.domain:}") private String cookieDomain;
 
     public void addCookie(
             HttpServletResponse res,
@@ -41,6 +42,11 @@ public class CookieUtils {
                 .secure(cookieSecureOnHttps)
                 .path(path)
                 .maxAge(maxAgeSeconds);
+
+        // Domain 설정 추가
+        if (cookieDomain != null && !cookieDomain.isEmpty()) {
+            cookieBuilder.domain(cookieDomain);
+        }
 
         // SameSite 설정 (Spring Boot 3.x에서는 문자열을 직접 사용)
         if (normalizedSameSite != null && !normalizedSameSite.isEmpty()) {
@@ -82,6 +88,11 @@ public class CookieUtils {
                 .path(path)
                 .maxAge(0); // 핵심: maxAge=0 → 즉시 삭제
 
+        // Domain 설정 추가 (쿠키 삭제 시에도 설정할 때와 동일한 도메인 사용)
+        if (cookieDomain != null && !cookieDomain.isEmpty()) {
+            cookieBuilder.domain(cookieDomain);
+        }
+
         if (normalizedSameSite != null && !normalizedSameSite.isEmpty()) {
             cookieBuilder.sameSite(normalizedSameSite);
         }
@@ -90,7 +101,7 @@ public class CookieUtils {
 
         res.addHeader("Set-Cookie", cookie.toString());
 
-        log.info("🍪 Cookie 삭제 완료 - Key: {}, Path: {}", cookieKey, path);
+        log.info("🍪 Cookie 삭제 완료 - Key: {}, Path: {}, Domain: {}", cookieKey, path, cookieDomain);
     }
 
     public void addAccessTokenCookie(HttpServletResponse res, String token, LocalDateTime exp) {
@@ -111,7 +122,17 @@ public class CookieUtils {
 
     // HttpServletRequest 에서 쿠키 value 읽기
     public String getCookieValue(HttpServletRequest req, String name) {
-        var cookie = WebUtils.getCookie(req, name);
-        return cookie != null ? cookie.getValue() : null;
+        try {
+            var cookie = WebUtils.getCookie(req, name);
+            if (cookie == null) {
+                log.debug("🔍 Cookie not found - Name: {}, Request URI: {}", name, req.getRequestURI());
+            } else {
+                log.debug("🔍 Cookie found - Name: {}, Value length: {}", name, cookie.getValue() != null ? cookie.getValue().length() : 0);
+            }
+            return cookie != null ? cookie.getValue() : null;
+        } catch (Exception e) {
+            log.error("⚠️ Exception while getting cookie value - Name: {}, Error: {}", name, e.getMessage(), e);
+            return null;
+        }
     }
 }

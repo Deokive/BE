@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -121,8 +122,42 @@ public class GlobalExceptionHandler {
         return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, String.join(", ", messages));
     }
 
+    // 정적 리소스를 찾을 수 없을 때 처리
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
+        String resourcePath = e.getResourcePath();
+        
+        // RequestMatcherHolder의 permitAll 경로가 아니고 /api/**도 아니면 DEBUG 레벨로 처리
+        // (SecurityConfig에서 denyAll()로 차단되므로 정상적인 요청이 아님)
+        if (resourcePath != null && !resourcePath.startsWith("/api/")) {
+            log.debug("🔍 Non-API resource not found (blocked by denyAll): {}", resourcePath);
+        } else {
+            log.warn("⚠️ Resource not found: {}", resourcePath);
+        }
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
+        // 정적 리소스 관련 예외인지 확인 (NoResourceFoundException이 잡히지 않은 경우 대비)
+        String message = e.getMessage();
+        if (message != null && message.contains("No static resource")) {
+            // 예외 메시지에서 경로 추출 시도
+            String resourcePath = extractResourcePathFromMessage(message);
+            
+            // /api/**가 아니면 DEBUG 레벨로 처리 (SecurityConfig에서 denyAll()로 차단됨)
+            if (resourcePath != null && !resourcePath.startsWith("/api/")) {
+                log.debug("🔍 Non-API resource not found (blocked by denyAll): {}", resourcePath);
+            } else {
+                log.warn("⚠️ Resource not found: {}", resourcePath != null ? resourcePath : message);
+            }
+            
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+        }
+        
         log.error("[INTERNAL ERROR] {}", e.getMessage(), e);
         return createErrorResponse(ErrorCode.GLOBAL_INTERNAL_SERVER_ERROR);
     }
@@ -248,4 +283,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode, customMessage));
     }
+
+    /**
+     * 예외 메시지에서 리소스 경로 추출
+     * "No static resource /path" 형식에서 경로를 추출
+     */
+    private String extractResourcePathFromMessage(String message) {
+        if (message == null || message.isEmpty()) {
+            return null;
+        }
+        
+        // "No static resource " 이후의 경로 추출
+        String prefix = "No static resource ";
+        int index = message.indexOf(prefix);
+        if (index >= 0) {
+            String path = message.substring(index + prefix.length()).trim();
+            // 빈 문자열이나 "."인 경우 null 반환
+            if (path.isEmpty() || path.equals(".")) {
+                return null;
+            }
+            return path;
+        }
+        
+        return null;
+    }
+
 }

@@ -24,6 +24,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -58,8 +59,12 @@ public class SecurityConfig {
                     oauth2.failureHandler(customFailureHandler);
                 })
                 .authorizeHttpRequests((auth) -> auth
+                        // 1. 비인증 경로들 (RequestMatcherHolder에서 관리)
                         .requestMatchers(requestMatcherHolder.getRequestMatchersByMinRole(null)).permitAll()
-                        .anyRequest().authenticated()
+                        // 2. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
+                        .requestMatchers(requestMatcherHolder.getApiRequestMatcher()).authenticated()
+                        // 3. 그 외 모든 요청 차단
+                        .anyRequest().denyAll()
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
@@ -80,8 +85,10 @@ public class SecurityConfig {
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Collections.singletonList("Set-Cookie"));
+        configuration.setExposedHeaders(Collections.singletonList("Authorization"));
 
-        log.info("🌐 CORS 허용 Origin: {}", origins);
+        log.info("🌐 CORS 허용 Origin: {}, AllowCredentials: {}", origins, configuration.getAllowCredentials());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

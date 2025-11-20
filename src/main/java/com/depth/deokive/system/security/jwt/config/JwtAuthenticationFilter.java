@@ -26,7 +26,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -41,7 +43,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-        return requestMatcherHolder.getRequestMatchersByMinRole(null).matches(request);
+        // 1. RequestMatcherHolder의 permitAll 경로는 필터 스킵
+        if (requestMatcherHolder.getRequestMatchersByMinRole(null).matches(request)) {
+            return true;
+        }
+
+        // 2. /api/**가 아닌 경로는 필터 스킵 (SecurityConfig에서 denyAll()로 차단됨)
+        String uri = request.getRequestURI();
+        if (uri != null && !uri.startsWith("/api/")) {
+            return true; // 필터 스킵 (SecurityConfig에서 처리)
+        }
+
+        // 3. /api/** 경로는 필터 통과 (인증 필요)
+        return false;
     }
 
     @Override
@@ -51,10 +65,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // 디버깅: 쿠키가 없을 때만 상세 로그 출력
+        // /api/** 경로만 필터를 통과하므로 여기서는 정상적인 API 요청만 처리
+        if (request.getCookies() == null || request.getCookies().length == 0) {
+            String uri = request.getRequestURI();
+            // /api/** 경로는 정상적인 API 요청이므로 WARN 레벨 유지
+            log.warn("⚠️ No cookies in request - URI: {}, Method: {}, Origin: {}, Referer: {}, Cookie Header: {}, All Headers: {}", 
+                    uri, 
+                    request.getMethod(),
+                    request.getHeader("Origin"),
+                    request.getHeader("Referer"),
+                    request.getHeader("Cookie"),
+                    Collections.list(request.getHeaderNames()).stream()
+                            .map(name -> name + "=" + request.getHeader(name))
+                            .collect(Collectors.joining(", ")));
+        }
+
         try {
             // Parse Token From Request
             var nullableToken = jwtTokenResolver.parseTokenFromRequest(request);
             if (nullableToken.isEmpty()) { throw new JwtMissingException(); }
+            // if (nullableToken.isEmpty()) { filterChain.doFilter(request, response); return; }
 
             // Extract JWT Payload with Validation (Token 자체의 유효성 검증)
             JwtDto.TokenPayload payload = jwtTokenResolver.resolveToken(nullableToken.get());
@@ -79,12 +110,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             writeErrorResponse(response, ErrorCode.JWT_INVALID);
             return;
         } catch (JwtMissingException e) {
-            log.debug("⚪ No JWT token found in request");
+            // /api/** 경로만 필터를 통과하므로 여기서는 정상적인 API 요청만 처리
+            String uri = request.getRequestURI();
+            log.warn("⚠️ No JWT token found in request - URI: {}, Method: {}", uri, request.getMethod());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_MISSING);
             return;
         } catch (JwtExpiredException e) {
-            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e);
+            log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e.getMessage());
             
             // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
             try {
@@ -176,3 +209,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }
+
