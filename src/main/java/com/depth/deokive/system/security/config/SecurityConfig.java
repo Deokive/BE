@@ -68,7 +68,12 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", request.getRequestURI());
+                            // log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", request.getRequestURI());
+                            if (uri != null && !uri.startsWith("/api/")) {
+                                log.debug("🔍 Non-API request denied (blocked by denyAll): {}", uri);
+                            } else {
+                                log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", uri);
+                            }
                             response.sendError(HttpServletResponse.SC_FORBIDDEN);
                         }))
                 .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

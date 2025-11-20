@@ -122,21 +122,19 @@ public class GlobalExceptionHandler {
         return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, String.join(", ", messages));
     }
 
-    // 정적 리소스를 찾을 수 없을 때 처리 (봇/스캐너 요청 포함)
+    // 정적 리소스를 찾을 수 없을 때 처리
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
         String resourcePath = e.getResourcePath();
         
-        // 봇/스캐너가 요청하는 일반적인 경로는 DEBUG 레벨로 처리
-        if (isCommonBotOrScannerPath(resourcePath)) {
-            log.debug("🔍 Bot/scanner requested non-existent resource: {}", resourcePath);
-            // 404 응답 반환 (봇/스캐너는 404를 정상적으로 처리함)
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+        // RequestMatcherHolder의 permitAll 경로가 아니고 /api/**도 아니면 DEBUG 레벨로 처리
+        // (SecurityConfig에서 denyAll()로 차단되므로 정상적인 요청이 아님)
+        if (resourcePath != null && !resourcePath.startsWith("/api/")) {
+            log.debug("🔍 Non-API resource not found (blocked by denyAll): {}", resourcePath);
+        } else {
+            log.warn("⚠️ Resource not found: {}", resourcePath);
         }
         
-        // 일반적인 리소스 요청은 WARN 레벨
-        log.warn("⚠️ Resource not found: {}", resourcePath);
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
     }
@@ -149,15 +147,13 @@ public class GlobalExceptionHandler {
             // 예외 메시지에서 경로 추출 시도
             String resourcePath = extractResourcePathFromMessage(message);
             
-            // 봇/스캐너가 요청하는 일반적인 경로는 DEBUG 레벨로 처리
-            if (isCommonBotOrScannerPath(resourcePath)) {
-                log.debug("🔍 Bot/scanner requested non-existent resource: {}", resourcePath != null ? resourcePath : message);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
+            // /api/**가 아니면 DEBUG 레벨로 처리 (SecurityConfig에서 denyAll()로 차단됨)
+            if (resourcePath != null && !resourcePath.startsWith("/api/")) {
+                log.debug("🔍 Non-API resource not found (blocked by denyAll): {}", resourcePath);
+            } else {
+                log.warn("⚠️ Resource not found: {}", resourcePath != null ? resourcePath : message);
             }
             
-            // 일반적인 리소스 요청은 WARN 레벨
-            log.warn("⚠️ Resource not found: {}", resourcePath != null ? resourcePath : message);
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found"));
         }
@@ -312,73 +308,4 @@ public class GlobalExceptionHandler {
         return null;
     }
 
-    /**
-     * 악성 스캐너가 요청하는 경로인지 확인 (차단해야 할 경로)
-     * @param path 요청 경로
-     * @return 악성 스캐너 경로면 true
-     */
-    private boolean isMaliciousScannerPath(String path) {
-        if (path == null || path.isEmpty()) {
-            return false;
-        }
-
-        String lowerPath = path.toLowerCase();
-
-        // 악성 스캐너 패턴 (Java 애플리케이션이므로 불필요한 경로들)
-        String[] maliciousPatterns = {
-            // PHP 관련
-            ".php", "phpunit", "eval-stdin",
-            // PHP 프레임워크/라이브러리
-            "vendor", "laravel", "yii", "zend", "drupal", "symfony",
-            // 다른 프레임워크/서비스
-            "containers", "wp-", "adminer", "phpmyadmin", "wordpress",
-            // 일반적인 스캐너가 시도하는 디렉토리
-            "/lib/", "/www/", "/public/", "/app/", "/admin/", "/backup/",
-            "/test/", "/demo/", "/cms/", "/crm/", "/panel/", "/blog/",
-            "/workspace/", "/apps/", "/v2/", "/ws/"
-        };
-
-        for (String pattern : maliciousPatterns) {
-            if (lowerPath.contains(pattern)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 일반적인 봇/스캐너가 요청하는 경로인지 확인 (하이브리드 접근)
-     * @param path 요청 경로
-     * @return 봇/스캐너 경로면 true
-     */
-    private boolean isCommonBotOrScannerPath(String path) {
-        if (path == null || path.isEmpty()) {
-            return false;
-        }
-
-        String lowerPath = path.toLowerCase();
-
-        // 1. 정상적인 애플리케이션 경로는 제외
-        if (lowerPath.startsWith("/api/") ||
-            lowerPath.startsWith("/swagger-ui") ||
-            lowerPath.startsWith("/v3/api-docs") ||
-            lowerPath.startsWith("/docs") ||
-            lowerPath.equals("/") ||
-            lowerPath.equals("/error")) {
-            return false;
-        }
-
-        // 2. 알려진 정상 봇 경로
-        if (lowerPath.startsWith("/.well-known/") ||
-            lowerPath.endsWith(".txt") ||
-            (lowerPath.contains("sitemap") && lowerPath.endsWith(".xml")) ||
-            lowerPath.endsWith("accesspolicy.xml") ||
-            lowerPath.equals("/favicon.ico")) {
-            return true;
-        }
-
-        // 3. 악성 스캐너 경로
-        return isMaliciousScannerPath(path);
-    }
 }

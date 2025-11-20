@@ -43,99 +43,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-        // 1. 기존 RequestMatcher 체크
+        // 1. RequestMatcherHolder의 permitAll 경로는 필터 스킵
         if (requestMatcherHolder.getRequestMatchersByMinRole(null).matches(request)) {
             return true;
         }
 
-        // 2. 스마트 필터링: 일반적인 봇/스캐너 경로 패턴 체크
+        // 2. /api/**가 아닌 경로는 필터 스킵 (SecurityConfig에서 denyAll()로 차단됨)
         String uri = request.getRequestURI();
-        if (isCommonBotOrScannerPath(uri)) {
-            return true; // 필터 스킵
+        if (uri != null && !uri.startsWith("/api/")) {
+            return true; // 필터 스킵 (SecurityConfig에서 처리)
         }
 
+        // 3. /api/** 경로는 필터 통과 (인증 필요)
         return false;
-    }
-
-    /**
-     * 정상적인 봇이 요청하는 경로인지 확인 (허용 가능한 경로)
-     * @param uri 요청 URI
-     * @return 정상 봇 경로면 true
-     */
-    private boolean isNormalBotPath(String uri) {
-        if (uri == null || uri.isEmpty()) {
-            return false;
-        }
-
-        String lowerUri = uri.toLowerCase();
-
-        // 알려진 정상 봇 경로 (robots.txt, security.txt, sitemap 등)
-        return lowerUri.startsWith("/.well-known/") ||
-               lowerUri.endsWith(".txt") ||
-               (lowerUri.contains("sitemap") && lowerUri.endsWith(".xml")) ||
-               lowerUri.endsWith("accesspolicy.xml") ||
-               lowerUri.equals("/favicon.ico");
-    }
-
-    /**
-     * 악성 스캐너가 요청하는 경로인지 확인 (차단해야 할 경로)
-     * @param uri 요청 URI
-     * @return 악성 스캐너 경로면 true
-     */
-    private boolean isMaliciousScannerPath(String uri) {
-        if (uri == null || uri.isEmpty()) {
-            return false;
-        }
-
-        String lowerUri = uri.toLowerCase();
-
-        // 악성 스캐너 패턴 (Java 애플리케이션이므로 불필요한 경로들)
-        String[] maliciousPatterns = {
-            // PHP 관련
-            ".php", "phpunit", "eval-stdin",
-            // PHP 프레임워크/라이브러리
-            "vendor", "laravel", "yii", "zend", "drupal", "symfony",
-            // 다른 프레임워크/서비스
-            "containers", "wp-", "adminer", "phpmyadmin", "wordpress",
-            // 일반적인 스캐너가 시도하는 디렉토리
-            "/lib/", "/www/", "/public/", "/app/", "/admin/", "/backup/",
-            "/test/", "/demo/", "/cms/", "/crm/", "/panel/", "/blog/",
-            "/workspace/", "/apps/", "/v2/", "/ws/"
-        };
-
-        for (String pattern : maliciousPatterns) {
-            if (lowerUri.contains(pattern)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 일반적인 봇/스캐너가 요청하는 경로인지 확인 (하이브리드 접근)
-     * @param uri 요청 URI
-     * @return 봇/스캐너 경로면 true (필터 스킵)
-     */
-    private boolean isCommonBotOrScannerPath(String uri) {
-        if (uri == null || uri.isEmpty()) {
-            return false;
-        }
-
-        String lowerUri = uri.toLowerCase();
-
-        // 1. 정상적인 애플리케이션 경로는 제외 (필터 통과)
-        if (lowerUri.startsWith("/api/") ||
-            lowerUri.startsWith("/swagger-ui") ||
-            lowerUri.startsWith("/v3/api-docs") ||
-            lowerUri.startsWith("/docs") ||
-            lowerUri.equals("/") ||
-            lowerUri.equals("/error")) {
-            return false; // 정상 경로는 필터 통과
-        }
-
-        // 2. 정상 봇 경로 또는 악성 스캐너 경로는 필터 스킵
-        return isNormalBotPath(uri) || isMaliciousScannerPath(uri);
     }
 
     @Override
@@ -146,24 +66,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         // 디버깅: 쿠키가 없을 때만 상세 로그 출력
-        // 로그 레벨 조정: 정상 봇/악성 스캐너는 DEBUG, 일반 요청은 WARN
+        // /api/** 경로만 필터를 통과하므로 여기서는 정상적인 API 요청만 처리
         if (request.getCookies() == null || request.getCookies().length == 0) {
             String uri = request.getRequestURI();
-            if (isMaliciousScannerPath(uri)) {
-                log.debug("🔍 Malicious scanner request (no cookies) - URI: {}, Method: {}", uri, request.getMethod());
-            } else if (isNormalBotPath(uri)) {
-                log.debug("🔍 Normal bot request (no cookies) - URI: {}, Method: {}", uri, request.getMethod());
-            } else {
-                log.warn("⚠️ No cookies in request - URI: {}, Method: {}, Origin: {}, Referer: {}, Cookie Header: {}, All Headers: {}", 
-                        uri, 
-                        request.getMethod(),
-                        request.getHeader("Origin"),
-                        request.getHeader("Referer"),
-                        request.getHeader("Cookie"),
-                        Collections.list(request.getHeaderNames()).stream()
-                                .map(name -> name + "=" + request.getHeader(name))
-                                .collect(Collectors.joining(", ")));
-            }
+            // /api/** 경로는 정상적인 API 요청이므로 WARN 레벨 유지
+            log.warn("⚠️ No cookies in request - URI: {}, Method: {}, Origin: {}, Referer: {}, Cookie Header: {}, All Headers: {}", 
+                    uri, 
+                    request.getMethod(),
+                    request.getHeader("Origin"),
+                    request.getHeader("Referer"),
+                    request.getHeader("Cookie"),
+                    Collections.list(request.getHeaderNames()).stream()
+                            .map(name -> name + "=" + request.getHeader(name))
+                            .collect(Collectors.joining(", ")));
         }
 
         try {
@@ -195,15 +110,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             writeErrorResponse(response, ErrorCode.JWT_INVALID);
             return;
         } catch (JwtMissingException e) {
+            // /api/** 경로만 필터를 통과하므로 여기서는 정상적인 API 요청만 처리
             String uri = request.getRequestURI();
-            // 로그 레벨 조정: 정상 봇은 DEBUG, 악성 스캐너는 DEBUG, 일반 요청은 WARN
-            if (isMaliciousScannerPath(uri)) {
-                log.debug("🔍 Malicious scanner request blocked - URI: {}, Method: {}", uri, request.getMethod());
-            } else if (isNormalBotPath(uri)) {
-                log.debug("🔍 Normal bot request (no JWT) - URI: {}, Method: {}", uri, request.getMethod());
-            } else {
-                log.warn("⚠️ No JWT token found in request - URI: {}, Method: {}", uri, request.getMethod());
-            }
+            log.warn("⚠️ No JWT token found in request - URI: {}, Method: {}", uri, request.getMethod());
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, ErrorCode.JWT_MISSING);
             return;
