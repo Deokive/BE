@@ -45,12 +45,18 @@ public class JwtTokenResolver {
             }
 
             // 디버깅: 쿠키를 찾지 못한 경우 상세 로그 출력
-            log.warn("⚠️ Access Token Cookie not found - Key: {}, Request URI: {}, Available cookies: {}", 
-                    cookieAtkKey, 
-                    request.getRequestURI(),
-                    request.getCookies() != null ? Arrays.stream(request.getCookies())
-                            .map(c -> c.getName() + "=" + (c.getValue().length() > 20 ? c.getValue().substring(0, 20) + "..." : c.getValue()))
-                            .collect(Collectors.joining(", ")) : "null");
+            // 일반적인 봇/스캐너 요청은 DEBUG 레벨로 처리
+            String uri = request.getRequestURI();
+            if (isCommonBotOrScannerPath(uri)) {
+                log.debug("🔍 Bot/scanner request (no ATK cookie) - URI: {}", uri);
+            } else {
+                log.warn("⚠️ Access Token Cookie not found - Key: {}, Request URI: {}, Available cookies: {}", 
+                        cookieAtkKey, 
+                        uri,
+                        request.getCookies() != null ? Arrays.stream(request.getCookies())
+                                .map(c -> c.getName() + "=" + (c.getValue().length() > 20 ? c.getValue().substring(0, 20) + "..." : c.getValue()))
+                                .collect(Collectors.joining(", ")) : "null");
+            }
             
             return Optional.empty();
         } catch (Exception e) {
@@ -129,5 +135,39 @@ public class JwtTokenResolver {
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
 
         return JwtDto.TokenStringPair.of(accessToken, refreshToken);
+    }
+
+    /**
+     * 일반적인 봇/스캐너가 요청하는 경로인지 확인
+     * @param uri 요청 URI
+     * @return 봇/스캐너 경로면 true
+     */
+    private boolean isCommonBotOrScannerPath(String uri) {
+        if (uri == null || uri.isEmpty()) {
+            return false;
+        }
+
+        // .well-known 경로 (RFC 8615)
+        if (uri.startsWith("/.well-known/")) {
+            return true;
+        }
+
+        // 확장자 기반 체크
+        String lowerUri = uri.toLowerCase();
+        if (lowerUri.endsWith(".txt") || 
+            lowerUri.endsWith("accesspolicy.xml") ||
+            (lowerUri.contains("sitemap") && lowerUri.endsWith(".xml"))) {
+            return true;
+        }
+
+        // 특정 파일명 패턴
+        if (lowerUri.equals("/security.txt") ||
+            lowerUri.equals("/robots.txt") ||
+            lowerUri.equals("/favicon.ico") ||
+            (lowerUri.startsWith("/sitemap") && lowerUri.endsWith(".xml"))) {
+            return true;
+        }
+
+        return false;
     }
 }

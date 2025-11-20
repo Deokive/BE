@@ -52,7 +52,14 @@ public class RequestMatcherHolder {
 
             // robots, metadata (JWT 미적용 / permitAll)
             new RequestInfo(HttpMethod.GET, "/robots.txt", null),
-            new RequestInfo(HttpMethod.GET, "/latest/meta-data/**", null)
+            new RequestInfo(HttpMethod.GET, "/latest/meta-data/**", null),
+
+            // bot/scanner common paths (pattern-based to cover all variations)
+            new RequestInfo(null, "/.well-known/**", null),           // security.txt, apple-app-site-association, etc.
+            new RequestInfo(null, "/*.txt", null),                    // robots.txt, security.txt, etc.
+            new RequestInfo(null, "/sitemap*.xml", null),            // sitemap.xml, sitemap_index.xml, sitemap1.xml, etc.
+            new RequestInfo(null, "/*accesspolicy.xml", null),       // clientaccesspolicy.xml, crossdomain.xml, etc.
+            new RequestInfo(null, "/security.txt", null)             // security.txt (root level)
     );
 
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
