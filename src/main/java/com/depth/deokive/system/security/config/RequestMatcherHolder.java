@@ -48,7 +48,11 @@ public class RequestMatcherHolder {
             new RequestInfo(HttpMethod.GET,  "/error", null),
             new RequestInfo(HttpMethod.GET,  "/swagger-ui/**", null),
             new RequestInfo(HttpMethod.GET,  "/v3/api-docs/**", null),
-            new RequestInfo(HttpMethod.GET,  "/", null)
+            new RequestInfo(HttpMethod.GET,  "/", null),
+
+            // robots, metadata (JWT 미적용 / permitAll)
+            new RequestInfo(HttpMethod.GET, "/robots.txt", null),
+            new RequestInfo(HttpMethod.GET, "/latest/meta-data/**", null)
     );
 
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
