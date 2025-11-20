@@ -313,6 +313,41 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 악성 스캐너가 요청하는 경로인지 확인 (차단해야 할 경로)
+     * @param path 요청 경로
+     * @return 악성 스캐너 경로면 true
+     */
+    private boolean isMaliciousScannerPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return false;
+        }
+
+        String lowerPath = path.toLowerCase();
+
+        // 악성 스캐너 패턴 (Java 애플리케이션이므로 불필요한 경로들)
+        String[] maliciousPatterns = {
+            // PHP 관련
+            ".php", "phpunit", "eval-stdin",
+            // PHP 프레임워크/라이브러리
+            "vendor", "laravel", "yii", "zend", "drupal", "symfony",
+            // 다른 프레임워크/서비스
+            "containers", "wp-", "adminer", "phpmyadmin", "wordpress",
+            // 일반적인 스캐너가 시도하는 디렉토리
+            "/lib/", "/www/", "/public/", "/app/", "/admin/", "/backup/",
+            "/test/", "/demo/", "/cms/", "/crm/", "/panel/", "/blog/",
+            "/workspace/", "/apps/", "/v2/", "/ws/"
+        };
+
+        for (String pattern : maliciousPatterns) {
+            if (lowerPath.contains(pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * 일반적인 봇/스캐너가 요청하는 경로인지 확인 (하이브리드 접근)
      * @param path 요청 경로
      * @return 봇/스캐너 경로면 true
@@ -343,27 +378,7 @@ public class GlobalExceptionHandler {
             return true;
         }
 
-        // 3. 악성 스캐너 패턴 (Java 애플리케이션이므로 불필요한 경로들)
-        String[] maliciousPatterns = {
-            // PHP 관련
-            ".php", "phpunit", "eval-stdin",
-            // PHP 프레임워크/라이브러리
-            "vendor", "laravel", "yii", "zend", "drupal", "symfony",
-            // 다른 프레임워크/서비스
-            "containers", "wp-", "adminer", "phpmyadmin", "wordpress",
-            // 일반적인 스캐너가 시도하는 디렉토리
-            "/lib/", "/www/", "/public/", "/app/", "/admin/", "/backup/",
-            "/test/", "/demo/", "/cms/", "/crm/", "/panel/", "/blog/",
-            "/workspace/", "/apps/", "/v2/", "/ws/"
-        };
-
-        for (String pattern : maliciousPatterns) {
-            if (lowerPath.contains(pattern)) {
-                return true;
-            }
-        }
-
-        // 4. 알 수 없는 경로는 보수적으로 false 반환
-        return false;
+        // 3. 악성 스캐너 경로
+        return isMaliciousScannerPath(path);
     }
 }

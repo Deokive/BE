@@ -59,8 +59,12 @@ public class SecurityConfig {
                     oauth2.failureHandler(customFailureHandler);
                 })
                 .authorizeHttpRequests((auth) -> auth
+                        // 1. 비인증 경로들 (RequestMatcherHolder에서 관리)
                         .requestMatchers(requestMatcherHolder.getRequestMatchersByMinRole(null)).permitAll()
-                        .anyRequest().authenticated()
+                        // 2. /api/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
+                        .requestMatchers(requestMatcherHolder.getApiRequestMatcher()).authenticated()
+                        // 3. 그 외 모든 요청 차단
+                        .anyRequest().denyAll()
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .accessDeniedHandler((request, response, accessDeniedException) -> {

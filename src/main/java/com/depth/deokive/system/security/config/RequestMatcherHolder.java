@@ -79,6 +79,24 @@ public class RequestMatcherHolder {
     }
 
     /**
+     * /api/**로 시작하는 모든 경로에 대한 RequestMatcher 반환 (캐시)
+     * @return /api/**로 시작하는 경로면 true
+     */
+    public RequestMatcher getApiRequestMatcher() {
+        return reqMatcherCacheMap.computeIfAbsent("API_PREFIX", k -> {
+            final PathPattern apiPattern = PARSER.parse("/api/**");
+            return (HttpServletRequest request) -> {
+                String uri = request.getRequestURI();
+                String contextPath = request.getContextPath();
+                if (contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)) {
+                    uri = uri.substring(contextPath.length());
+                }
+                return apiPattern.matches(PathContainer.parsePath(uri));
+            };
+        });
+    }
+
+    /**
      * 단일 항목을 PathPattern 기반 RequestMatcher 로 변환
      */
     private RequestMatcher toRequestMatcher(RequestInfo info) {
