@@ -48,13 +48,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return true;
         }
 
-        // 2. /api/**가 아닌 경로는 필터 스킵 (SecurityConfig에서 denyAll()로 차단됨)
+        // 2. /api/v1/**가 아닌 경로는 필터 스킵 (SecurityConfig에서 denyAll()로 차단됨)
         String uri = request.getRequestURI();
-        if (uri != null && !uri.startsWith("/api/")) {
+        if (uri != null && !uri.startsWith("/api/v1/")) {
             return true; // 필터 스킵 (SecurityConfig에서 처리)
         }
 
-        // 3. /api/** 경로는 필터 통과 (인증 필요)
+        // 3. /api/v1/** 경로는 필터 통과 (인증 필요)
         return false;
     }
 

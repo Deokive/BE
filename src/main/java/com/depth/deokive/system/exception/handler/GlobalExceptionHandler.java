@@ -7,6 +7,7 @@ import com.depth.deokive.system.security.jwt.exception.*;
 import io.lettuce.core.RedisCommandExecutionException;
 import io.lettuce.core.RedisCommandTimeoutException;
 import io.lettuce.core.RedisException;
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.*;
@@ -25,6 +26,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    // TODO: Deprecated Exceptions->Deadlock, CannotSerializable...
+
     @ExceptionHandler(RestException.class)
     public ResponseEntity<ErrorResponse> handleBaseException(RestException e) {
         return createErrorResponse(e.getErrorCode(), e.getMessage());
@@ -107,7 +110,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
         String msg = e.getConstraintViolations().stream()
-                .map(v -> v.getMessage())
+                .map(ConstraintViolation::getMessage)
                 .findFirst()
                 .orElse("요청 파라미터가 올바르지 않습니다.");
         return createErrorResponse(HttpStatus.BAD_REQUEST, "GLOBAL_INVALID_PARAMETER", msg);
@@ -129,7 +132,7 @@ public class GlobalExceptionHandler {
         
         // RequestMatcherHolder의 permitAll 경로가 아니고 /api/**도 아니면 DEBUG 레벨로 처리
         // (SecurityConfig에서 denyAll()로 차단되므로 정상적인 요청이 아님)
-        if (resourcePath != null && !resourcePath.startsWith("/api/")) {
+        if (!resourcePath.startsWith("/api/")) {
             log.debug("🔍 Non-API resource not found (blocked by denyAll): {}", resourcePath);
         } else {
             log.warn("⚠️ Resource not found: {}", resourcePath);

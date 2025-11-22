@@ -69,8 +69,8 @@ public class RequestMatcherHolder {
     }
 
     /**
-     * /api/**로 시작하는 모든 경로에 대한 RequestMatcher 반환 (캐시)
-     * @return /api/**로 시작하는 경로면 true
+     * /api/v1/**로 시작하는 모든 경로에 대한 RequestMatcher 반환 (캐시)
+     * @return /api/v1/**로 시작하는 경로면 true
      */
     public RequestMatcher getApiRequestMatcher() {
         return reqMatcherCacheMap.computeIfAbsent("API_PREFIX", k -> {
