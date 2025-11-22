@@ -67,6 +67,10 @@ public class SecurityConfig {
                         .anyRequest().denyAll()
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", request.getRequestURI());
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", request.getRequestURI());
                             response.sendError(HttpServletResponse.SC_FORBIDDEN);
