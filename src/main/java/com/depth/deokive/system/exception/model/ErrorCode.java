@@ -22,7 +22,7 @@ public enum ErrorCode {
     JWT_MALFORMED(HttpStatus.UNAUTHORIZED, "JWT MALFORMED", "토큰 형식이 올바르지 않습니다."),
     JWT_AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "JWT AUTHENTICATION FAILED", "토큰 인증에 실패했습니다."),
     JWT_CANNOT_GENERATE_TOKEN(HttpStatus.BAD_REQUEST, "JWT CANNOT GENERATE TOKEN", "토큰을 생성할 수 없습니다."),
-    JWT_MISSING(HttpStatus.BAD_REQUEST, "JWT MISSING", "토큰이 누락되었습니다."),
+    JWT_MISSING(HttpStatus.UNAUTHORIZED, "JWT MISSING", "토큰이 누락되었습니다."),
     JWT_FAILED_PARSING(HttpStatus.UNAUTHORIZED, "JWT FAILED PARSING", "토큰을 파싱하는데 실패했습니다."),
     JWT_BLACKLIST(HttpStatus.UNAUTHORIZED, "JWT BLACKLIST", "블랙리스트에 해당하는 토큰입니다."),
 
