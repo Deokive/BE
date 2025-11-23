@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main"]
 
 env:
   AWS_REGION: ap-northeast-2
@@ -37,7 +37,7 @@ jobs:
           aws ec2 authorize-security-group-ingress \
             --group-id ${{ env.AWS_SECURITY_GROUP_ID }} \
             --protocol tcp \
-            --port 22 \
+            --port ${{ secrets.EC2_SSH_PORT }} \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
       # ------------------------------------------------------
 
@@ -76,6 +76,7 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
+          port: ${{ secrets.EC2_SSH_PORT }} # 웹봇 자동 공격량 감안하여 기본 22번 포트가 아닌 다른 포트 사용
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           source: deploy/*
@@ -93,6 +94,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
+          port: ${{ secrets.EC2_SSH_PORT }} # 웹봇 자동 공격량 감안하여 기본 22번 포트가 아닌 다른 포트 사용
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script_stop: true
@@ -172,5 +174,5 @@ jobs:
           aws ec2 revoke-security-group-ingress \
             --group-id ${{ env.AWS_SECURITY_GROUP_ID }} \
             --protocol tcp \
-            --port 22 \
+            --port ${{ secrets.EC2_SSH_PORT }} \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
