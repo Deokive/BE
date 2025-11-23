@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "DEOK-22-CICD-흐름-수정-for-서버-보안-강화" ]
 
 env:
   AWS_REGION: ap-northeast-2
