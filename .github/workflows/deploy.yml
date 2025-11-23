@@ -86,7 +86,7 @@ jobs:
       - name: Add EC2 host to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p ${{ secrets.EC2_SSH_PORT }} ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
       # [1]. 배포 디렉토리 생성 (서버에 이미 있다면 생략)
       - name: Deploy via SSH (docker compose pull & up)
