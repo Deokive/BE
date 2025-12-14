@@ -36,11 +36,6 @@ spring:
       region:
         static: ap-northeast-2
 
-  servlet:
-    multipart:
-      max-file-size: ${MAX_FILE_SIZE}
-      max-request-size: ${MAX_REQUEST_SIZE}
-
   data:
     redis:
       host: ${REDIS_HOST:localhost}

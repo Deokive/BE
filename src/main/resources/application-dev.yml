@@ -40,11 +40,6 @@ spring:
         access-key: ${AWS_IAM_ACCESS_KEY} # // Only Local 환경에서만
         secret-key: ${AWS_IAM_SECRET_KEY} # // Only Local 환경에서만
 
-  servlet:
-    multipart:
-      max-file-size: 16MB
-      max-request-size: 20MB
-
 logging:
   level:
     org.hibernate.SQL: debug
