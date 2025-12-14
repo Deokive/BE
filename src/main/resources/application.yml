@@ -36,11 +36,6 @@ spring:
       region:
         static: ap-northeast-2
 
-  servlet:
-    multipart:
-      max-file-size: ${MAX_FILE_SIZE}
-      max-request-size: ${MAX_REQUEST_SIZE}
-
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -116,3 +111,6 @@ app:
 
 hmac:
   secret: ${HMAC_SECRET_KEY} # at least 32 characters long
+
+cdn:
+  base-url: ${CDN_BASE_URL:} # CDN이 있다면 설정, 없으면 빈 문자열 (S3 URL 사용)
