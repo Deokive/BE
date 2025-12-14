@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * S3 업로드, File 엔티티 관리, CDN URL 생성 등 파일 관련 기능만 담당
  * Entity-File 매핑은 FileAttachmentService에서 처리
  *
- * 썸네일 처리 방식: 동적 썸네일 URL 생성
+ * 썸네일 처리 방식: 패턴 4 (동적 썸네일 URL 생성)
  * - 썸네일 파일을 DB에 저장하지 않음
  * - 조회 시 원본 파일의 S3 키를 기반으로 썸네일 URL을 동적으로 생성
  * - S3에 썸네일이 있으면 해당 URL 반환, 없으면 원본 URL 사용 (fallback)
@@ -30,12 +30,16 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class FileService {
     private final S3Service s3Service;
     private final FileRepository fileRepository;
 
-    @Value("${cdn.base-url:#{null}}") private String cdnBaseUrl;
-    @Value("${spring.cloud.aws.s3.bucket}") private String bucketName;
+    @Value("${cdn.base-url:#{null}}")
+    private String cdnBaseUrl;
+
+    @Value("${spring.cloud.aws.s3.bucket}")
+    private String bucketName;
 
     /**
      * 멀티파트 업로드 초기화 (모든 파일 타입: 이미지, 동영상 등)
@@ -106,7 +110,6 @@ public class FileService {
      * @param mediaRole MediaRole (PREVIEW인 경우 isThumbnail = true로 설정)
      * @return 업로드된 File 엔티티
      */
-    @Transactional
     public File completeMultipartUpload(
             String key,
             String uploadId,
@@ -208,17 +211,23 @@ public class FileService {
 
     /**
      * CDN URL 생성
-     * CDN base URL이 설정되어 있으면 사용, 없으면 S3 URL 사용
+     * CDN base URL이 필수로 설정되어 있어야 함 (보안: 버킷명 노출 방지)
+     *
+     * @param s3Url S3 URL
+     * @return CDN URL
+     * @throws IllegalStateException CDN base URL이 설정되지 않은 경우
      */
     private String generateCdnUrl(String s3Url) {
-        if (cdnBaseUrl != null && !cdnBaseUrl.isBlank()) {
-            // S3 URL에서 key 추출하여 CDN URL로 변환
-            // 예: https://bucket.s3.region.amazonaws.com/key -> https://cdn.example.com/key
-            // 실제 구현은 CDN 설정에 따라 다를 수 있음
-            String key = extractKeyFromS3Url(s3Url);
-            return buildCdnUrl(key);
+        if (cdnBaseUrl == null || cdnBaseUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "CDN base URL이 설정되지 않았습니다. " + "보안을 위해 CDN 설정이 필수입니다. "
+            );
         }
-        return s3Url;
+
+        // S3 URL에서 key 추출하여 CDN URL로 변환
+        // 예: https://bucket.s3.region.amazonaws.com/key -> https://cdn.example.com/key
+        String key = extractKeyFromS3Url(s3Url);
+        return buildCdnUrl(key);
     }
 
     /** S3 URL에서 key 추출 */
@@ -259,9 +268,12 @@ public class FileService {
      * 썸네일 URL 생성 (리사이징 버킷 → CDN)
      * 원본 File에서 썸네일 URL을 동적으로 생성 (패턴 4)
      *
+     * CDN base URL이 필수로 설정되어 있어야 함 (보안: 버킷명 노출 방지)
+     *
      * @param file 원본 File 엔티티
      * @param size 썸네일 크기 ("thumbnail" 또는 "medium")
      * @return 썸네일 CDN URL
+     * @throws IllegalStateException CDN base URL이 설정되지 않은 경우
      */
     public String getThumbnailUrl(File file, String size) {
         if (file.getMediaType() != MediaType.IMAGE) {
@@ -273,19 +285,18 @@ public class FileService {
         String thumbnailKey = generateThumbnailKey(originalKey, size);
 
         // CDN URL 생성 (CloudFront의 /files/thumbnails/* 패턴 사용)
-        if (cdnBaseUrl != null && !cdnBaseUrl.isBlank()) {
-            // CDN base URL에 썸네일 키를 직접 추가
-            // 예: https://cdn.example.com/files/thumbnails/thumbnail/{UUID}__{filename}.jpg
-            return buildCdnUrl(thumbnailKey);
+        // CDN이 필수이므로 설정되지 않으면 예외 발생
+        if (cdnBaseUrl == null || cdnBaseUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "CDN base URL이 설정되지 않았습니다. " +
+                            "보안을 위해 CDN 설정이 필수입니다. " +
+                            "application.yml에 cdn.base-url을 설정해주세요."
+            );
         }
 
-        // CDN이 없으면 리사이징 버킷의 S3 URL 반환
-        String resizedBucket = bucketName + "-resized";
-        return String.format(
-                "https://%s.s3.ap-northeast-2.amazonaws.com/%s",
-                resizedBucket,
-                thumbnailKey
-        );
+        // CDN base URL에 썸네일 키를 직접 추가
+        // 예: https://cdn.example.com/files/thumbnails/thumbnail/{UUID}__{filename}.jpg
+        return buildCdnUrl(thumbnailKey);
     }
 
     /**
