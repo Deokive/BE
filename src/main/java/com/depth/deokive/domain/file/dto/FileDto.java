@@ -1,6 +1,6 @@
 package com.depth.deokive.domain.file.dto;
 
-import com.depth.deokive.domain.file.entity.MediaRole;
+import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.file.entity;
+package com.depth.deokive.domain.file.entity.enums;
 
 public enum MediaType {
     VIDEO,
