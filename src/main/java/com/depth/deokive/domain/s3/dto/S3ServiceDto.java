@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.file.dto;
+package com.depth.deokive.domain.s3.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
