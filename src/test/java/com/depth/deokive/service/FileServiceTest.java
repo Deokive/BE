@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,7 +33,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FileService 테스트")
 class FileServiceTest {
-
     @Mock
     private S3Service s3Service;
 
@@ -192,8 +192,10 @@ class FileServiceTest {
                 .build());
 
         // S3Service Mock 설정
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
-                .location(TEST_S3_URL)
+                .location(s3Url)
                 .eTag("\"final-etag\"")
                 .build();
 
@@ -213,12 +215,15 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(1L);
         assertThat(result.getS3ObjectKey()).isEqualTo(key);
@@ -227,9 +232,21 @@ class FileServiceTest {
         assertThat(result.getMediaType()).isEqualTo(MediaType.IMAGE);
         assertThat(result.getIsThumbnail()).isFalse(); // CONTENT이므로 false
 
+        // Then - DB에 저장되는 File 엔티티 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
+        assertThat(savedEntity.getMediaType()).isEqualTo(MediaType.IMAGE);
+        assertThat(savedEntity.getIsThumbnail()).isFalse(); // CONTENT이므로 false
+        assertThat(savedEntity.getFilePath()).isNotNull();
+        assertThat(savedEntity.getFilePath()).contains(TEST_CDN_BASE_URL);
+        assertThat(savedEntity.getFilePath()).contains(key);
+
         // Verify
         verify(s3Service, times(1)).completeUpload(any(S3ServiceDto.CompleteUploadRequest.class));
-        verify(fileRepository, times(1)).save(any(File.class));
     }
 
     @Test
@@ -250,8 +267,10 @@ class FileServiceTest {
                 .build());
 
         // S3Service Mock 설정
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
-                .location(TEST_S3_URL)
+                .location(s3Url)
                 .eTag("\"final-etag\"")
                 .build();
 
@@ -271,19 +290,34 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(2L);
         assertThat(result.getIsThumbnail()).isTrue(); // PREVIEW이므로 true
 
+        // Then - DB에 저장되는 File 엔티티 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
+        assertThat(savedEntity.getMediaType()).isEqualTo(MediaType.IMAGE);
+        assertThat(savedEntity.getIsThumbnail()).isTrue(); // PREVIEW이므로 true
+        assertThat(savedEntity.getFilePath()).isNotNull();
+        assertThat(savedEntity.getFilePath()).contains(TEST_CDN_BASE_URL);
+        assertThat(savedEntity.getFilePath()).contains(key);
+
         // Verify
         verify(s3Service, times(1)).completeUpload(any(S3ServiceDto.CompleteUploadRequest.class));
-        verify(fileRepository, times(1)).save(any(File.class));
     }
 
     @Test
@@ -304,8 +338,10 @@ class FileServiceTest {
         parts.add(FileDto.Part.builder().partNumber(3).etag("\"etag-part-3\"").build());
 
         // S3Service Mock 설정
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
-                .location(TEST_S3_URL)
+                .location(s3Url)
                 .eTag("\"final-etag-combined\"")
                 .build();
 
@@ -325,14 +361,30 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result).isNotNull();
         assertThat(result.getMediaType()).isEqualTo(MediaType.VIDEO);
+
+        // Then - DB에 저장되는 File 엔티티 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
+        assertThat(savedEntity.getMediaType()).isEqualTo(MediaType.VIDEO);
+        assertThat(savedEntity.getIsThumbnail()).isFalse();
+        assertThat(savedEntity.getFilePath()).isNotNull();
+        assertThat(savedEntity.getFilePath()).contains(TEST_CDN_BASE_URL);
+        assertThat(savedEntity.getFilePath()).contains(key);
 
         // Verify - S3Service에 전달된 CompleteUploadRequest의 parts 검증
         verify(s3Service, times(1)).completeUpload(argThat(request -> {
@@ -345,7 +397,6 @@ class FileServiceTest {
                     req.getParts().get(2).getPartNumber() == 3 &&
                     req.getParts().get(2).getEtag().equals("\"etag-part-3\"");
         }));
-        verify(fileRepository, times(1)).save(any(File.class));
     }
 
     @Test
@@ -450,8 +501,10 @@ class FileServiceTest {
         List<FileDto.Part> parts = new ArrayList<>();
         parts.add(FileDto.Part.builder().partNumber(1).etag("\"etag-123\"").build());
 
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
-                .location(TEST_S3_URL)
+                .location(s3Url)
                 .eTag("\"final-etag\"")
                 .build();
 
@@ -469,13 +522,24 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result.getMediaType()).isEqualTo(MediaType.IMAGE);
+
+        // Then - DB에 저장되는 File 엔티티 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+        assertThat(savedEntity.getMediaType()).isEqualTo(MediaType.IMAGE);
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
     }
 
     @Test
@@ -492,8 +556,10 @@ class FileServiceTest {
         List<FileDto.Part> parts = new ArrayList<>();
         parts.add(FileDto.Part.builder().partNumber(1).etag("\"etag-456\"").build());
 
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
-                .location(TEST_S3_URL)
+                .location(s3Url)
                 .eTag("\"final-etag\"")
                 .build();
 
@@ -511,13 +577,24 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result.getMediaType()).isEqualTo(MediaType.VIDEO);
+
+        // Then - DB에 저장되는 File 엔티티 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+        assertThat(savedEntity.getMediaType()).isEqualTo(MediaType.VIDEO);
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
     }
 
     @Test
@@ -534,8 +611,10 @@ class FileServiceTest {
         List<FileDto.Part> parts = new ArrayList<>();
         parts.add(FileDto.Part.builder().partNumber(1).etag("\"etag-789\"").build());
 
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
-                .location(TEST_S3_URL)
+                .location(s3Url)
                 .eTag("\"final-etag\"")
                 .build();
 
@@ -553,13 +632,24 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result.getMediaType()).isEqualTo(MediaType.MUSIC);
+
+        // Then - DB에 저장되는 File 엔티티 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+        assertThat(savedEntity.getMediaType()).isEqualTo(MediaType.MUSIC);
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
     }
 
     @Test
@@ -577,7 +667,8 @@ class FileServiceTest {
         parts.add(FileDto.Part.builder().partNumber(1).etag("\"etag-123\"").build());
 
         // S3 URL에서 key 추출하여 CDN URL로 변환
-        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/files/uuid-123__test-image.jpg";
+        // S3Response의 location은 실제 key를 포함한 S3 URL이어야 함
+        String s3Url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key;
         CompleteMultipartUploadResponse s3Response = CompleteMultipartUploadResponse.builder()
                 .location(s3Url)
                 .eTag("\"final-etag\"")
@@ -597,15 +688,28 @@ class FileServiceTest {
 
         when(fileRepository.save(any(File.class))).thenReturn(savedFile);
 
+        // ArgumentCaptor로 저장되는 File 엔티티 캡처
+        ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
         // When
         File result = fileService.completeMultipartUpload(
                 key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
         );
 
-        // Then
+        // Then - 반환된 결과 검증
         assertThat(result.getFilePath()).isNotNull();
         assertThat(result.getFilePath()).contains(TEST_CDN_BASE_URL);
         assertThat(result.getFilePath()).contains("files/uuid-123__test-image.jpg");
+
+        // Then - DB에 저장되는 File 엔티티의 filePath 검증
+        verify(fileRepository, times(1)).save(fileCaptor.capture());
+        File savedEntity = fileCaptor.getValue();
+        assertThat(savedEntity.getFilePath()).isNotNull();
+        assertThat(savedEntity.getFilePath()).contains(TEST_CDN_BASE_URL);
+        assertThat(savedEntity.getFilePath()).contains("files/uuid-123__test-image.jpg");
+        assertThat(savedEntity.getS3ObjectKey()).isEqualTo(key);
+        assertThat(savedEntity.getFilename()).isEqualTo(originalFileName);
+        assertThat(savedEntity.getFileSize()).isEqualTo(fileSize);
     }
 
     @Test
