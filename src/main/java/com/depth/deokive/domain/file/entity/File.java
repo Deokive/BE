@@ -19,12 +19,6 @@ public class File extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
-    private Long ticketId;
-
-    @Column(unique = true)
-    private Long archiveId;
-
     @Column(nullable = false, unique = true)
     private String s3ObjectKey;
 

@@ -1,0 +1,8 @@
+package com.depth.deokive.domain.diary.repository;
+
+import com.depth.deokive.domain.diary.entity.Diary;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface DiaryRepository extends JpaRepository<Diary, Long> {
+}
+
