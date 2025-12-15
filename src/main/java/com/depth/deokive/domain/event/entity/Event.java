@@ -24,6 +24,9 @@ public class Event extends TimeBaseEntity {
     private LocalDateTime date;
 
     @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false)
     private boolean hasTime; // 사용자 시간 설정 On-Off 여부
 
     @Column(nullable = false, length = 7, columnDefinition = "CHAR(7)")
