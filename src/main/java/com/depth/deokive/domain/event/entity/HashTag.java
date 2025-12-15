@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "hash_tag")
-public class HashTag {
+@Table(name = "hashtag")
+public class Hashtag {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
