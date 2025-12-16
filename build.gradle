@@ -57,11 +57,11 @@ dependencies {
     // https://mvnrepository.com/artifact/io.awspring.cloud/spring-cloud-aws-starter-s3
     implementation("io.awspring.cloud:spring-cloud-aws-starter-s3:3.4.0")
 
-//    // QueryDSL -- 추후 추가
-//    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
-//    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
-//    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
-//    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+    // QueryDSL
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 
     // OAuth2 Client
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
@@ -82,6 +82,20 @@ dependencies {
 
     testCompileOnly "org.projectlombok:lombok"
     testAnnotationProcessor "org.projectlombok:lombok"
+}
+
+def querydslDir = "$buildDir/generated/querydsl"
+
+sourceSets {
+    main.java.srcDirs += [ querydslDir ]
+}
+
+tasks.withType(JavaCompile) {
+    options.getGeneratedSourceOutputDirectory().set(file(querydslDir))
+}
+
+clean.doLast {
+    file(querydslDir).deleteDir()
 }
 
 tasks.named('test') {
