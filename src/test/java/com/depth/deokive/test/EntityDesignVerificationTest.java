@@ -23,7 +23,7 @@ import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.post.entity.Post;
-import com.depth.deokive.domain.post.entity.enums.Community;
+import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.post.entity.PostLikeCount;
 import com.depth.deokive.domain.post.repository.PostLikeCountRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
@@ -345,7 +345,7 @@ class EntityDesignVerificationTest {
                 .user(user)
                 .title("가입 인사")
                 .content("반갑습니다.")
-                .community(Community.IDOL)
+                .category(Category.IDOL)
                 .build();
         postRepository.save(post);
 
@@ -515,7 +515,7 @@ class EntityDesignVerificationTest {
                 .user(userA)
                 .title("가입 인사")
                 .content("반갑습니다.")
-                .community(Community.IDOL)
+                .category(Category.IDOL)
                 .build();
         postRepository.save(post);
 
@@ -704,7 +704,7 @@ class EntityDesignVerificationTest {
                 .user(userA)
                 .title("가입 인사")
                 .content("반갑습니다.")
-                .community(Community.IDOL)
+                .category(Category.IDOL)
                 .build();
         postRepository.save(post);
 

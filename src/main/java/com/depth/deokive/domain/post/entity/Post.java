@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.post.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
-import com.depth.deokive.domain.post.entity.enums.Community;
+import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -24,7 +24,7 @@ public class Post extends TimeBaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Community community;
+    private Category category;
 
     @Column(nullable = false, length = 5000)
     private String content;
