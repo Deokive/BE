@@ -1,6 +1,6 @@
 package com.depth.deokive.domain.archive.entity;
 
-import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.auditor.UserBaseEntity;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.user.entity.User;
@@ -17,7 +17,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @Getter
 @Table(name = "archive")
-public class Archive extends TimeBaseEntity {
+public class Archive extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
