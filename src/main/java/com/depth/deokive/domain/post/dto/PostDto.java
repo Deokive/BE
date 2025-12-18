@@ -1,7 +1,10 @@
 package com.depth.deokive.domain.post.dto;
 
 import com.depth.deokive.domain.file.dto.FileDto;
+import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
+import com.depth.deokive.domain.post.entity.Post;
+import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.User;
@@ -14,7 +17,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class PostDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -32,7 +37,14 @@ public class PostDto {
         @Schema(description = "첨부된 파일 연결 정보 리스트")
         private List<AttachedFileRequest> files;
 
-        // TODO: 정적 팩토리 메서드 구현
+        public static Post from(PostDto.Request request, User user) {
+            return Post.builder()
+                    .title(request.getTitle())
+                    .content(request.getContent())
+                    .category(request.getCategory())
+                    .user(user)
+                    .build();
+        }
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -95,7 +107,40 @@ public class PostDto {
         """)
         private List<FileDto.UploadFileResponse> files;
 
-        // TODO: 정적 팩토리 메서드 구현
+        public static Response of(Post post, List<PostFileMap> maps) {
+            return Response.builder()
+                    .id(post.getId())
+                    .title(post.getTitle())
+                    .content(post.getContent())
+                    .category(post.getCategory())
+                    .createdAt(post.getCreatedAt())
+                    .lastModifiedAt(post.getLastModifiedAt())
+                    .createdBy(post.getCreatedBy())
+                    .lastModifiedBy(post.getLastModifiedBy())
+                    .files(toFileResponses(maps))
+                    .build();
+        }
+
+        private static List<FileDto.UploadFileResponse> toFileResponses(List<PostFileMap> maps) {
+            if (maps == null || maps.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            return maps.stream()
+                .map(map -> {
+                    File file = map.getFile();
+                    return FileDto.UploadFileResponse.builder()
+                        .fileId(file.getId())
+                        .filename(file.getFilename())
+                        .cdnUrl(file.getFilePath())
+                        .fileSize(file.getFileSize())
+                        .mediaType(file.getMediaType().name())
+                        .mediaRole(map.getMediaRole())
+                        .sequence(map.getSequence())
+                        .build();
+                })
+                .collect(Collectors.toList());
+        }
     }
 
     /**
