@@ -50,6 +50,12 @@ public enum ErrorCode {
     REDIS_COMMAND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_COMMAND_FAILED", "Redis 명령 실행 중 오류가 발생했습니다."),
     REDIS_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "REDIS_TIMEOUT", "Redis 서버 응답 시간이 초과되었습니다."),
 
+    // MAIL Errors
+    MAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL SEND FAILED", "이메일 전송에 실패했습니다."),
+    MAIL_INVALID_ADDRESS(HttpStatus.BAD_REQUEST, "MAIL INVALID ADDRESS", "유효하지 않은 이메일 주소입니다."),
+    MAIL_TEMPLATE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL TEMPLATE ERROR", "이메일 템플릿 처리 중 오류가 발생했습니다."),
+    MAIL_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "MAIL CONNECTION FAILED", "메일 서버에 연결할 수 없습니다."),
+
     // FILE Errors
     FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FILE NOT FOUND", "파일을 찾을 수 없습니다."),
     FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "FILE STORAGE ERROR", "파일 저장 중 오류가 발생했습니다."),
