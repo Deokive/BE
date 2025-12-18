@@ -9,6 +9,7 @@ import com.depth.deokive.domain.post.repository.PostFileMapRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
+import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -85,6 +86,7 @@ public class PostService {
     }
 
     @Transactional
+    @ExecutionTime // 삭제 처리 시간 로깅 AOP (실제 JPA 처리와의 차이 확인 용도)
     public void deletePost(UserPrincipal userPrincipal, Long postId) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
