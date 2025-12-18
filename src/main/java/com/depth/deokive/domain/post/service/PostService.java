@@ -36,6 +36,7 @@ public class PostService {
 
         // SEQ 2. 게시글 저장
         Post post = PostDto.Request.from(request, foundUser);
+        postRepository.save(post);
 
         // SEQ 3. 파일 연결
         connectFilesToPost(post, request.getFiles());
@@ -49,23 +50,66 @@ public class PostService {
 
     @Transactional(readOnly=true)
     public PostDto.Response getPost(Long postId) {
+        // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND)); // ErrorCode 필요
+                .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
 
-        return toResponse(post);
+        // SEQ 2. 해당 게시글의 파일 매핑 조회
+        List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
+
+        // SEQ 3. Return
+        return PostDto.Response.of(post, maps);
+    }
+
+    @Transactional
+    public PostDto.Response updatePost(UserPrincipal userPrincipal, Long postId, PostDto.Request request) {
+        // SEQ 1. 게시글 조회
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
+
+        // SEQ 2. 작성자 검증
+        validateOwner(post, userPrincipal);
+
+        // SEQ 3. 게시글 정보 업데이트 (Dirty Checking)
+        post.update(request);
+
+        // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
+        postFileMapRepository.deleteAllByPostId(post.getId());
+        connectFilesToPost(post, request.getFiles());
+
+        // SEQ 5. 파일 매핑 조회
+        List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
+
+        // SEQ 6. Return
+        return PostDto.Response.of(post, maps);
+    }
+
+    @Transactional
+    public void deletePost(UserPrincipal userPrincipal, Long postId) {
+        // SEQ 1. 게시글 조회
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
+
+        // SEQ 2. 작성자 검증
+        validateOwner(post, userPrincipal);
+
+        // SEQ 3. 파일 매핑 해제: Cascade.REMOVE 의 N+1 문제 및 성능 이슈 -> 명시적 삭제: Bulk 처리 (Using JPQL)
+        postFileMapRepository.deleteAllByPostId(postId);
+
+        // SEQ 4. 게시글 삭제
+        postRepository.delete(post);
     }
 
     // ------ Helper Methods -------
-
-    /** 게시글과 파일 매핑 연결 */
     private void connectFilesToPost(Post post, List<PostDto.AttachedFileRequest> fileRequests) {
+        // SEQ 1. 파일 매핑이 없으면 종료
         if (fileRequests == null || fileRequests.isEmpty()) { return; }
 
+        // SEQ 2. 파일 매핑 생성
         for (PostDto.AttachedFileRequest fileReq : fileRequests) {
             File file = fileRepository.findById(fileReq.getFileId())
                     .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
 
-            //  PostFileMap 생성
             PostFileMap map = PostFileMap.builder()
                     .post(post)
                     .file(file)
