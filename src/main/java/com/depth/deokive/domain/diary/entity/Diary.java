@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.diary.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.auditor.UserBaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,7 +16,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Getter
 @Table(name = "diary")
-public class Diary extends TimeBaseEntity {
+public class Diary extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
