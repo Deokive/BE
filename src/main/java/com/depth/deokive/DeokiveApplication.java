@@ -10,7 +10,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import java.util.TimeZone;
 
 @EnableAsync
-@EnableJpaAuditing
 @SpringBootApplication
 public class DeokiveApplication {
 
