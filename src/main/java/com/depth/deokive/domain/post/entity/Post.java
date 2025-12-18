@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.post.entity;
 
-import com.depth.deokive.common.auditor.TimeBaseEntity;
 import com.depth.deokive.common.auditor.UserBaseEntity;
+import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
 import jakarta.persistence.*;
@@ -33,4 +33,16 @@ public class Post extends UserBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    public void update(PostDto.Request request) {
+        if (request == null) return;
+
+        this.title = nonBlankOrDefault(request.getTitle(), this.title);
+        this.category = nonBlankOrDefault(request.getCategory(), this.category);
+        this.content = nonBlankOrDefault(request.getContent(), this.content);
+    }
+
+    private <T> T nonBlankOrDefault(T newValue, T currentValue) {
+        return newValue != null ? newValue : currentValue;
+    }
 }
