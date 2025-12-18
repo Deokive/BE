@@ -1,4 +1,4 @@
-package com.depth.deokive.test;
+package com.depth.deokive.general_test;
 
 import com.depth.deokive.domain.archive.entity.*;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;

@@ -1,4 +1,4 @@
-package com.depth.deokive.service;
+package com.depth.deokive.domain.file.service;
 
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
