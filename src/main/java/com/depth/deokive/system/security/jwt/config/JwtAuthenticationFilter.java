@@ -84,8 +84,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             // Parse Token From Request
             var nullableToken = jwtTokenResolver.parseTokenFromRequest(request);
-            if (nullableToken.isEmpty()) { throw new JwtMissingException(); }
-            // if (nullableToken.isEmpty()) { filterChain.doFilter(request, response); return; }
+            // if (nullableToken.isEmpty()) { throw new JwtMissingException(); }
+            if (nullableToken.isEmpty()) { filterChain.doFilter(request, response); return; }
 
             // Extract JWT Payload with Validation (Token 자체의 유효성 검증)
             JwtDto.TokenPayload payload = jwtTokenResolver.resolveToken(nullableToken.get());
@@ -118,7 +118,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         } catch (JwtExpiredException e) {
             log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e.getMessage());
-            
+
+            // TODO: Refactoring 필요 -> 별도의 Helper Methods 로 분리할 것
             // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
             try {
                 // 1. RTK 존재 여부 확인 (ATK는 없어도 RTK만 있으면 자동 Refresh 가능)
