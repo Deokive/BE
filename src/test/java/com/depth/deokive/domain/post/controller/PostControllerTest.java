@@ -4,6 +4,7 @@ import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.post.dto.PostDto;
+import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
@@ -163,7 +164,7 @@ class PostControllerTest {
     @Test
     @DisplayName("Authorization: 다른 사람의 글을 삭제하려 하면 403 Forbidden")
     void deletePost_Forbidden_Fail() throws Exception {
-        com.depth.deokive.domain.post.entity.Post post = postRepository.save(com.depth.deokive.domain.post.entity.Post.builder()
+        Post post = postRepository.save(Post.builder()
                 .title("A's Post")
                 .content("..")
                 .category(Category.IDOL)
