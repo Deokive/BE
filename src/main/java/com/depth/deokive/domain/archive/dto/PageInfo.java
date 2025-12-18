@@ -40,7 +40,7 @@ public class PageInfo {
 
         return PageInfo.builder()
                 .size(page.getSize())
-                .pageNumber(page.getPageNumber())
+                .pageNumber(page.getNumber())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
                 .sort(sortProperty)
