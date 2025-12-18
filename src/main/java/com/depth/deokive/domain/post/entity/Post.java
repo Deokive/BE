@@ -1,9 +1,10 @@
 package com.depth.deokive.domain.post.entity;
 
-import com.depth.deokive.common.auditor.UserBaseEntity;
+import com.depth.deokive.common.auditor.TimeBaseEntity;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
+import com.depth.deokive.domain.user.entity.enums.Role;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,7 +17,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @Getter
 @Table(name = "post")
-public class Post extends UserBaseEntity {
+public class Post extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 

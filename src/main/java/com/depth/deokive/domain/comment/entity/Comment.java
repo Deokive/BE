@@ -1,7 +1,6 @@
 package com.depth.deokive.domain.comment.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
-import com.depth.deokive.common.auditor.UserBaseEntity;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.user.entity.User;
 import jakarta.persistence.*;
@@ -29,7 +28,7 @@ import lombok.experimental.SuperBuilder;
         @Index(name = "idx_comment_user", columnList = "user_id")
     }
 )
-public class Comment extends UserBaseEntity {
+public class Comment extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
