@@ -1,0 +1,77 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect # H2 호환 모드
+
+  cloud:
+    aws:
+      s3:
+        bucket: test-bucket
+      credentials:
+        access-key: test-access-key
+        secret-key: test-secret-key
+      region:
+        static: ap-northeast-2
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-id
+            client-secret: test-google-secret
+          naver:
+            client-id: test-naver-id
+            client-secret: test-naver-secret
+          kakao:
+            client-id: test-kakao-id
+            client-secret: test-kakao-secret
+
+  mail:
+    host: localhost
+    port: 1025
+    username: test-user
+    password: test-password
+    group: TestGroup
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls.enable: false
+
+hmac:
+  secret: test-hmac-secret-key-must-be-at-least-32-bytes-long
+
+jwt:
+  secret: dGVzdC1qd3Qtc2VjcmV0LWtleS1tdXN0LWJlLXZlcnktbG9uZy1mb3Itc2VjdXJpdHktcHVycG9zZQ== # Base64 Encoded Dummy
+  atk-exp-min: 30
+  rtk-exp-week: 2
+
+cdn:
+  base-url: http://test-cdn.com
+
+app:
+  front-redirect-uri: http://localhost:3000/oauth/callback
+  front-base-url: http://localhost:3000
+  allowed-origins: "*"
