@@ -8,13 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
-public class ArchiveResponseDto {
-    private Long archiveId;
+public class ArchiveMeResponseDto {
+    private Long id;
     private String title;
-    private String nickname; // 작성자 닉네임
     private String thumbnailUrl; // 썸네일 이미지 URL
-    private long likeCount;
-    private long viewCount;
-    private boolean isLiked; // 내가 좋아요 눌렀는지 여부
     private LocalDateTime createdAt;
+    private LocalDateTime lastModifiedAt;
 }
