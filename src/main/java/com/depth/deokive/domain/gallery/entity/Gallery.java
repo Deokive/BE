@@ -13,10 +13,15 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "gallery")
+@Table(name = "gallery",
+    // 이거 주석처리 했다가 풀었다 하면서 성능 비교할 것
+    indexes = @Index(name = "idx_gallery_archive_created", columnList = "archive_id, created_at DESC"))
 public class Gallery extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "archive_id")
+    private Long archiveId; // 조회 성능을 위한 역정규화 컬럼
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gallery_book_id", nullable = false)
@@ -26,6 +31,4 @@ public class Gallery extends TimeBaseEntity {
     @JoinColumn(name = "file_id", nullable = false)
     private File file;
 
-    // @Column(nullable = false)
-    // private Integer sequence; // 앨범 내 정렬 순서 (사용자 지정) // TODO: 기획측에서 아직 의도는 안했지만, 필요할 가능성이 높음 (추후 확장)
 }
