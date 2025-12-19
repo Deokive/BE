@@ -16,11 +16,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.validation.BindException;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
@@ -106,6 +110,18 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.BAD_REQUEST, "GLOBAL_INVALID_PARAMETER", message);
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String fieldName = e.getName();
+        // 사용자가 보낸 잘못된 값
+        String invalidValue = e.getValue() != null ? e.getValue().toString() : "null";
+
+        // 깔끔한 메시지로 변환
+        String errorMessage = String.format("%s : 값의 형식이 올바르지 않습니다. (입력값: %s)", fieldName, invalidValue);
+
+        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, errorMessage);
+    }
+
     // ★ @RequestParam/@PathVariable 검증 실패 처리
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
@@ -116,13 +132,32 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.BAD_REQUEST, "GLOBAL_INVALID_PARAMETER", msg);
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
-            MethodArgumentNotValidException e) {
-        var messages = e.getBindingResult().getFieldErrors().stream()
-                .map(err -> err.getField() + " : " + err.getDefaultMessage())
-                .toList();
-        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, String.join(", ", messages));
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    public ResponseEntity<ErrorResponse> handleValidationException(Exception e) {
+        BindingResult bindingResult = null;
+        if (e instanceof BindException) {
+            bindingResult = ((BindException) e).getBindingResult();
+        }
+
+        String errorMessage = "잘못된 요청입니다.";
+        if (bindingResult != null && bindingResult.hasErrors()) {
+            FieldError fieldError = bindingResult.getFieldError();
+
+            if (fieldError != null) {
+                // 1. 타입 변환 실패인지 확인
+                // codes 배열에 "typeMismatch"가 포함되어 있거나, isBindingFailure()가 true인 경우
+                if (fieldError.isBindingFailure() || "typeMismatch".equals(fieldError.getCode())) {
+                    String invalidValue = fieldError.getRejectedValue() != null ? fieldError.getRejectedValue().toString() : "null";
+                    errorMessage = fieldError.getField() + " : 값의 형식이 올바르지 않습니다. (입력값: " + invalidValue + ")";
+                }
+                // 2. 일반 유효성 검사 실패 (@Min, @Max 등)
+                else {
+                    errorMessage = fieldError.getField() + " : " + fieldError.getDefaultMessage();
+                }
+            }
+        }
+
+        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, errorMessage);
     }
 
     // 정적 리소스를 찾을 수 없을 때 처리
