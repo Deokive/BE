@@ -43,6 +43,7 @@ public class Post extends TimeBaseEntity {
         this.content = nonBlankOrDefault(request.getContent(), this.content);
     }
 
+    // TODO: 사실 이게 PATCH 패턴 처리 방식. Validation 에서 체크를 해줘서 빈 값 들어올 일은 없긴 한데... 일단 보류. 리팩토링 단계에서 고려
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;
     }
