@@ -10,6 +10,7 @@ import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,12 +26,15 @@ public class PostDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "게시글 작성 요청 DTO")
     public static class Request {
+        @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "게시글 제목", example = "짱구는 못말려: 어른 제국의 역습 후기")
         private String title;
 
+        @NotBlank(message = "게시글 작성은 필수입니다.")
         @Schema(description = "게시글 본문", example = "신형만의 회상씬은 정말 최고였다 ... (중략)")
         private String content;
 
+        @NotBlank(message = "게시글 카테고리 설정은 필수입니다.")
         @Schema(description = "게시글 카테고리", example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
         private Category category;
 
