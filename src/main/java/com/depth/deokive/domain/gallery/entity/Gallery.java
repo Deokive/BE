@@ -15,7 +15,10 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Table(name = "gallery",
     // 이거 주석처리 했다가 풀었다 하면서 성능 비교할 것
-    indexes = @Index(name = "idx_gallery_archive_created", columnList = "archive_id, created_at DESC"))
+    indexes = {
+        @Index(name = "idx_gallery_archive_created", columnList = "archive_id, created_at DESC"),
+        @Index(name = "idx_gallery_archive_last_modified", columnList = "archive_id, last_modified_at DESC"),
+    })
 public class Gallery extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
