@@ -68,6 +68,12 @@ public enum ErrorCode {
     POST_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST UPDATE FAILED", "게시글 수정에 실패했습니다."),
     POST_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST DELETE FAILED", "게시글 삭제에 실패했습니다."),
 
+    // archive Errors
+    ARCHIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "ARCHIVE_NOT_FOUND", "존재하지 않는 아카이브입니다."),
+    ARCHIVE_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_CREATION_FAILED", "아카이브 생성에 실패했습니다."),
+    ARCHIVE_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_UPDATE_FAILED", "아카이브 수정에 실패했습니다."),
+    ARCHIVE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_DELETE_FAILED", "아카이브 삭제에 실패했습니다."),
+
     // DB Errors
     DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),
     DB_QUERY_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "DB QUERY TIMEOUT", "쿼리 실행 시간이 초과되었습니다."),

@@ -84,20 +84,6 @@ dependencies {
     testAnnotationProcessor "org.projectlombok:lombok"
 }
 
-def querydslDir = "$buildDir/generated/querydsl"
-
-sourceSets {
-    main.java.srcDirs += [ querydslDir ]
-}
-
-tasks.withType(JavaCompile) {
-    options.getGeneratedSourceOutputDirectory().set(file(querydslDir))
-}
-
-clean.doLast {
-    file(querydslDir).deleteDir()
-}
-
 tasks.named('test') {
     useJUnitPlatform()
 }
