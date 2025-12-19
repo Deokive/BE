@@ -34,7 +34,7 @@ public class PostDto {
         @Schema(description = "게시글 본문", example = "신형만의 회상씬은 정말 최고였다 ... (중략)")
         private String content;
 
-        @NotBlank(message = "게시글 카테고리 설정은 필수입니다.")
+        @NotNull(message = "게시글 카테고리 설정은 필수입니다.")
         @Schema(description = "게시글 카테고리", example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
         private Category category;
 
