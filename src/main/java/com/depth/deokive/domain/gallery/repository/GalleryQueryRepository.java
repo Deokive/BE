@@ -16,12 +16,10 @@ import static com.depth.deokive.domain.gallery.entity.QGalleryFileMap.galleryFil
 import static com.depth.deokive.domain.file.entity.QFile.file;
 
 @RequiredArgsConstructor
-public class GalleryRepositoryImpl implements GalleryRepositoryCustom {
+public class GalleryQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-
-    @Override
     public Page<GalleryResponseDto> searchGalleries(Long archiveId, Pageable pageable) {
 
         // 1. 컨텐츠 조회
