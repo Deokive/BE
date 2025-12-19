@@ -14,13 +14,14 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Table(name = "gallery_book")
 public class GalleryBook {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
     private Long id;
 
     @Column(nullable = false)
     private String title;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "archive_id", nullable = false)
+    @MapsId
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "archive_id")
     private Archive archive;
 }
