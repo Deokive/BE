@@ -13,5 +13,6 @@ public class GalleryDto {
         private Long id; // 갤러리 삭제하거나 수정하고 싶을 수 있으니까
         private String thumbnailUrl;
         private LocalDateTime createdAt;
+        private LocalDateTime lastModifiedAt;
     }
 }
