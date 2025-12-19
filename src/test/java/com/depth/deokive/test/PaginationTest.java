@@ -1,71 +1,75 @@
 package com.depth.deokive.test;
 
-import com.depth.deokive.domain.gallery.dto.GalleryResponseDto;
-import com.depth.deokive.domain.gallery.repository.GalleryRepository;
-import lombok.extern.slf4j.Slf4j;
+import com.depth.deokive.common.init.DataInitializer;
+import com.depth.deokive.domain.user.entity.User;
+import com.depth.deokive.domain.user.repository.UserRepository;
+import com.depth.deokive.system.security.model.UserPrincipal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.util.StopWatch;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Slf4j
 @SpringBootTest
-@ActiveProfiles("dev") // 로컬 DB에 연결하기 위함
+@AutoConfigureMockMvc(addFilters = false)
 public class PaginationTest {
 
     @Autowired
-    private GalleryRepository galleryRepository;
+    private MockMvc mockMvc;
 
-    // 1. Gallery 페이지네이션 Test
-    @Test
-    @DisplayName(" 갤러리 N+1 문제 검증")
-    void testGalleryNPlusOne() {
-        Long archiveId = 1L;
-        PageRequest pageRequest = PageRequest.of(0, 5);
+    @Autowired
+    private DataInitializer dataInitializer;
 
-        log.info("[Gallery] N+1 문제 검증 시작");
-        long startTime = System.currentTimeMillis();
+    @Autowired
+    private UserRepository userRepository;
 
-        Page<GalleryResponseDto> result = galleryRepository.searchGalleries(archiveId, pageRequest);
+    @BeforeEach
+    void setUp() {
+        // 1. 더미 데이터 생성 (User 1명, Archive 30개)
+        dataInitializer.initDummyData();
 
-        long endTime = System.currentTimeMillis();
-        log.info("[Gallery] N+1 문제 검증 종료");
+        // 2. 로그인 처리
+        // DataInitializer에서 만든 이메일로 유저 조회
+        User user = userRepository.findByEmail("test@deokive.com")
+                .orElseThrow(() -> new RuntimeException("테스트용 유저를 찾을 수 없습니다. DataInitializer를 확인해주세요."));
 
-        assertThat(result.getContent()).hasSize(5);
+        // UserPrincipal.from() 메서드 사용
+        UserPrincipal principal = UserPrincipal.from(user);
 
-        assertThat(result.getContent().get(0).getTitle()).isNotNull();
-        assertThat(result.getContent().get(0).getThumbnailUrl()).isNotNull();
+        // SecurityContext에 인증 객체 주입
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
 
-        log.info("첫 페이지(5개) 조회 시간: {}ms", (endTime - startTime));
-        log.info("콘솔 로그에서 'Hibernate:'로 시작하는 쿼리가 [Count 1개 + Select 1개] 총 2개만 나가야 정상.");
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
     }
 
     @Test
-    @DisplayName("갤러리: 대용량 데이터 성능 검증 (50만 번째 데이터 조회)")
-    void testGalleryDeepPagination() {
-
-        Long archiveId = 1L;
-        int page = 100000;
-        PageRequest pageRequest = PageRequest.of(page, 5);
-
-
-        log.info("[Gallery] 성능 검증 시작 (Offset: 500,000)");
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
-
-        Page<GalleryResponseDto> result = galleryRepository.searchGalleries(archiveId, pageRequest);
-
-        stopWatch.stop();
-        log.info("[Gallery] 성능 검증 종료");
-
-        assertThat(result.getContent()).hasSize(5);
-
-        log.info("⏱50만 번째 페이지 조회 시간: {}ms", stopWatch.getTotalTimeMillis());
+    @DisplayName("내 아카이브 페이지네이션 - 0페이지(5개) 조회 성공")
+    @WithMockUser(username = "test@deokive.com", roles = "USER")
+    void getMyArchivesTest() throws Exception {
+        mockMvc.perform(get("/api/v1/archives/me")
+                        .param("page", "0")
+                        .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(30)) // 전체 30개
+                .andExpect(jsonPath("$.page.totalPages").value(6)) // 총 6페이지
+                .andExpect(jsonPath("$.page.pageNumber").value(0)) // 현재 0페이지
+                .andExpect(jsonPath("$.page.size").value(5))
+                .andExpect(jsonPath("$.content.length()").value(5)) // 데이터 5개
+                .andExpect(jsonPath("$.content[0].title").exists()) // 제목 필드 확인
+                .andDo(print());
     }
 }
