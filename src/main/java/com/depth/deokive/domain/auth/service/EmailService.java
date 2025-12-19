@@ -10,9 +10,11 @@ import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.angus.mail.util.MailConnectException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -81,6 +83,9 @@ public class EmailService {
         } catch (DataAccessException e) {
             log.error("🔴 Redis 데이터 접근 오류 (이메일 발송 중): {}", e.getMessage(), e);
             throw new RestException(ErrorCode.REDIS_ERROR);
+        } catch (MailException e) {
+            log.error("🔴 메일 서버 연결 실패 (이메일 발송 중): {}", e.getMessage(), e);
+            throw new RestException(ErrorCode.MAIL_CONNECTION_FAILED);
         }
     }
 

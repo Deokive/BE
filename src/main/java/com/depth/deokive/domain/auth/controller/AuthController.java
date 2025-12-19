@@ -145,7 +145,7 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "이메일 전송 성공")
     public ResponseEntity<String> sendEmail(@RequestParam String email) {
         emailService.sendEmail(email);
-        return ResponseEntity.ok("이메일이 발송되었습니다.");
+        return ResponseEntity.accepted().body("이메일 전송 요청이 접수되었습니다.");
     }
 
     // NO AUTH

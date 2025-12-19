@@ -25,7 +25,7 @@ public class UserDto {
         private Long id;
         @Schema(description = "이메일", example = "user@email.com")
         private String email;
-        @Schema(description = "사용자 성별", example = "USER | MANAGER | ADMIN")
+        @Schema(description = "사용자 역할", example = "USER | ADMIN")
         private Role role;
         @Schema(description = "사용자 닉네임", example = "hades")
         private String nickname;

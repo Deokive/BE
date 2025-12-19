@@ -3,14 +3,18 @@ package com.depth.deokive.system.security.config;
 import com.depth.deokive.domain.oauth2.handler.CustomFailureHandler;
 import com.depth.deokive.domain.oauth2.handler.CustomSuccessHandler;
 import com.depth.deokive.domain.oauth2.service.CustomOAuth2UserService;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
+import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.security.jwt.config.JwtAuthenticationFilter;
 import com.depth.deokive.system.security.util.OriginUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -23,6 +27,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -69,14 +74,23 @@ public class SecurityConfig {
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .authenticationEntryPoint((request, response, authException) -> {
                             // log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", request.getRequestURI());
-                            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                            writeErrorResponse(response, ErrorCode.JWT_MISSING);
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             // log.error("⚠️ Access Denied - 403 Forbidden. RequestURI: {}", request.getRequestURI());
-                            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                            writeErrorResponse(response, ErrorCode.AUTH_FORBIDDEN);
                         }))
                 .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         return http.build();
+    }
+
+    private void writeErrorResponse(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+        response.setStatus(errorCode.getStatus().value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+
+        ErrorResponse errorResponse = ErrorResponse.of(errorCode);
+        new ObjectMapper().writeValue(response.getWriter(), errorResponse);
     }
 
     @Bean

@@ -1,6 +1,6 @@
 package com.depth.deokive.domain.post.entity.enums;
 
-public enum Community {
+public enum Category {
     IDOL,
     ACTOR,
     MUSICIAN,
