@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.gallery.dto;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -17,20 +18,34 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class GalleryDto {
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Data @NoArgsConstructor
     @Schema(description = "갤러리 이미지 응답 DTO", name = "GalleryResponse")
     public static class Response {
         @Schema(description = "갤러리 아이디", example = "1")
         private Long id;
         
-        @Schema(description = "썸네일 이미지 URL", example = "https://cdn.example.com/gallery/123/thumbnail.jpg")
+        @Schema(description = "썸네일 이미지 URL",
+                example = "https://cdn.deokive.hooby-server.com/files/thumbnails/thumbnail/uuid_filename.jpg")
         private String thumbnailUrl;
+
+        @Schema(description = "원본 이미지 URL", example = "https://cdn.deokive.hooby-server.com/files/uuid_filename.jpg")
+        private String originalUrl; // 사용자가 클릭 시 원본 이미지를 띄움
         
         @Schema(description = "생성 시간", example = "2024-01-01T00:00:00")
         private LocalDateTime createdAt;
         
         @Schema(description = "수정 시간", example = "2024-01-01T00:00:00")
         private LocalDateTime lastModifiedAt;
+
+        @Builder
+        public Response(Long id, String filePath, LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
+            this.id = id;
+            this.createdAt = createdAt;
+            this.lastModifiedAt = lastModifiedAt;
+
+            this.originalUrl = filePath;
+            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(filePath);
+        }
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
