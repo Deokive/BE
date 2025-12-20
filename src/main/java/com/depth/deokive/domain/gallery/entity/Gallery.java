@@ -18,7 +18,14 @@ import lombok.experimental.SuperBuilder;
     indexes = {
         @Index(name = "idx_gallery_archive_created", columnList = "archive_id, created_at DESC"),
         @Index(name = "idx_gallery_archive_last_modified", columnList = "archive_id, last_modified_at DESC"),
-    })
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_gallery_archive_file",
+            columnNames = {"archive_id", "file_id"}
+        )
+    }
+)
 public class Gallery extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
