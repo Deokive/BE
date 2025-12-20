@@ -18,17 +18,31 @@ import java.util.List;
 
 public class GalleryDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "갤러리 이미지 응답 DTO", name = "GalleryResponse")
     public static class Response {
+        @Schema(description = "갤러리 아이디", example = "1")
         private Long id;
+        
+        @Schema(description = "썸네일 이미지 URL", example = "https://cdn.example.com/gallery/123/thumbnail.jpg")
         private String thumbnailUrl;
+        
+        @Schema(description = "생성 시간", example = "2024-01-01T00:00:00")
         private LocalDateTime createdAt;
+        
+        @Schema(description = "수정 시간", example = "2024-01-01T00:00:00")
         private LocalDateTime lastModifiedAt;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "갤러리 목록 페이징 응답 DTO", name = "GalleryPageListResponse")
     public static class PageListResponse {
+        @Schema(description = "갤러리 제목", example = "2024년 1월 갤러리")
         private String title;
+        
+        @Schema(description = "갤러리 이미지 목록", type = "array", implementation = Response.class)
         private List<Response> content;
+        
+        @Schema(description = "페이지 메타데이터")
         private PageInfo page; // 커스텀 페이지 메타데이터
 
         public static PageListResponse of(String title, Page<Response> pageData) {
@@ -42,6 +56,7 @@ public class GalleryDto {
 
     // DESCRIPTION: Pageable로 받을 수 있는데 Validation을 못함 -> 커스텀으로 Request를 만듦
     @Data
+    @Schema(description = "갤러리 목록 조회 요청 DTO")
     public static class GalleryPageRequest {
         @Min(value = 0, message = "페이지 번호는 0 이상이어야 합니다.")
         @Schema(description = "페이지 번호 (0부터 시작)", defaultValue = "0", example = "?page=1")
@@ -68,13 +83,27 @@ public class GalleryDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "페이지 정보 메타데이터 DTO")
     public static class PageInfo {
+        @Schema(description = "페이지 크기", example = "10")
         private int size;
+        
+        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
         private int pageNumber;
+        
+        @Schema(description = "전체 요소 개수", example = "100")
         private long totalElements;
+        
+        @Schema(description = "전체 페이지 수", example = "10")
         private int totalPages;
+        
+        @Schema(description = "이전 페이지 존재 여부", example = "false")
         private boolean hasPrev;
+        
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
         private boolean hasNext;
+        
+        @Schema(description = "빈 페이지 여부", example = "false")
         private boolean empty;
 
         public PageInfo(Page<?> page) {
