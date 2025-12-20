@@ -1,6 +1,5 @@
 package com.depth.deokive.domain.diary.entity;
 
-import com.depth.deokive.common.auditor.TimeBaseEntity;
 import com.depth.deokive.common.auditor.UserBaseEntity;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import jakarta.persistence.*;
@@ -16,7 +15,9 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "diary")
+@Table(name = "diary", indexes = {
+    @Index(name = "idx_diary_book_recorded_at", columnList = "diary_book_id, recorded_at DESC")
+})
 public class Diary extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -24,10 +25,10 @@ public class Diary extends UserBaseEntity {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false)
-    private LocalDate date; // 사용자 지정 일기 일자
+    @Column(name = "recorded_at", nullable = false)
+    private LocalDate recordedAt;
 
-    @Column(nullable = false, length = 7, columnDefinition = "CHAR(7)")
+    @Column(nullable = false, length = 7)
     private String color; // 색상 코드 (예: #FF5733)
 
     @Column(nullable = false, length = 1000)
@@ -35,7 +36,7 @@ public class Diary extends UserBaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    Visibility visibility;
+    private Visibility visibility;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "diary_book_id", nullable = false)
