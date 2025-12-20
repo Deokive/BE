@@ -24,4 +24,10 @@ public class GalleryBook {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "archive_id")
     private Archive archive;
+
+    public void updateTitle(String newTitle) { // Dirty Check
+        if (newTitle != null && !newTitle.isBlank()) {
+            this.title = newTitle;
+        }
+    }
 }
