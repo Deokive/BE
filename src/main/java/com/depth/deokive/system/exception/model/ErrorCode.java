@@ -68,11 +68,17 @@ public enum ErrorCode {
     POST_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST UPDATE FAILED", "게시글 수정에 실패했습니다."),
     POST_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST DELETE FAILED", "게시글 삭제에 실패했습니다."),
 
-    // archive Errors
+    // ARCHIVE Errors
     ARCHIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "ARCHIVE_NOT_FOUND", "존재하지 않는 아카이브입니다."),
     ARCHIVE_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_CREATION_FAILED", "아카이브 생성에 실패했습니다."),
     ARCHIVE_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_UPDATE_FAILED", "아카이브 수정에 실패했습니다."),
     ARCHIVE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_DELETE_FAILED", "아카이브 삭제에 실패했습니다."),
+
+    // DIARY Errors
+    DIARY_NOT_FOUND(HttpStatus.NOT_FOUND, "DIARY_NOT_FOUND", "존재하지 않는 다이어리입니다."),
+    DIARY_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_CREATION_FAILED", "다이어리 생성에 실패했습니다."),
+    DIARY_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_UPDATE_FAILED", "다이어리 수정에 실패했습니다."),
+    DIARY_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_DELETE_FAILED", "다이어리 삭제에 실패했습니다."),
 
     // DB Errors
     DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),
