@@ -1,6 +1,8 @@
 package com.depth.deokive.domain.diary.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.auditor.UserBaseEntity;
+import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,7 +17,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Getter
 @Table(name = "diary")
-public class Diary extends TimeBaseEntity {
+public class Diary extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -30,6 +32,10 @@ public class Diary extends TimeBaseEntity {
 
     @Column(nullable = false, length = 1000)
     private String content;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    Visibility visibility;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "diary_book_id", nullable = false)
