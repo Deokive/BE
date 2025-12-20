@@ -1,33 +1,55 @@
 package com.depth.deokive.domain.archive.service;
 
-import com.depth.deokive.domain.archive.dto.ArchiveMeResponseDto;
-import com.depth.deokive.domain.archive.dto.CustomPageResponse;
-import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.archive.dto.ArchiveDto;
+import com.depth.deokive.domain.archive.repository.ArchiveQueryRepository;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
+import com.depth.deokive.domain.user.repository.UserRepository;
+import com.depth.deokive.system.config.aop.ExecutionTime;
+import com.depth.deokive.system.exception.model.ErrorCode;
+import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ArchiveService {
 
-    private final ArchiveRepository archiveRepository;
+    private final ArchiveQueryRepository archiveQueryRepository;
+    private final FriendMapRepository friendMapRepository;
+    private final UserRepository userRepository;
 
-    public CustomPageResponse<ArchiveMeResponseDto> getMyArchiveList(Pageable pageable, Long userId) {
-        // 1. querydsl (userId 넘겨서 조회)
-        Page<ArchiveMeResponseDto> page = archiveRepository.searchMyArchive(pageable, userId);
+    @ExecutionTime
+    @Transactional(readOnly = true)
+    public ArchiveDto.PageListResponse getMyArchives(Long userId, Pageable pageable) {
+        Page<ArchiveDto.Response> page = archiveQueryRepository.searchArchives(userId, true, pageable);
+        return ArchiveDto.PageListResponse.of(page);
+    }
 
-        // 2. 인덱스 범위 체크
-        if(page.getTotalElements() > 0 && pageable.getPageNumber() >= page.getTotalPages()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 페이지는 존재하지 않습니다.");
+    @ExecutionTime
+    @Transactional(readOnly = true)
+    public ArchiveDto.PageListResponse getFriendArchives(Long myUserId, Long friendId, Pageable pageable) {
+
+        validateFriendRelationship(myUserId, friendId);
+
+        Page<ArchiveDto.Response> page = archiveQueryRepository.searchArchives(friendId, false, pageable);
+
+        return ArchiveDto.PageListResponse.of(page);
+    }
+
+    // 친구 관계 검증 로직 분리 (Clean Code)
+    private void validateFriendRelationship(Long myUserId, Long friendId) {
+        if (!userRepository.existsById(friendId)) {
+            throw new RestException(ErrorCode.USER_NOT_FOUND);
         }
 
-        // 3. 커스텀 응답 포맷
-        return CustomPageResponse.of(page);
+        boolean isFriend = friendMapRepository.existsFriendship(myUserId, friendId, FriendStatus.ACCEPTED);
+
+        if (!isFriend) {
+            throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 친구가 아님
+        }
     }
 }
