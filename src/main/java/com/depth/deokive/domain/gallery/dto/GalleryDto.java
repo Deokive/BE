@@ -2,9 +2,7 @@ package com.depth.deokive.domain.gallery.dto;
 
 import com.depth.deokive.common.util.ThumbnailUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -130,5 +128,51 @@ public class GalleryDto {
             this.hasNext = page.hasNext();
             this.empty = page.isEmpty();
         }
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "갤러리 이미지 등록 요청 DTO")
+    public static class CreateRequest {
+        @NotEmpty(message = "파일 ID 리스트는 비어있을 수 없습니다.")
+        @Size(max = 10, message = "한 번에 최대 10장까지만 업로드 가능합니다.") // 정책에 따라 조정
+        @Schema(description = "업로드된 파일 ID 리스트", example = "[101, 102, 103]")
+        private List<Long> fileIds;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "갤러리북 제목 수정 요청 DTO")
+    public static class UpdateTitleRequest {
+        @NotBlank(message = "제목은 필수입니다.")
+        // @Size(max = 50, message = "제목은 50자를 초과할 수 없습니다.")
+        @Schema(description = "변경할 갤러리북 제목", example = "2024 제주도 여행 (수정됨)")
+        private String title;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "갤러리 이미지 삭제 요청 DTO")
+    public static class DeleteRequest {
+        @NotEmpty(message = "삭제할 갤러리 ID 리스트는 비어있을 수 없습니다.")
+        @Schema(description = "삭제할 갤러리 ID 리스트", example = "[1, 2, 5]")
+        private List<Long> galleryIds;
+    }
+
+    @Data @Builder @AllArgsConstructor
+    @Schema(description = "갤러리 이미지 등록 성공 응답")
+    public static class CreateResponse {
+        @Schema(description = "생성된 갤러리 아이템 개수", example = "5")
+        private int createdCount;
+
+        @Schema(description = "소속 아카이브 ID", example = "1")
+        private Long archiveId;
+    }
+
+    @Data @Builder @AllArgsConstructor
+    @Schema(description = "갤러리북 제목 수정 성공 응답")
+    public static class UpdateTitleResponse {
+        @Schema(description = "수정된 갤러리북 ID (Archive ID)", example = "1")
+        private Long galleryBookId;
+
+        @Schema(description = "수정된 제목", example = "2024 제주도 여행 (수정됨)")
+        private String updatedTitle;
     }
 }
