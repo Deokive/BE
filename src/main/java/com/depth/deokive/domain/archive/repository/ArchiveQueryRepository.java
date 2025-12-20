@@ -6,6 +6,9 @@ import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
+import com.querydsl.core.types.dsl.NumberTemplate;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +26,10 @@ import java.util.stream.Collectors;
 
 import static com.depth.deokive.domain.archive.entity.QArchive.archive;
 import static com.depth.deokive.domain.archive.entity.QArchiveFileMap.archiveFileMap;
+import static com.depth.deokive.domain.archive.entity.QArchiveLikeCount.archiveLikeCount;
+import static com.depth.deokive.domain.archive.entity.QArchiveViewCount.archiveViewCount;
 import static com.depth.deokive.domain.file.entity.QFile.file;
+import static com.depth.deokive.domain.user.entity.QUser.user;
 
 @Repository
 @RequiredArgsConstructor
@@ -82,6 +89,88 @@ public class ArchiveQueryRepository {
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
     }
 
+    /**
+     * 핫피드 목록 조회 (Case IV 알고리즘 적용)
+     * 조건: PUBLIC 게시글만 노출, Hot Score 내림차순 정렬
+     */
+    public Page<ArchiveDto.Response> searchHotArchives(Pageable pageable) {
+
+        // 핫피드 스코어 수식 정의
+        NumberExpression<Double> hotScore = calculateHotScore();
+
+        // STEP 1. 스코어 계산 및 ID 조회
+        List<Long> ids = queryFactory
+                .select(archive.id)
+                .from(archive)
+                .leftJoin(archiveLikeCount).on(archiveLikeCount.archive.id.eq(archive.id))
+                .leftJoin(archiveViewCount).on(archiveViewCount.archive.id.eq(archive.id))
+                .where(archive.visibility.eq(Visibility.PUBLIC))
+                .orderBy(hotScore.desc()) // 계산된 점수로 정렬
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        if (ids.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        // STEP 2. 실제 데이터 조회 (User Fetch Join 포함)
+        List<Archive> archives = queryFactory
+                .selectFrom(archive)
+                .join(archive.user, user).fetchJoin()
+                .where(archive.id.in(ids))
+                .fetch();
+
+        // STEP 3. 순서 보장 (DB 순서대로 메모리 정렬)
+        Map<Long, Archive> archiveMap = archives.stream()
+                .collect(Collectors.toMap(Archive::getId, a -> a));
+
+        List<Archive> sortedArchives = ids.stream()
+                .map(archiveMap::get)
+                .toList();
+
+        // STEP 4. 썸네일 조회 (Map 메모리 매핑)
+        Map<Long, String> thumbnailMap = getThumbnailMap(ids);
+
+        // STEP 5. DTO 변환
+        List<ArchiveDto.Response> content = sortedArchives.stream()
+                .map(a -> ArchiveDto.Response.from(a, thumbnailMap.get(a.getId())))
+                .toList();
+
+        // Count Query
+        JPAQuery<Long> countQuery = queryFactory
+                .select(archive.count())
+                .from(archive)
+                .where(archive.visibility.eq(Visibility.PUBLIC));
+
+        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
+    // 핫피드 스코어 계산 로직 (Case IV 알고리즘)
+    private NumberExpression<Double> calculateHotScore() {
+        double w1 = 4.0; // 좋아요 가중치
+        double w2 = 6.0; // 조회수 가중치
+        double lambda = 0.05; // 시간 감쇠 계수
+
+        NumberExpression<Long> likes = archiveLikeCount.likeCount.coalesce(0L);
+        NumberExpression<Long> views = archiveViewCount.viewCount.coalesce(0L);
+
+        // 게시글 경과 시간 (단위: 시간)
+        NumberTemplate<Long> ageHours = Expressions.numberTemplate(Long.class,
+                "TIMESTAMPDIFF(HOUR, {0}, {1})",
+                archive.createdAt,
+                LocalDateTime.now());
+
+        // 조회수 로그 스케일링: LOG(1 + view) -> 데이터를 변환해서 비교하기 쉽게 해주는 것
+        NumberTemplate<Double> logViews = Expressions.numberTemplate(Double.class,
+                "LOG(1 + {0})", views);
+
+        // 공식 : (w1 * like + w2 * log(1 + view)) * exp(-lambda * age)
+        return likes.doubleValue().multiply(w1)
+                .add(logViews.multiply(w2))
+                .multiply(Expressions.numberTemplate(Double.class, "EXP({0} * {1})", -lambda, ageHours));
+    }
+
     // 공개 범위 필터링 조건
     private BooleanExpression filterVisibility(boolean isMe) {
         if (isMe) {
@@ -129,4 +218,6 @@ public class ArchiveQueryRepository {
 
         return orders.toArray(new OrderSpecifier[0]);
     }
+
+
 }
