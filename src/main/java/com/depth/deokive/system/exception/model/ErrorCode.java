@@ -58,7 +58,8 @@ public enum ErrorCode {
     DB_PESSIMISTIC_LOCK_FAILED(HttpStatus.CONFLICT, "DB PESSIMISTIC LOCK FAILED", "비관적 락 실패"),
     DB_INCORRECT_RESULT_SIZE(HttpStatus.INTERNAL_SERVER_ERROR, "DB INCORRECT RESULT SIZE", "결과 크기 불일치"),
     DB_TRANSACTION_SERIALIZATION_FAILED(HttpStatus.CONFLICT, "DB TRANSACTION SERIALIZATION FAILED", "트랜잭션 직렬화 실패"),
-    DB_DATA_ACCESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB DATA ACCESS ERROR", "데이터 접근 오류");
+    DB_DATA_ACCESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB DATA ACCESS ERROR", "데이터 접근 오류"),
+    DB_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "DB DATA NOT FOUND", "존재하지 않는 데이터입니다.");
 
     private final HttpStatus status;
     private final String error;
