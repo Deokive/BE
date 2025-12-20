@@ -25,4 +25,8 @@ public class DiaryBook extends TimeBaseEntity {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "archive_id")
     private Archive archive;
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
 }
