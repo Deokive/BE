@@ -1,41 +1,46 @@
 package com.depth.deokive.domain.archive.controller;
 
-import com.depth.deokive.domain.archive.dto.ArchiveMeResponseDto;
-import com.depth.deokive.domain.archive.dto.CustomPageResponse;
+import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.service.ArchiveService;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/v1/archives")
+@RequestMapping("/api/v1/archives")
 @RequiredArgsConstructor
+@Tag(name = "Archive", description = "아카이브 API")
 public class ArchiveController {
 
     private final ArchiveService archiveService;
 
     @GetMapping("/me")
-    public ResponseEntity<CustomPageResponse<ArchiveMeResponseDto>> getMyArchive(
-            @PageableDefault(size = 5, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
-            @AuthenticationPrincipal UserPrincipal userPrincipal
-            ) {
-        // Constraints 로그인 유저 체크
-        if(userPrincipal == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
-        }
-        Long userId = userPrincipal.getUserId();
+    @Operation(summary = "내 아카이브 목록 조회")
+    public ResponseEntity<ArchiveDto.PageListResponse> getMyArchives(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @ModelAttribute ArchiveDto.ArchivePageRequest pageRequest
+    ) {
+        ArchiveDto.PageListResponse response =
+                archiveService.getMyArchives(userPrincipal.getUserId(), pageRequest.toPageable());
 
-        return ResponseEntity.ok(archiveService.getMyArchiveList(pageable, userId));
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/friend/{friendId}")
+    @Operation(summary = "친구 아카이브 목록 조회")
+    public ResponseEntity<ArchiveDto.PageListResponse> getFriendArchives(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long friendId,
+            @Valid @ModelAttribute ArchiveDto.ArchivePageRequest pageRequest
+    ) {
+        ArchiveDto.PageListResponse response =
+                archiveService.getFriendArchives(userPrincipal.getUserId(), friendId, pageRequest.toPageable());
+
+        return ResponseEntity.ok(response);
     }
 }
