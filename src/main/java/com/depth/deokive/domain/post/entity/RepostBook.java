@@ -10,18 +10,23 @@ import lombok.experimental.SuperBuilder;
 
 @Entity
 @SuperBuilder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Getter
 @Table(name = "repost_book")
 public class RepostBook extends TimeBaseEntity {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Id
+    private Long id; // Archive ID 공유
 
     @Column(nullable = false)
     private String title;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "archive_id", nullable = false)
+    @MapsId
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "archive_id")
     private Archive archive;
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
 }
