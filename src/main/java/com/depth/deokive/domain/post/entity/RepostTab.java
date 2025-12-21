@@ -23,4 +23,8 @@ public class RepostTab extends TimeBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repost_book_id", nullable = false)
     private RepostBook repostBook;
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
 }
