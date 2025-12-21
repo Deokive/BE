@@ -13,12 +13,14 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DiaryService {
@@ -50,12 +52,13 @@ public class DiaryService {
     }
 
     @Transactional(readOnly = true)
-    public DiaryDto.Response getDiary(UserPrincipal userPrincipal, Long diaryId) {
+    public DiaryDto.Response retrieveDiary(UserPrincipal userPrincipal, Long diaryId) {
         // SEQ 1. 다이어리 조회
         Diary diary = diaryRepository.findById(diaryId)
                 .orElseThrow(() -> new RestException(ErrorCode.DIARY_NOT_FOUND));
 
         // SEQ 2. 다이어리 접근 권한 점검
+        log.info("🟢 Retrieve diary : {}", diary);
         validateReadPermission(diary, userPrincipal);
 
         return DiaryDto.Response.of(diary, getFileMaps(diaryId));
@@ -94,14 +97,40 @@ public class DiaryService {
         diaryRepository.delete(diary);
     }
 
+    @Transactional
+    public DiaryDto.UpdateBookTitleResponse updateDiaryBookTitle(UserPrincipal userPrincipal, Long archiveId, DiaryDto.UpdateBookTitleRequest request) {
+        // SEQ 1. 다이어리북 조회
+        DiaryBook diaryBook = diaryBookRepository.findById(archiveId)
+                .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+
+        // SEQ 2. 소유권 확인
+        validateBookOwner(diaryBook, userPrincipal.getUserId());
+
+        // SEQ 3. 제목 업데이트 (Dirty Checking)
+        diaryBook.updateTitle(request.getTitle());
+
+        // SEQ 4. 응답 반환
+        return DiaryDto.UpdateBookTitleResponse.builder()
+                .diaryBookId(archiveId)
+                .updatedTitle(diaryBook.getTitle())
+                .build();
+    }
+
     // --- Helper Methods ---
 
     private void validateReadPermission(Diary diary, UserPrincipal userPrincipal) {
         Long viewerId = userPrincipal != null ? userPrincipal.getUserId() : null;
         Long writerId = diary.getCreatedBy();
 
+        log.info("🟢 Diary Visibility : {}", diary.getVisibility());
+        log.info("🟢 Diary WriterId : {}", writerId);
+        log.info("🟢 Diary ViewerId : {}", viewerId);
+
         // SEQ 1. 작성자 본인이면 통과
-        if (Objects.equals(viewerId, writerId)) return;
+        if (Objects.equals(viewerId, writerId) && writerId != null) return;
+        // if (Objects.equals(viewerId, writerId)) return;
+
+        log.info("🟢 Let's Check Diary Visibility : {}", diary.getVisibility());
 
         // SEQ 2. 공개 범위 체크
         switch (diary.getVisibility()) {
@@ -111,7 +140,7 @@ public class DiaryService {
                 boolean isFriend = checkFriendRelationship(viewerId, writerId);
                 if (!isFriend) throw new RestException(ErrorCode.AUTH_FORBIDDEN);
             }
-            case PUBLIC -> { /* 모두 허용 */ }
+            case PUBLIC -> {/* 모두 허용 */}
         }
     }
 
