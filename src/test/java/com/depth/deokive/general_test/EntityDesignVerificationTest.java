@@ -302,7 +302,7 @@ class EntityDesignVerificationTest {
                 .diaryBook(book)
                 .title("오늘의 일기")
                 .content("굿")
-                .date(LocalDate.now())
+                .recordedAt(LocalDate.now())
                 .color("white")
                 .build();
         diaryRepository.save(diary);
@@ -495,7 +495,7 @@ class EntityDesignVerificationTest {
                 .diaryBook(diaryBook)
                 .title("오늘의 일기")
                 .content("굿")
-                .date(LocalDate.now())
+                .recordedAt(LocalDate.now())
                 .color("white")
                 .build();
         diaryRepository.save(diary);

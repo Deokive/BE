@@ -15,13 +15,18 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Table(name = "diary_book")
 public class DiaryBook extends TimeBaseEntity {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
     private Long id;
 
     @Column(nullable = false)
     private String title;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "archive_id", nullable = false)
+    @MapsId
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "archive_id")
     private Archive archive;
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
 }
