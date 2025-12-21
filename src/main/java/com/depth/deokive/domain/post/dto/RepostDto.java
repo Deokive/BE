@@ -17,9 +17,6 @@ public class RepostDto {
     public static class CreateRequest {
         @NotNull(message = "원본 게시글 ID는 필수입니다.")
         private Long postId;
-
-        @Schema(description = "사용자 지정 제목 (비워두면 원본 제목 사용)")
-        private String customTitle;
     }
 
     @Data @NoArgsConstructor
