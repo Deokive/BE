@@ -88,7 +88,10 @@ public enum ErrorCode {
     DB_PESSIMISTIC_LOCK_FAILED(HttpStatus.CONFLICT, "DB PESSIMISTIC LOCK FAILED", "비관적 락 실패"),
     DB_INCORRECT_RESULT_SIZE(HttpStatus.INTERNAL_SERVER_ERROR, "DB INCORRECT RESULT SIZE", "결과 크기 불일치"),
     DB_TRANSACTION_SERIALIZATION_FAILED(HttpStatus.CONFLICT, "DB TRANSACTION SERIALIZATION FAILED", "트랜잭션 직렬화 실패"),
-    DB_DATA_ACCESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB DATA ACCESS ERROR", "데이터 접근 오류");
+    DB_DATA_ACCESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB DATA ACCESS ERROR", "데이터 접근 오류"),
+    DB_DATA_TOO_LONG(HttpStatus.BAD_REQUEST, "DB DATA TOO LONG", "데이터 길이가 허용된 한도를 초과했습니다."),
+    DB_NOT_NULL_VIOLATION(HttpStatus.BAD_REQUEST, "DB NOT NULL VIOLATION", "필수 필드가 누락되었습니다."),
+    DB_FOREIGN_KEY_VIOLATION(HttpStatus.BAD_REQUEST, "DB FOREIGN KEY VIOLATION", "참조 무결성 제약 조건을 위반했습니다.");
 
     private final HttpStatus status;
     private final String error;
