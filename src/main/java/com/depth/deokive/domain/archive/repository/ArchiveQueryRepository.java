@@ -163,7 +163,7 @@ public class ArchiveQueryRepository {
 
         // 조회수 로그 스케일링: LOG(1 + view) -> 데이터를 변환해서 비교하기 쉽게 해주는 것
         NumberTemplate<Double> logViews = Expressions.numberTemplate(Double.class,
-                "LOG(1 + {0})", views);
+                "LN(1 + {0})", views);
 
         // 공식 : (w1 * like + w2 * log(1 + view)) * exp(-lambda * age)
         return likes.doubleValue().multiply(w1)
