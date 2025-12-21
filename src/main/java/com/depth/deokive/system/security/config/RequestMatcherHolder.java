@@ -39,6 +39,9 @@ public class RequestMatcherHolder {
             // gallery
             new RequestInfo(HttpMethod.GET, "/api/v1/gallery/{archiveId}", null),
 
+            // ticket
+            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId}", null),
+
             // user
 
             // system
