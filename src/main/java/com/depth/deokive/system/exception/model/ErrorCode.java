@@ -80,6 +80,12 @@ public enum ErrorCode {
     DIARY_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_UPDATE_FAILED", "다이어리 수정에 실패했습니다."),
     DIARY_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_DELETE_FAILED", "다이어리 삭제에 실패했습니다."),
 
+    // TICKET Erorrs
+    TICKET_NOT_FOUND(HttpStatus.NOT_FOUND, "TICKET_NOT_FOUND", "존재하지 않는 티켓입니다."),
+    TICKET_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_CREATION_FAILED", "티켓 생성에 실패했습니다."),
+    TICKET_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_UPDATE_FAILED", "티켓 수정에 실패했습니다."),
+    TICKET_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_DELETE_FAILED", "티켓 삭제에 실패했습니다."),
+
     // DB Errors
     DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),
     DB_QUERY_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "DB QUERY TIMEOUT", "쿼리 실행 시간이 초과되었습니다."),
