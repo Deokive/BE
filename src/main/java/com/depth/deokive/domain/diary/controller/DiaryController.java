@@ -38,7 +38,7 @@ public class DiaryController {
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long diaryId
     ) {
-        DiaryDto.Response response = diaryService.getDiary(userPrincipal, diaryId);
+        DiaryDto.Response response = diaryService.retrieveDiary(userPrincipal, diaryId);
         return ResponseEntity.ok(response);
     }
 
@@ -61,5 +61,16 @@ public class DiaryController {
     ) {
         diaryService.deleteDiary(userPrincipal, diaryId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{archiveId}")
+    @Operation(summary = "다이어리북 제목 수정", description = "다이어리북(폴더)의 제목을 수정합니다.")
+    public ResponseEntity<DiaryDto.UpdateBookTitleResponse> updateDiaryBookTitle(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long archiveId,
+            @Valid @RequestBody DiaryDto.UpdateBookTitleRequest request
+    ) {
+        DiaryDto.UpdateBookTitleResponse response = diaryService.updateDiaryBookTitle(userPrincipal, archiveId, request);
+        return ResponseEntity.ok(response);
     }
 }
