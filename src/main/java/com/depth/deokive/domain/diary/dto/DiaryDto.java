@@ -78,7 +78,7 @@ public class DiaryDto {
         private String color;
         private Visibility visibility;
         private Long diaryBookId;
-        private Long writerId;
+        private Long createdBy;
         private List<FileDto.UploadFileResponse> files;
 
         public static Response of(Diary diary, List<DiaryFileMap> maps) {
@@ -90,7 +90,7 @@ public class DiaryDto {
                     .color(diary.getColor())
                     .visibility(diary.getVisibility())
                     .diaryBookId(diary.getDiaryBook().getId()) // Archive ID와 동일
-                    .writerId(diary.getCreatedBy())
+                    .createdBy(diary.getCreatedBy())
                     .files(toFileResponses(maps))
                     .build();
         }
@@ -108,6 +108,24 @@ public class DiaryDto {
                         .build();
             }).collect(Collectors.toList());
         }
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "다이어리북 제목 수정 요청 DTO")
+    public static class UpdateBookTitleRequest {
+        @NotBlank(message = "제목은 필수입니다.")
+        @Schema(description = "변경할 다이어리북 제목", example = "2025년 나의 기록 (수정)")
+        private String title;
+    }
+
+    @Data @Builder @AllArgsConstructor
+    @Schema(description = "다이어리북 제목 수정 성공 응답")
+    public static class UpdateBookTitleResponse {
+        @Schema(description = "수정된 다이어리북 ID (Archive ID)", example = "1")
+        private Long diaryBookId;
+
+        @Schema(description = "수정된 제목", example = "2025년 나의 기록 (수정)")
+        private String updatedTitle;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
