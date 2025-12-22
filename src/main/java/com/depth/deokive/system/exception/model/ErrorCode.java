@@ -93,11 +93,19 @@ public enum ErrorCode {
     DIARY_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_UPDATE_FAILED", "다이어리 수정에 실패했습니다."),
     DIARY_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_DELETE_FAILED", "다이어리 삭제에 실패했습니다."),
 
-    // TICKET Erorrs
+    // TICKET Errors
     TICKET_NOT_FOUND(HttpStatus.NOT_FOUND, "TICKET_NOT_FOUND", "존재하지 않는 티켓입니다."),
     TICKET_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_CREATION_FAILED", "티켓 생성에 실패했습니다."),
     TICKET_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_UPDATE_FAILED", "티켓 수정에 실패했습니다."),
     TICKET_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_DELETE_FAILED", "티켓 삭제에 실패했습니다."),
+
+    // EVENT Errors
+    EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND", "존재하지 않는 이벤트입니다."),
+    EVENT_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_CREATION_FAILED", "이벤트 생성에 실패했습니다."),
+    EVENT_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_UPDATE_FAILED", "이벤트 수정에 실패했습니다."),
+    EVENT_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_DELETE_FAILED", "이벤트 삭제에 실패했습니다."),
+
+
 
     // DB Errors
     DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),
