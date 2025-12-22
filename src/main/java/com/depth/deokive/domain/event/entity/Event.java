@@ -2,6 +2,9 @@ package com.depth.deokive.domain.event.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
 import com.depth.deokive.domain.archive.entity.Archive;
+import com.depth.deokive.domain.event.dto.EventDto;
+import com.depth.deokive.domain.file.entity.File;
+import com.depth.deokive.domain.ticket.dto.TicketDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,6 +45,21 @@ public class Event extends TimeBaseEntity {
     @JoinColumn(name = "archive_id", nullable = false)
     private Archive archive;
 
-    @OneToOne(mappedBy = "event", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "event", fetch = FetchType.LAZY)
     private SportRecord sportRecord;
+
+    public void update(EventDto.Request request, LocalDateTime recordAt) {
+        if (request == null) return;
+
+        this.title = nonBlankOrDefault(request.getTitle(), this.title);
+        this.date = nonBlankOrDefault(recordAt, this.date);
+
+        this.hasTime = nonBlankOrDefault(request.getHasTime(), this.hasTime);
+        this.color = nonBlankOrDefault(request.getColor(), this.color);
+        this.isSportType = nonBlankOrDefault(request.getIsSportType(), this.isSportType);
+    }
+
+    private <T> T nonBlankOrDefault(T newValue, T currentValue) {
+        return newValue != null ? newValue : currentValue;
+    }
 }
