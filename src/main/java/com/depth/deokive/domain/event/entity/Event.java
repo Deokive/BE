@@ -41,4 +41,7 @@ public class Event extends TimeBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "archive_id", nullable = false)
     private Archive archive;
+
+    @OneToOne(mappedBy = "event", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private SportRecord sportRecord;
 }
