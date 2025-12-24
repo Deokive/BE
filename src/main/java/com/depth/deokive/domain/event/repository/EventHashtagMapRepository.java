@@ -22,5 +22,9 @@ public interface EventHashtagMapRepository extends JpaRepository<EventHashtagMap
 
     @EntityGraph(attributePaths = {"hashtag"})
     List<EventHashtagMap> findAllByEventIdIn(List<Long> eventIds);
+
+    @Modifying
+    @Query("DELETE FROM EventHashtagMap ehm WHERE ehm.event.id IN (SELECT e.id FROM Event e WHERE e.archive.id = :archiveId)")
+    void deleteByArchiveId(@Param("archiveId") Long archiveId);
 }
 
