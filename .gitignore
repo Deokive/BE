@@ -55,11 +55,6 @@ test-scenario/
 ### Frontend ### 
 frontend/
 
-### QueryDSL Generated ###
-/src/main/generated
-/build
-/out
-
 ### 페이지 네이션 테스트를 위한 더미 데이터 ###
 DataInitializer.java
 

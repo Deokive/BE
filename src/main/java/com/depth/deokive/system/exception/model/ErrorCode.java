@@ -50,6 +50,63 @@ public enum ErrorCode {
     REDIS_COMMAND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_COMMAND_FAILED", "Redis 명령 실행 중 오류가 발생했습니다."),
     REDIS_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "REDIS_TIMEOUT", "Redis 서버 응답 시간이 초과되었습니다."),
 
+    // MAIL Errors
+    MAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL SEND FAILED", "이메일 전송에 실패했습니다."),
+    MAIL_INVALID_ADDRESS(HttpStatus.BAD_REQUEST, "MAIL INVALID ADDRESS", "유효하지 않은 이메일 주소입니다."),
+    MAIL_TEMPLATE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL TEMPLATE ERROR", "이메일 템플릿 처리 중 오류가 발생했습니다."),
+    MAIL_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "MAIL CONNECTION FAILED", "메일 서버에 연결할 수 없습니다."),
+
+    // FILE Errors
+    FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FILE NOT FOUND", "파일을 찾을 수 없습니다."),
+    FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "FILE STORAGE ERROR", "파일 저장 중 오류가 발생했습니다."),
+    FILE_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "FILE INVALID FORMAT", "유효하지 않은 파일 형식입니다."),
+    FILE_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "FILE SIZE EXCEEDED", "파일 크기가 허용된 한도를 초과했습니다."),
+
+    // POST Errors
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST NOT FOUND", "존재하지 않는 게시글입니다."),
+    POST_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST CREATION FAILED", "게시글 생성에 실패했습니다."),
+    POST_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST UPDATE FAILED", "게시글 수정에 실패했습니다."),
+    POST_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "POST DELETE FAILED", "게시글 삭제에 실패했습니다."),
+
+    // REPOST Errors
+    REPOST_NOT_FOUND(HttpStatus.NOT_FOUND, "REPOST NOT FOUND", "존재하지 않는 리포스트입니다."),
+    REPOST_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST CREATION FAILED", "리포스트 생성에 실패했습니다."),
+    REPOST_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST UPDATE FAILED", "리포스트 수정에 실패했습니다."),
+    REPOST_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST DELETE FAILED", "리포스트 삭제에 실패했습니다."),
+
+    REPOST_TAB_NOT_FOUND(HttpStatus.NOT_FOUND, "REPOST TAB NOT FOUND", "존재하지 않는 리포스트 탭입니다."),
+    REPOST_TAB_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB CREATION FAILED", "리포스트 탭 생성에 실패했습니다."),
+    REPOST_TAB_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB UPDATE FAILED", "리포스트 탭 수정에 실패했습니다."),
+    REPOST_TAB_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB DELETE FAILED", "리포스트 탭 삭제에 실패했습니다."),
+    REPOST_TAB_LIMIT_EXCEED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB LIMIT EXCEED", "가능한 리포스트 탭 갯수를 초과했습니다."),
+    REPOST_TAB_AND_POST_DUPLICATED(HttpStatus.CONFLICT, "REPOST_TAB_AND_POST_DUPLICATED", "중복된 리포스트입니다."),
+
+    // ARCHIVE Errors
+    ARCHIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "ARCHIVE_NOT_FOUND", "존재하지 않는 아카이브입니다."),
+    ARCHIVE_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_CREATION_FAILED", "아카이브 생성에 실패했습니다."),
+    ARCHIVE_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_UPDATE_FAILED", "아카이브 수정에 실패했습니다."),
+    ARCHIVE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_DELETE_FAILED", "아카이브 삭제에 실패했습니다."),
+
+    // DIARY Errors
+    DIARY_NOT_FOUND(HttpStatus.NOT_FOUND, "DIARY_NOT_FOUND", "존재하지 않는 다이어리입니다."),
+    DIARY_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_CREATION_FAILED", "다이어리 생성에 실패했습니다."),
+    DIARY_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_UPDATE_FAILED", "다이어리 수정에 실패했습니다."),
+    DIARY_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "DIARY_DELETE_FAILED", "다이어리 삭제에 실패했습니다."),
+
+    // TICKET Errors
+    TICKET_NOT_FOUND(HttpStatus.NOT_FOUND, "TICKET_NOT_FOUND", "존재하지 않는 티켓입니다."),
+    TICKET_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_CREATION_FAILED", "티켓 생성에 실패했습니다."),
+    TICKET_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_UPDATE_FAILED", "티켓 수정에 실패했습니다."),
+    TICKET_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TICKET_DELETE_FAILED", "티켓 삭제에 실패했습니다."),
+
+    // EVENT Errors
+    EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND", "존재하지 않는 이벤트입니다."),
+    EVENT_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_CREATION_FAILED", "이벤트 생성에 실패했습니다."),
+    EVENT_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_UPDATE_FAILED", "이벤트 수정에 실패했습니다."),
+    EVENT_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_DELETE_FAILED", "이벤트 삭제에 실패했습니다."),
+
+
+
     // DB Errors
     DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),
     DB_QUERY_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "DB QUERY TIMEOUT", "쿼리 실행 시간이 초과되었습니다."),
@@ -59,7 +116,10 @@ public enum ErrorCode {
     DB_INCORRECT_RESULT_SIZE(HttpStatus.INTERNAL_SERVER_ERROR, "DB INCORRECT RESULT SIZE", "결과 크기 불일치"),
     DB_TRANSACTION_SERIALIZATION_FAILED(HttpStatus.CONFLICT, "DB TRANSACTION SERIALIZATION FAILED", "트랜잭션 직렬화 실패"),
     DB_DATA_ACCESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB DATA ACCESS ERROR", "데이터 접근 오류"),
-    DB_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "DB DATA NOT FOUND", "존재하지 않는 데이터입니다.");
+    DB_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "DB DATA NOT FOUND", "존재하지 않는 데이터입니다."),
+    DB_DATA_TOO_LONG(HttpStatus.BAD_REQUEST, "DB DATA TOO LONG", "데이터 길이가 허용된 한도를 초과했습니다."),
+    DB_NOT_NULL_VIOLATION(HttpStatus.BAD_REQUEST, "DB NOT NULL VIOLATION", "필수 필드가 누락되었습니다."),
+    DB_FOREIGN_KEY_VIOLATION(HttpStatus.BAD_REQUEST, "DB FOREIGN KEY VIOLATION", "참조 무결성 제약 조건을 위반했습니다.");
 
     private final HttpStatus status;
     private final String error;

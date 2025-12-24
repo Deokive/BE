@@ -4,6 +4,7 @@ import com.depth.deokive.system.exception.dto.ErrorResponse;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.jwt.exception.*;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import io.lettuce.core.RedisCommandExecutionException;
 import io.lettuce.core.RedisCommandTimeoutException;
 import io.lettuce.core.RedisException;
@@ -15,12 +16,17 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.validation.BindException;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
@@ -44,13 +50,53 @@ public class GlobalExceptionHandler {
         // 꼭 Entity Unique Constraints name 과 일치 하는지, 혹은 따로 명시 하지는 않았는 지 반드시 확인할 것
 
         log.info("🔴 DataIntegrityViolationException: {}", errorMessage);
-        if (errorMessage != null && errorMessage.contains("USER_EMAIL")) {
-            return createErrorResponse(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
-        } else if (errorMessage != null && errorMessage.contains("USER_USERNAME")) {
-            return createErrorResponse(ErrorCode.USER_USERNAME_ALREADY_EXISTS);
-        } else {
-            return createErrorResponse(ErrorCode.GLOBAL_ALREADY_RESOURCE);
+        
+        if (errorMessage == null) {
+            return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST);
         }
+
+        // Step 1: 데이터 길이 초과 감지
+        if (errorMessage.contains("Data too long") || errorMessage.contains("too long for column")) {
+            String columnName = extractColumnNameFromDataTooLong(errorMessage);
+            String customMessage = columnName != null 
+                ? String.format("%s 필드의 값이 너무 깁니다.", columnName)
+                : "데이터 길이가 허용된 한도를 초과했습니다.";
+            return createErrorResponse(ErrorCode.DB_DATA_TOO_LONG, customMessage);
+        }
+
+        // Step 2: NOT NULL 제약 위반 감지
+        if (errorMessage.contains("cannot be null") || 
+            (errorMessage.contains("Column") && errorMessage.contains("cannot be null"))) {
+            String columnName = extractColumnNameFromNotNull(errorMessage);
+            String customMessage = columnName != null
+                ? String.format("%s 필드는 필수입니다.", columnName)
+                : "필수 필드가 누락되었습니다.";
+            return createErrorResponse(ErrorCode.DB_NOT_NULL_VIOLATION, customMessage);
+        }
+
+        // Step 3: 외래 키 제약 위반 감지
+        if (errorMessage.contains("foreign key constraint") || 
+            errorMessage.contains("Cannot add or update a child row") ||
+            errorMessage.contains("a foreign key constraint fails")) {
+            return createErrorResponse(ErrorCode.DB_FOREIGN_KEY_VIOLATION);
+        }
+
+        // Step 4: UNIQUE 제약 위반 감지 (중복)
+        if (errorMessage.contains("Duplicate entry") || 
+            errorMessage.contains("UNIQUE constraint") ||
+            errorMessage.contains("unique constraint")) {
+            // 기존 로직: 특정 제약 이름으로 구분
+            if (errorMessage.contains("USER_EMAIL")) {
+                return createErrorResponse(ErrorCode.USER_EMAIL_ALREADY_EXISTS);
+            } else if (errorMessage.contains("USER_USERNAME")) {
+                return createErrorResponse(ErrorCode.USER_USERNAME_ALREADY_EXISTS);
+            } else {
+                return createErrorResponse(ErrorCode.GLOBAL_ALREADY_RESOURCE);
+            }
+        }
+
+        // Step 5: 기타 제약 위반
+        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, "데이터 무결성 제약 조건을 위반했습니다.");
     }
 
     @ExceptionHandler(JwtMissingException.class)
@@ -88,6 +134,26 @@ public class GlobalExceptionHandler {
         return createErrorResponse(ErrorCode.JWT_MALFORMED);
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException e) {
+        String fieldName = extractFieldName(e);
+        String errorMessage;
+        
+        if (fieldName != null) {
+            String causeMessage = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            // errorMessage = String.format("필드 '%s'의 값 형식이 올바르지 않습니다: %s", fieldName, causeMessage);
+            errorMessage = String.format("필드 '%s'의 값 형식이 올바르지 않습니다", fieldName);
+        } else {
+            String causeMessage = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            // errorMessage = "요청 본문의 JSON 형식이 올바르지 않습니다: " + causeMessage;
+            errorMessage = "요청 본문의 JSON 형식이 올바르지 않습니다: ";
+        }
+        
+        log.warn("🔴 JSON 파싱 오류: {}", errorMessage);
+        return createErrorResponse(HttpStatus.BAD_REQUEST, "JSON_PARSE_ERROR", errorMessage);
+    }
+
     @ExceptionHandler(HttpMessageConversionException.class)
     public ResponseEntity<ErrorResponse> handleHttpMessageConversionException(){
         return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST);
@@ -106,6 +172,18 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.BAD_REQUEST, "GLOBAL_INVALID_PARAMETER", message);
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String fieldName = e.getName();
+        // 사용자가 보낸 잘못된 값
+        String invalidValue = e.getValue() != null ? e.getValue().toString() : "null";
+
+        // 깔끔한 메시지로 변환
+        String errorMessage = String.format("%s : 값의 형식이 올바르지 않습니다. (입력값: %s)", fieldName, invalidValue);
+
+        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, errorMessage);
+    }
+
     // ★ @RequestParam/@PathVariable 검증 실패 처리
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
@@ -116,13 +194,32 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.BAD_REQUEST, "GLOBAL_INVALID_PARAMETER", msg);
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
-            MethodArgumentNotValidException e) {
-        var messages = e.getBindingResult().getFieldErrors().stream()
-                .map(err -> err.getField() + " : " + err.getDefaultMessage())
-                .toList();
-        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, String.join(", ", messages));
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    public ResponseEntity<ErrorResponse> handleValidationException(Exception e) {
+        BindingResult bindingResult = null;
+        if (e instanceof BindException) {
+            bindingResult = ((BindException) e).getBindingResult();
+        }
+
+        String errorMessage = "잘못된 요청입니다.";
+        if (bindingResult != null && bindingResult.hasErrors()) {
+            FieldError fieldError = bindingResult.getFieldError();
+
+            if (fieldError != null) {
+                // 1. 타입 변환 실패인지 확인
+                // codes 배열에 "typeMismatch"가 포함되어 있거나, isBindingFailure()가 true인 경우
+                if (fieldError.isBindingFailure() || "typeMismatch".equals(fieldError.getCode())) {
+                    String invalidValue = fieldError.getRejectedValue() != null ? fieldError.getRejectedValue().toString() : "null";
+                    errorMessage = fieldError.getField() + " : 값의 형식이 올바르지 않습니다. (입력값: " + invalidValue + ")";
+                }
+                // 2. 일반 유효성 검사 실패 (@Min, @Max 등)
+                else {
+                    errorMessage = fieldError.getField() + " : " + fieldError.getDefaultMessage();
+                }
+            }
+        }
+
+        return createErrorResponse(ErrorCode.GLOBAL_BAD_REQUEST, errorMessage);
     }
 
     // 정적 리소스를 찾을 수 없을 때 처리
@@ -285,6 +382,102 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ErrorResponse> createErrorResponse(ErrorCode errorCode, String customMessage) {
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode, customMessage));
+    }
+
+    /**
+     * "Data too long for column" 메시지에서 컬럼명 추출
+     * 예: "Data too long for column 'content' at row 1" → "content"
+     */
+    private String extractColumnNameFromDataTooLong(String errorMessage) {
+        if (errorMessage == null) {
+            return null;
+        }
+        
+        // "Data too long for column 'content' at row 1" 패턴
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "Data too long for column '([^']+)'", 
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(errorMessage);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        // "too long for column 'content'" 패턴 (대체)
+        pattern = java.util.regex.Pattern.compile(
+            "too long for column '([^']+)'", 
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        matcher = pattern.matcher(errorMessage);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        return null;
+    }
+
+    /**
+     * "Column '...' cannot be null" 메시지에서 컬럼명 추출
+     * 예: "Column 'title' cannot be null" → "title"
+     */
+    private String extractColumnNameFromNotNull(String errorMessage) {
+        if (errorMessage == null) {
+            return null;
+        }
+        
+        // "Column 'title' cannot be null" 패턴
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "Column '([^']+)' cannot be null", 
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(errorMessage);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        return null;
+    }
+
+    /**
+     * HttpMessageNotReadableException에서 필드명 추출
+     * Jackson의 JsonMappingException을 통해 필드 경로를 추출합니다.
+     */
+    private String extractFieldName(HttpMessageNotReadableException e) {
+        Throwable cause = e.getCause();
+        
+        if (cause instanceof JsonMappingException) {
+            JsonMappingException jsonMappingException = (JsonMappingException) cause;
+            var path = jsonMappingException.getPath();
+            
+            if (path != null && !path.isEmpty()) {
+                JsonMappingException.Reference reference = path.get(path.size() - 1);
+                if (reference != null) {
+                    String fieldName = reference.getFieldName();
+                    if (fieldName != null) {
+                        return fieldName;
+                    }
+                    // 필드명이 없으면 인덱스 정보 반환 (배열인 경우)
+                    if (reference.getIndex() >= 0) {
+                        return "[" + reference.getIndex() + "]";
+                    }
+                }
+            }
+        }
+        
+        // 대안: 예외 메시지에서 필드명 추출 시도
+        String message = e.getMessage();
+        if (message != null) {
+            // "Cannot deserialize value of type `java.time.LocalDate` from String \"2025/12/21\""
+            // 같은 메시지에서 패턴 매칭으로 필드명 찾기
+            // Jackson이 때때로 메시지에 필드 경로를 포함시킴
+            // 예: "JSON parse error: Cannot deserialize value of type `java.time.LocalDate` from String \"2025/12/21\": Failed to deserialize java.time.LocalDate: (java.time.format.DateTimeParseException) Text '2025/12/21' could not be parsed at index 4"
+            // 이 경우에는 JsonMappingException의 path를 사용하는 것이 더 정확함
+        }
+        
+        return null;
     }
 
     /**

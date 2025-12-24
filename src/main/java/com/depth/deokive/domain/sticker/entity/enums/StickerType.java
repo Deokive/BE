@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.archive.entity.enums;
+package com.depth.deokive.domain.sticker.entity.enums;
 
 public enum StickerType {
     HEART,

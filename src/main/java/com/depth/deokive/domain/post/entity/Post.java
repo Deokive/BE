@@ -1,8 +1,10 @@
 package com.depth.deokive.domain.post.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
-import com.depth.deokive.domain.post.entity.enums.Community;
+import com.depth.deokive.domain.post.dto.PostDto;
+import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
+import com.depth.deokive.domain.user.entity.enums.Role;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -24,7 +26,7 @@ public class Post extends TimeBaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Community community;
+    private Category category;
 
     @Column(nullable = false, length = 5000)
     private String content;
@@ -32,4 +34,17 @@ public class Post extends TimeBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    public void update(PostDto.Request request) {
+        if (request == null) return;
+
+        this.title = nonBlankOrDefault(request.getTitle(), this.title);
+        this.category = nonBlankOrDefault(request.getCategory(), this.category);
+        this.content = nonBlankOrDefault(request.getContent(), this.content);
+    }
+
+    // TODO: 사실 이게 PATCH 패턴 처리 방식. Validation 에서 체크를 해줘서 빈 값 들어올 일은 없긴 한데... 일단 보류. 리팩토링 단계에서 고려
+    private <T> T nonBlankOrDefault(T newValue, T currentValue) {
+        return newValue != null ? newValue : currentValue;
+    }
 }

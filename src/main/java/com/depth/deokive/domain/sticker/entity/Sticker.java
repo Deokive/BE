@@ -1,6 +1,7 @@
-package com.depth.deokive.domain.archive.entity;
+package com.depth.deokive.domain.sticker.entity;
 
-import com.depth.deokive.domain.archive.entity.enums.StickerType;
+import com.depth.deokive.domain.archive.entity.Archive;
+import com.depth.deokive.domain.sticker.entity.enums.StickerType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

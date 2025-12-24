@@ -1,6 +1,8 @@
 package com.depth.deokive.domain.ticket.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.domain.file.entity.File;
+import com.depth.deokive.domain.ticket.dto.TicketDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -41,4 +43,25 @@ public class Ticket extends TimeBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ticket_book_id", nullable = false)
     private TicketBook ticketBook;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "file_id")
+    private File file;
+
+    public void update(TicketDto.Request request, File newFile) {
+        if (request == null) return;
+
+        this.title = nonBlankOrDefault(request.getTitle(), this.title);
+        this.date = nonBlankOrDefault(request.getDate(), this.date);
+        this.location = nonBlankOrDefault(request.getLocation(), this.location);
+        this.seat = nonBlankOrDefault(request.getSeat(), this.seat);
+        this.casting = nonBlankOrDefault(request.getSeat(), this.casting);
+        this.score = nonBlankOrDefault(request.getScore(), this.score);
+        this.review = nonBlankOrDefault(request.getReview(), this.review);
+        this.file = nonBlankOrDefault(newFile, this.file);
+    }
+
+    private <T> T nonBlankOrDefault(T newValue, T currentValue) {
+        return newValue != null ? newValue : currentValue;
+    }
 }

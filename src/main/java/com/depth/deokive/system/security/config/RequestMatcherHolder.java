@@ -33,6 +33,15 @@ public class RequestMatcherHolder {
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/email/send", null),
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/email/verify", null),
 
+            // posts
+            new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId}", null),
+
+            // gallery
+            new RequestInfo(HttpMethod.GET, "/api/v1/gallery/{archiveId}", null),
+
+            // ticket
+            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId}", null),
+
             // user
 
             // system
