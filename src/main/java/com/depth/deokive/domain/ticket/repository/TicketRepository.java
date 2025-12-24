@@ -2,6 +2,7 @@ package com.depth.deokive.domain.ticket.repository;
 
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,4 +12,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     @Query("SELECT t FROM Ticket t LEFT JOIN FETCH t.file WHERE t.id = :id")
     Optional<Ticket> findByIdWithFile(@Param("id") Long id);
+
+    @Modifying
+    @Query("DELETE FROM Ticket t WHERE t.ticketBook.id = :bookId")
+    void deleteByBookId(@Param("bookId") Long bookId);
 }
