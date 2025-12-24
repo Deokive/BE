@@ -71,7 +71,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                             "/api/v1/diary/{diaryId}",
                             "/api/v1/events/{eventId}",
-                            "/api/v1/events/monthly/{archiveId}"
+                            "/api/v1/events/monthly/{archiveId}",
+                            "/api/v1/archives/{archiveId}"
                         ).permitAll()
                         // 3. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
                         .requestMatchers(requestMatcherHolder.getApiRequestMatcher()).authenticated()

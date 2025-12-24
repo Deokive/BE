@@ -2,6 +2,7 @@ package com.depth.deokive.domain.event.repository;
 
 import com.depth.deokive.domain.event.entity.Event;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,5 +22,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    @Modifying
+    @Query("DELETE FROM Event e WHERE e.archive.id = :archiveId")
+    void deleteByArchiveId(@Param("archiveId") Long archiveId);
 }
 

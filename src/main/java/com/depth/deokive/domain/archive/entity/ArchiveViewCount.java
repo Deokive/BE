@@ -25,4 +25,6 @@ public class ArchiveViewCount {
     @Builder.Default
     @Column(nullable = false)
     private long viewCount = 0;
+
+    public void increment() { this.viewCount++; }
 }

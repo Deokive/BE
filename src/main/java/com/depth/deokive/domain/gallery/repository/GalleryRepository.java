@@ -12,4 +12,8 @@ public interface GalleryRepository extends JpaRepository<Gallery, Long> {
     @Modifying(clearAutomatically = true) // 1차 캐시 정합성을 위한 clear 옵션 On
     @Query("DELETE FROM Gallery g WHERE g.id IN :ids AND g.archiveId = :archiveId")
     void deleteByIdsAndArchiveId(@Param("ids") List<Long> ids, @Param("archiveId") Long archiveId);
+
+    @Modifying
+    @Query("DELETE FROM Gallery g WHERE g.archiveId = :archiveId")
+    void deleteByArchiveId(@Param("archiveId") Long archiveId);
 }
