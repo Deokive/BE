@@ -109,8 +109,13 @@ app:
   front-base-url: "${FRONT_BASE_URL:http://localhost:5173}"
   allowed-origins: "${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}"
 
+
 hmac:
   secret: ${HMAC_SECRET_KEY} # at least 32 characters long
 
 cdn:
   base-url: ${CDN_BASE_URL:} # CDN이 있다면 설정, 없으면 빈 문자열 (S3 URL 사용)
+
+scheduler:
+  hot-score-cron: "0 0 * * * *"  # 1시간 간격으로 핫스코어 갱신
+  badge-cron: "0 0 0 * * *"      # 자정마다 배지 갱신
