@@ -32,11 +32,10 @@ public class TicketService {
         validateOwner(ticketBook.getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 2. 파일 조회 (있으면 찾고, 없으면 null)
-        File file = null;
-        if (request.getFileId() != null) {
-            file = fileRepository.findById(request.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-        }
+        File file = (request.getFileId() != null)
+                ? fileRepository.findById(request.getFileId())
+                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND))
+                : null;
 
         // SEQ 3. 저장 (Entity에 File 바로 꽂기)
         Ticket ticket = request.toEntity(ticketBook, file);
@@ -57,19 +56,17 @@ public class TicketService {
 
     @Transactional
     public TicketDto.Response updateTicket(UserPrincipal userPrincipal, Long ticketId, TicketDto.Request request) {
+        // SEQ 1. 티켓 조회
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
 
+        // SEQ 2. 소유자 검증
         validateOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
-        // 파일 교체 로직
-        File newFile = null;
-        if (request.getFileId() != null) {
-            newFile = fileRepository.findById(request.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-        }
+        // SEQ 3. 파일 조회 및 결정
+        File newFile = resolveNewFile(ticket.getFile(), request.getFileId());
 
-        // 업데이트 (내부적으로 File 참조 변경)
+        // SEQ 4. 업데이트
         ticket.update(request, newFile);
 
         return TicketDto.Response.of(ticket);
@@ -113,5 +110,13 @@ public class TicketService {
         if (visibility != Visibility.PUBLIC) {
             throw new RestException(ErrorCode.AUTH_FORBIDDEN);
         }
+    }
+
+    private File resolveNewFile(File currentFile, Long requestFileId) {
+        if (requestFileId == null) { return currentFile; } // 변경 없음
+        if (requestFileId == -1L) { return null; } // 이미지 삭제 (연결 해제)
+
+        return fileRepository.findById(requestFileId)
+                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND)); // 새 이미지 교체
     }
 }
