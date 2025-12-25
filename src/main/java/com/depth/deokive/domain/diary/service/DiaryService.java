@@ -17,8 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,9 +50,9 @@ public class DiaryService {
         diaryRepository.save(diary);
 
         // SEQ 4. 파일 연결
-        connectFiles(diary, request.getFiles());
+        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles());
 
-        return DiaryDto.Response.of(diary, getFileMaps(diary.getId()));
+        return DiaryDto.Response.of(diary, maps);
     }
 
     @Transactional(readOnly = true)
@@ -76,11 +80,11 @@ public class DiaryService {
         // SEQ 3. 업데이트 (Dirty Checking 기반)
         diary.update(request);
 
-        // SEQ 4. 파일 갈아끼우기 (Post와 똑같이 처리)
+        // SEQ 4. 파일 갈아끼우기 : 전략 -> Full Replacement
         diaryFileMapRepository.deleteAllByDiaryId(diaryId);
-        connectFiles(diary, request.getFiles());
+        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles());
 
-        return DiaryDto.Response.of(diary, getFileMaps(diaryId));
+        return DiaryDto.Response.of(diary, maps);
     }
 
     @Transactional
@@ -162,21 +166,59 @@ public class DiaryService {
         }
     }
 
-    private void connectFiles(Diary diary, List<DiaryDto.AttachedFileRequest> files) {
-        if (files == null || files.isEmpty()) return;
-
-        for (DiaryDto.AttachedFileRequest fileReq : files) {
-            File file = fileRepository.findById(fileReq.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-
-            DiaryFileMap map = DiaryFileMap.builder()
-                    .diary(diary)
-                    .file(file)
-                    .mediaRole(fileReq.getMediaRole())
-                    .sequence(fileReq.getSequence())
-                    .build();
-            diaryFileMapRepository.save(map);
+    // Refactor : 파일 목록 한 번에 조회하고, 매핑 엔터티 생성해서 일괄 저장, N+1 문제 방지 및 DB 커넥션 비용 최소화
+    private List<DiaryFileMap> connectFiles(Diary diary, List<DiaryDto.AttachedFileRequest> fileRequests) {
+        // SEQ 1. Validation
+        if (fileRequests == null || fileRequests.isEmpty()) {
+            return Collections.emptyList();
         }
+
+        // SEQ 2. 파일 ID 목록 추출
+        List<Long> fileIds = fileRequests.stream()
+                .map(DiaryDto.AttachedFileRequest::getFileId).toList();
+
+        // SEQ 3. File Entity Bulk Fetch
+        List<File> files = fileRepository.findAllById(fileIds);
+
+        // SEQ 4. Validate Files
+        if (files.size() != fileIds.stream().distinct().count()) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
+
+        // SEQ 5. List to Map (ID를 Key로 해서 O(1) 접근 가능하게 할라고 함)
+        Map<Long, File> fileMap = files.stream()
+                .collect(Collectors.toMap(File::getId, Function.identity()));
+
+        // SEQ 6. Mapping Entities Creation (요청 순서 유지)
+        List<DiaryFileMap> newMaps = fileRequests.stream()
+                .map(req -> {
+                    File file = fileMap.get(req.getFileId());
+                    // TODO: 이런 builder 긴거 싫으니까 추후 리팩터링 단계에서 정적 팩터리 메서드 만들 것
+                    return DiaryFileMap.builder()
+                            .diary(diary)
+                            .file(file)
+                            .mediaRole(req.getMediaRole())
+                            .sequence(req.getSequence())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // SEQ 7. Bulk Insert
+        return diaryFileMapRepository.saveAll(newMaps);
+
+        // N+1 문제 초래하는 코드 -> 비교하라고 남겨둠 -> 나중에 최종 리팩토링 단계에서 지울거임
+        // for (DiaryDto.AttachedFileRequest fileReq : fileRequests) {
+        //     File file = fileRepository.findById(fileReq.getFileId())
+        //             .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
+        //
+        //     DiaryFileMap map = DiaryFileMap.builder()
+        //             .diary(diary)
+        //             .file(file)
+        //             .mediaRole(fileReq.getMediaRole())
+        //             .sequence(fileReq.getSequence())
+        //             .build();
+        //     diaryFileMapRepository.save(map);
+        // }
     }
 
     private List<DiaryFileMap> getFileMaps(Long diaryId) {
