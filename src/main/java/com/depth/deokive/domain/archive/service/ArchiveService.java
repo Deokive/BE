@@ -1,7 +1,6 @@
 package com.depth.deokive.domain.archive.service;
 
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
-import com.depth.deokive.domain.archive.repository.ArchiveQueryRepository;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -10,7 +9,6 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.depth.deokive.domain.archive.entity.*;
@@ -41,6 +39,8 @@ import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,8 +51,6 @@ public class ArchiveService {
 
     // --- Core Repositories ---
     private final ArchiveRepository archiveRepository;
-    private final ArchiveViewCountRepository viewCountRepository;
-    private final ArchiveLikeCountRepository likeCountRepository;
     private final ArchiveLikeRepository likeRepository;
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
@@ -78,65 +76,6 @@ public class ArchiveService {
     private final RepostTabRepository repostTabRepository;
     private final StickerRepository stickerRepository;
 
-
-    // 내 아카이브 목록 조회
-    @ExecutionTime
-    @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getMyArchives(Long userId, Pageable pageable) {
-        // 1. 조회
-        Page<ArchiveDto.Response> page = archiveQueryRepository.searchArchives(userId, true, pageable);
-
-        // 2. 인덱스 범위 검증
-        validateIndexBounds(pageable, page);
-
-        return ArchiveDto.PageListResponse.of(page);
-    }
-
-    // 친구 아카이브 목록 조회
-    @ExecutionTime
-    @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getFriendArchives(Long myUserId, Long friendId, Pageable pageable) {
-        // 1. 친구 관계 검증
-        validateFriendRelationship(myUserId, friendId);
-
-        // 2. 조회
-        Page<ArchiveDto.Response> page = archiveQueryRepository.searchArchives(friendId, false, pageable);
-
-        // 3. 인덱스 범위 검증
-        validateIndexBounds(pageable, page);
-
-        return ArchiveDto.PageListResponse.of(page);
-    }
-
-    // 핫피드 목록 조회
-    @ExecutionTime
-    @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getHotArchives(Pageable pageable) {
-
-        // 1. 핫피드 조회
-        Page<ArchiveDto.Response> page = archiveQueryRepository.searchHotArchives(pageable);
-
-        // 2. 페이지 범위 검증(데이터 없는데 페이지 요청 시 -> 404에러)
-        validateIndexBounds(pageable, page);
-
-        return ArchiveDto.PageListResponse.of(page);
-    }
-
-    // 친구 관계 검증 로직 분리 (Clean Code)
-    private void validateFriendRelationship(Long myUserId, Long friendId) {
-        // 친구 존재 여부 확인
-        if (!userRepository.existsById(friendId)) {
-            throw new RestException(ErrorCode.USER_NOT_FOUND); // 존재하지 X -> 404에러
-        }
-
-        // 친구 관계 확인(ACCEPTED인지)
-        boolean isFriend = friendMapRepository.existsFriendship(myUserId, friendId, FriendStatus.ACCEPTED);
-
-        if (!isFriend) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 친구 X -> 403 에러
-        }
-    }
-
     @Transactional
     public ArchiveDto.Response createArchive(UserPrincipal userPrincipal, ArchiveDto.CreateRequest request) {
         // SEQ 1. User 조회
@@ -156,11 +95,7 @@ public class ArchiveService {
         // SEQ 3. Sub Domain Books 자동 생성
         createSubDomainBooks(archive);
 
-        // SEQ 4. Counts 초기화 (1:1 식별 관계) -> // TODO: DTO를 굳이 둬야할지 고민중
-        viewCountRepository.save(ArchiveViewCount.builder().archive(archive).viewCount(0).build());
-        likeCountRepository.save(ArchiveLikeCount.builder().archive(archive).likeCount(0).build());
-
-        // SEQ 5. 배너 이미지 연결
+        // SEQ 4. 배너 이미지 연결
         String bannerUrl = null;
         if (request.getBannerImageId() != null) {
             File banner = fileRepository.findById(request.getBannerImageId())
@@ -173,7 +108,7 @@ public class ArchiveService {
         return ArchiveDto.Response.of(archive, bannerUrl, 0, 0, false, true);
     }
 
-    @Transactional
+    @Transactional // viewCount 바꿔서 readOnly가 아닌거임
     public ArchiveDto.Response getArchiveDetail(UserPrincipal userPrincipal, Long archiveId) {
         // SEQ 1. Fetch Join을 사용하여 Archive + User 조회 (N+1 방지)
         Archive archive = archiveRepository.findByIdWithUser(archiveId)
@@ -187,21 +122,18 @@ public class ArchiveService {
         checkVisibility(viewerId, isOwner, archive);
 
         // SEQ 4. 조회수 증가 (Dirty Checking)
-        // TODO: 동시성 이슈 고려 시 Redis 사용. 현재는 단순 증가. 추후 개선
-        ArchiveViewCount viewCountEntity = viewCountRepository.findById(archiveId)
-                .orElseGet(() -> viewCountRepository.save(ArchiveViewCount.builder().archive(archive).build()));
-        viewCountEntity.increment();
+        archive.increaseViewCount();
 
         // SEQ 5. 데이터 조회 : 좋아요 수, 조회수, isLiked, isOwner, bannerUrl, archive
-        ArchiveLikeCount likeCountEntity = likeCountRepository.findById(archiveId).orElse(null);
+        // ArchiveLikeCount likeCountEntity = likeCountRepository.findById(archiveId).orElse(null);
         String bannerUrl = (archive.getBannerFile() != null) ? archive.getBannerFile().getFilePath() : null;
         boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
 
         return ArchiveDto.Response.of(
                 archive,
                 bannerUrl,
-                viewCountEntity.getViewCount(), // 조회수: 조회 시점 값 반환
-                (likeCountEntity != null) ? likeCountEntity.getLikeCount() : 0, // 좋아요 수
+                archive.getViewCount(),
+                archive.getLikeCount(),
                 isLiked,
                 isOwner
         );
@@ -234,11 +166,16 @@ public class ArchiveService {
         }
 
         // SEQ 5. 리턴용 조회
-        long viewCount = viewCountRepository.findById(archiveId).map(ArchiveViewCount::getViewCount).orElse(0L);
-        long likeCount = likeCountRepository.findById(archiveId).map(ArchiveLikeCount::getLikeCount).orElse(0L);
         boolean isLiked = likeRepository.existsByArchiveIdAndUserId(archiveId, user.getUserId());
 
-        return ArchiveDto.Response.of(archive, bannerUrl, viewCount, likeCount, isLiked, true);
+        return ArchiveDto.Response.of(
+                archive,
+                bannerUrl,
+                archive.getViewCount(),
+                archive.getLikeCount(),
+                isLiked,
+                true
+        );
     }
 
     @Transactional
@@ -278,11 +215,66 @@ public class ArchiveService {
         // 6️⃣ Sticker Domain Cleanup
         stickerRepository.deleteByArchiveId(archiveId); // Level 2
 
-        // Step 2. Root 삭제
-        // Cascade -> Sub Domain 삭제: DiaryBook, GalleryBook, TicketBook, RepostBook, ViewCount, LikeCount, Banner
+        // Step 2. 명시적 삭제 - Like
+        likeRepository.deleteByArchiveId(archiveId);
+
+        // Step 3. Root 삭제
+        // Cascade -> Sub Domain 삭제: DiaryBook, GalleryBook, TicketBook, RepostBook, Banner
         archiveRepository.delete(archive);
 
         log.info("🟢 Archive Delete Completed.");
+    }
+
+    @ExecutionTime
+    @Transactional(readOnly = true)
+    public ArchiveDto.PageListResponse getGlobalFeed(ArchiveDto.FeedRequest request) {
+        // 무조건 PUBLIC & 전체 유저 대상
+        Page<ArchiveDto.FeedResponse> page = archiveQueryRepository.searchArchiveFeed(
+                null, // filterUserId
+                List.of(Visibility.PUBLIC),
+                request.toPageable()
+        );
+
+        String title = "hotScore".equals(request.getSort()) ? "지금 핫한 피드" : "최신 아카이브 피드";
+
+        return ArchiveDto.PageListResponse.of(title, page);
+    }
+
+    @ExecutionTime
+    @Transactional(readOnly = true)
+    public ArchiveDto.PageListResponse getUserArchives(
+            UserPrincipal userPrincipal,
+            Long targetUserId,
+            ArchiveDto.FeedRequest request
+    ) {
+        List<Visibility> visibilities;
+        String pageTitle;
+
+        // 본인 확인
+        if (userPrincipal != null && userPrincipal.getUserId().equals(targetUserId)) {
+            visibilities = List.of(Visibility.PUBLIC, Visibility.RESTRICTED, Visibility.PRIVATE);
+            pageTitle = "마이 아카이브";
+        } else {
+            // 친구 확인 (Stub: 추후 친구 로직 구현 시 대체)
+            boolean isFriend = isFriendCheck(userPrincipal, targetUserId);
+            visibilities = isFriend
+                    ? List.of(Visibility.PUBLIC, Visibility.RESTRICTED)
+                    : List.of(Visibility.PUBLIC);
+
+            // 닉네임 조회 (Optional, UX용)
+            String nickname = userRepository.findById(targetUserId)
+                    .map(User::getNickname)
+                    .orElse("알 수 없는 사용자");
+            pageTitle = nickname + "님의 아카이브";
+        }
+
+        Page<ArchiveDto.FeedResponse> page = archiveQueryRepository.searchArchiveFeed(
+                targetUserId,
+                visibilities,
+                request.toPageable()
+        );
+
+        return ArchiveDto.PageListResponse.of(pageTitle, page);
     }
 
     // -------- Helper Methods
@@ -310,17 +302,18 @@ public class ArchiveService {
         }
 
         if (archive.getVisibility() == Visibility.RESTRICTED) {
-            // TODO: 친구 관계 확인 로직 구현 필요
-            // 현재는 친구 기능이 없으므로 RESTRICTED도 접근 불가 처리
             throw new RestException(ErrorCode.AUTH_FORBIDDEN);
         }
     }
 
-    // 공통 검증 로직(원래 있으면 재사용, 없으면 추가)
-    public void validateIndexBounds(Pageable pageable, Page<?> pageData) {
-        // 요청한 페이지 -> 전체 페이지 수, 데이터가 아예 없는게 아니면 404 예외처리
-        if (pageable.getPageNumber() > 0 && pageData.getTotalPages() <= pageable.getPageNumber()) {
-            throw new RestException(ErrorCode.DB_DATA_NOT_FOUND);
-        }
+    private boolean isFriendCheck(UserPrincipal viewer, Long ownerId) {
+        if (viewer == null) return false;
+
+        // JPQL 쿼리를 통해 친구 여부 확인
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewer.getUserId(),
+                ownerId,
+                FriendStatus.ACCEPTED
+        );
     }
 }
