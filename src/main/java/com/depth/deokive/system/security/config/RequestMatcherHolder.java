@@ -42,6 +42,19 @@ public class RequestMatcherHolder {
             // ticket
             new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId}", null),
 
+            // diary
+            new RequestInfo(HttpMethod.GET, "/api/v1/diary/{diaryId}", null),
+
+            // event
+            new RequestInfo(HttpMethod.GET, "/api/v1/events/{eventId}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/events/monthly/{archiveId}", null),
+
+            // archive
+            new RequestInfo(HttpMethod.GET, "/api/v1/archives/{archiveId}", null),
+
+            // test
+            new RequestInfo(HttpMethod.POST, "/api/system/test/scheduler/**", null),
+
             // user
 
             // system

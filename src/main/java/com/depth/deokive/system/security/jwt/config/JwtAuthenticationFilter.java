@@ -36,7 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenResolver jwtTokenResolver;
     private final UserLoadService userLoadService;
     private final JwtTokenValidator jwtTokenValidator;
-    private final RequestMatcherHolder requestMatcherHolder;
+    // private final RequestMatcherHolder requestMatcherHolder;
     private final ObjectMapper objectMapper;
     private final TokenService tokenService;
 
@@ -44,9 +44,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         // 1. RequestMatcherHolder의 permitAll 경로는 필터 스킵
-        if (requestMatcherHolder.getRequestMatchersByMinRole(null).matches(request)) {
-            return true;
-        }
+        // if (requestMatcherHolder.getRequestMatchersByMinRole(null).matches(request)) {
+        //     return true;
+        // }
 
         // 2. /api/v1/**가 아닌 경로는 필터 스킵 (SecurityConfig에서 denyAll()로 차단됨)
         String uri = request.getRequestURI();

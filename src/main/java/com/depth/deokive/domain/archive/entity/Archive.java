@@ -17,15 +17,23 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Entity
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "archive")
+@Table(name = "archive", indexes = {
+        // 1. 마이/친구 아카이브용 (유저별 + 생성/수정일 정렬)
+        @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC"),
+        @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC"), // updated_at은 TimeBaseEntity
+
+        // 2. 피드/핫피드용 (공개범위 + 핫스코어/조회수/좋아요 정렬)
+        // 커버링 인덱스 효과를 극대화하기 위해 visibility를 선행 컬럼으로 둠
+        @Index(name = "idx_archive_pub_hot", columnList = "visibility, hot_score DESC"),
+        @Index(name = "idx_archive_pub_view", columnList = "visibility, view_count DESC"),
+        @Index(name = "idx_archive_pub_like", columnList = "visibility, like_count DESC"),
+        @Index(name = "idx_archive_pub_new", columnList = "visibility, created_at DESC")
+})
 public class Archive extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -46,11 +54,17 @@ public class Archive extends TimeBaseEntity {
     @Column(nullable = false)
     Badge badge = Badge.NEWBIE;
 
-    @OneToOne(mappedBy = "archive", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private ArchiveViewCount viewCount;
+    @Builder.Default
+    @Column(nullable = false)
+    private Long viewCount = 0L;
 
-    @OneToOne(mappedBy = "archive", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private ArchiveLikeCount likeCount;
+    @Builder.Default
+    @Column(nullable = false)
+    private Long likeCount = 0L;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Double hotScore = 0.0;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "banner_file_id")
@@ -78,6 +92,8 @@ public class Archive extends TimeBaseEntity {
     public void updateBanner(File file) {
         this.bannerFile = file;
     }
+    public void updateHotScore(Double score) { this.hotScore = score; }
+    public void increaseViewCount() { this.viewCount++; }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) { return newValue != null ? newValue : currentValue; }
 }
