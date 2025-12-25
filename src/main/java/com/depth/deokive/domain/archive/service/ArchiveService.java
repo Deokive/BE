@@ -90,19 +90,22 @@ public class ArchiveService {
                 .badge(Badge.NEWBIE) // 생성 시점에선 기본 뱃지로 들어감
                 .build();
 
+        // SEQ 3. Banner 파일 연결 (기존에서 순서를 변경 -> 추후 IDOR 취약점 방지 처리 로직 넣을거임)
+        if (request.getBannerImageId() != null) {
+            File bannerFile = validateAndGetFile(request.getBannerImageId());
+            archive.updateBanner(bannerFile);
+        }
+
+        // SEQ 4. 저장
         archiveRepository.save(archive);
 
-        // SEQ 3. Sub Domain Books 자동 생성
+        // SEQ 5. Sub Domain Books 자동 생성
         createSubDomainBooks(archive);
 
-        // SEQ 4. 배너 이미지 연결
-        String bannerUrl = null;
-        if (request.getBannerImageId() != null) {
-            File banner = fileRepository.findById(request.getBannerImageId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-            archive.updateBanner(banner);
-            bannerUrl = banner.getFilePath();
-        }
+        // SEQ 6. Response
+        String bannerUrl = (archive.getBannerFile() != null)
+                ? archive.getBannerFile().getFilePath()
+                : null;
 
         // p: archive, bannerUrl, viewCount, likeCount, isLiked, isOwner
         return ArchiveDto.Response.of(archive, bannerUrl, 0, 0, false, true);
@@ -152,18 +155,7 @@ public class ArchiveService {
         archive.update(request); // 여기서 bannerUrl 은 처리하지 않음
 
         // SEQ 4. 배너 수정
-        String bannerUrl = (archive.getBannerFile() != null) ? archive.getBannerFile().getFilePath() : null;
-        if (request.getBannerImageId() != null) {
-            if (request.getBannerImageId() == -1L) {
-                archive.updateBanner(null);
-                bannerUrl = null;
-            } else {
-                File newBanner = fileRepository.findById(request.getBannerImageId())
-                        .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-                archive.updateBanner(newBanner);
-                bannerUrl = newBanner.getFilePath();
-            }
-        }
+        String bannerUrl = updateBannerImage(archive, request.getBannerImageId());
 
         // SEQ 5. 리턴용 조회
         boolean isLiked = likeRepository.existsByArchiveIdAndUserId(archiveId, user.getUserId());
@@ -315,5 +307,25 @@ public class ArchiveService {
                 ownerId,
                 FriendStatus.ACCEPTED
         );
+    }
+
+    private File validateAndGetFile(Long fileId) {
+        return fileRepository.findById(fileId)
+                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
+    }
+
+    private String updateBannerImage(Archive archive, Long newFileId) {
+        if (newFileId == null) return null;
+
+        if (newFileId == -1L) {
+            // 삭제 요청: 기존 파일 연결 해제
+            archive.updateBanner(null); // 실제 S3 삭제는 배치 처리로 위임 (Lazy Deletion)
+            return null;
+        } else {
+            // 변경 요청
+            File newBanner = validateAndGetFile(newFileId);
+            archive.updateBanner(newBanner);
+            return newBanner.getFilePath();
+        }
     }
 }
