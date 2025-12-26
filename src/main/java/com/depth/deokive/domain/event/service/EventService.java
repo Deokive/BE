@@ -57,7 +57,7 @@ public class EventService {
         }
 
         // SEQ 6. 해시태그 저장
-        updateHashtags(event, request.getHashtags());
+        saveHashtags(event, request.getHashtags());
 
         return EventDto.Response.of(event, sportRecord, request.getHashtags());
     }
@@ -100,7 +100,7 @@ public class EventService {
 
         // SEQ 5. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
         eventHashtagMapRepository.deleteByEventId(eventId);
-        updateHashtags(event, request.getHashtags());
+        saveHashtags(event, request.getHashtags());
 
         return EventDto.Response.of(event, sportRecord, request.getHashtags());
     }
@@ -189,41 +189,22 @@ public class EventService {
         }
     }
 
-    private void updateHashtags(Event event, List<String> newTagNames) {
-        // SEQ 1. null 처리 (빈 리스트로 간주)
-        List<String> requestTags = (newTagNames == null) ? List.of() : newTagNames;
+    private void saveHashtags(Event event, List<String> tagNames) {
+        if (tagNames == null || tagNames.isEmpty()) return;
 
-        // SEQ 2. 현재 DB에 저장된 태그 매핑 조회
-        List<EventHashtagMap> currentMaps = eventHashtagMapRepository.findAllByEventId(event.getId());
+        // 중복 제거 (Set) 처리
+        List<String> uniqueNames = tagNames.stream().distinct().toList();
 
-        // SEQ 3. 현재 태그 이름 추출
-        List<String> currentTagNames = currentMaps.stream()
-                .map(map -> map.getHashtag().getName())
-                .toList();
-
-        // SEQ 4. 삭제할 태그 찾기 (기존엔 있는데, 요청엔 없는 것)
-        List<EventHashtagMap> toDelete = currentMaps.stream()
-                .filter(map -> !requestTags.contains(map.getHashtag().getName()))
-                .toList();
-
-        // SEQ 5. 삭제할 태그만 타겟팅해서 삭제
-        eventHashtagMapRepository.deleteAll(toDelete);
-
-        // SEQ 6. 추가할 태그 찾기 (기존엔 없는데, 요청엔 있는 것)
-        List<String> toAdd = requestTags.stream()
-                .filter(name -> !currentTagNames.contains(name))
-                .toList();
-
-        // SEQ 7. 추가할 타겟 태그들 추가
-        for (String name : toAdd) {
+        for (String name : uniqueNames) {
+            // 태그가 존재하면 찾고, 없으면 생성 (Find or Create)
             Hashtag hashtag = hashtagRepository.findByName(name)
                     .orElseGet(() -> hashtagRepository.save(Hashtag.builder().name(name).build()));
 
+            // 매핑 테이블 저장
             EventHashtagMap map = EventHashtagMap.builder()
                     .event(event)
                     .hashtag(hashtag)
                     .build();
-
             eventHashtagMapRepository.save(map);
         }
     }
