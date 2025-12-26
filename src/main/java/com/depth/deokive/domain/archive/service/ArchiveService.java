@@ -251,7 +251,8 @@ public class ArchiveService {
             pageTitle = "마이 아카이브";
         } else {
             // 친구 확인 (Stub: 추후 친구 로직 구현 시 대체)
-            boolean isFriend = isFriendCheck(userPrincipal, targetUserId);
+            Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+            boolean isFriend = isFriendCheck(viewerId, targetUserId);
             visibilities = isFriend
                     ? List.of(Visibility.PUBLIC, Visibility.RESTRICTED)
                     : List.of(Visibility.PUBLIC);
@@ -289,6 +290,7 @@ public class ArchiveService {
         }
     }
 
+    // TODO: 다른 도메인과 메서드 규칙 일관성 맞춰둘 것
     private void checkVisibility(Long viewerId, boolean isOwner, Archive archive) {
         if (isOwner) return; // 주인은 모든 상태 볼 수 있음
 
@@ -297,25 +299,22 @@ public class ArchiveService {
         }
 
         if (archive.getVisibility() == Visibility.RESTRICTED) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+            if (!isFriendCheck(viewerId, archive.getUser().getId())) {
+                throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+            }
         }
     }
 
-    private boolean isFriendCheck(UserPrincipal viewer, Long ownerId) {
-        if (viewer == null) return false;
+    private boolean isFriendCheck(Long viewerId, Long ownerId) {
+        if (viewerId == null) return false;
 
         // JPQL 쿼리를 통해 친구 여부 확인
         return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
-                viewer.getUserId(),
+                viewerId,
                 ownerId,
                 FriendStatus.ACCEPTED
         );
     }
-
-    // private File validateAndGetFile(Long fileId) {
-    //     return fileRepository.findById(fileId)
-    //             .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-    // }
 
     private String updateBannerImage(Archive archive, Long newFileId, Long userId) {
         if (newFileId == null) return null;
