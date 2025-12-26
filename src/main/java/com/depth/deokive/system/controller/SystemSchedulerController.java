@@ -6,11 +6,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.batch.core.Job;
 
 @Slf4j
 @RestController
@@ -22,6 +26,9 @@ public class SystemSchedulerController {
 
     private final ArchiveHotFeedScheduler hotFeedScheduler;
     private final ArchiveBadgeScheduler badgeScheduler;
+
+    private final JobLauncher jobLauncher;
+    private final Job fileCleanupJob; // Bean 이름(FileCleanupBatchConfig의 메서드명)과 일치해야 자동 주입됨
 
     @PostMapping("/hot-score")
     @Operation(summary = "🔥 핫 스코어 갱신 강제 실행", description = "100만 건 기준 약 1~3초 소요 예상")
@@ -45,5 +52,30 @@ public class SystemSchedulerController {
 
         long end = System.currentTimeMillis();
         return ResponseEntity.ok("Badge Update Completed! (Time: " + (end - start) + "ms)");
+    }
+
+    @PostMapping("/batch/file-cleanup")
+    @Operation(summary = "🧹 고아 파일 정리 배치 강제 실행", description = "S3 및 DB에서 연결되지 않은(24시간 경과) 파일 삭제")
+    public ResponseEntity<String> triggerFileCleanupBatch() {
+        log.info("Manual Trigger: File Cleanup Batch");
+        long start = System.currentTimeMillis();
+
+        try {
+            // Spring Batch는 동일한 파라미터로 이미 성공한 Job을 재실행하지 않음.
+            // 따라서 매번 실행할 때마다 현재 시간을 파라미터로 넣어 '새로운 작업'임을 알려야 함.
+            JobParameters jobParameters = new JobParametersBuilder()
+                    .addLong("time", System.currentTimeMillis())
+                    .addString("type", "manual_trigger") // 구분용 태그
+                    .toJobParameters();
+
+            jobLauncher.run(fileCleanupJob, jobParameters);
+
+        } catch (Exception e) {
+            log.error("🔴 Batch execution failed", e);
+            return ResponseEntity.internalServerError().body("Batch Failed: " + e.getMessage());
+        }
+
+        long end = System.currentTimeMillis();
+        return ResponseEntity.ok("File Cleanup Batch Completed! (Time: " + (end - start) + "ms)");
     }
 }
