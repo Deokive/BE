@@ -4,6 +4,7 @@ import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.entity.Gallery;
 import com.depth.deokive.domain.gallery.entity.GalleryBook;
@@ -29,9 +30,9 @@ public class GalleryService {
 
     private final GalleryQueryRepository galleryQueryRepository;
     private final GalleryBookRepository galleryBookRepository;
-    private final FileRepository fileRepository;
     private final ArchiveRepository archiveRepository;
     private final GalleryRepository galleryRepository;
+    private final FileService fileService;
 
     @ExecutionTime
     @Transactional(readOnly = true)
@@ -56,7 +57,7 @@ public class GalleryService {
 
         validateOwner(galleryBook.getArchive().getUser().getId(), userPrincipal);
 
-        List<File> files = fileRepository.findAllById(request.getFileIds());
+        List<File> files = fileService.validateFileOwners(request.getFileIds(), userPrincipal.getUserId());
 
         if (files.size() != request.getFileIds().size()) {
             throw new RestException(ErrorCode.FILE_NOT_FOUND);
