@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.archive.service;
 
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -45,6 +46,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ArchiveService {
+
+    private final FileService fileService;
 
     private final ArchiveQueryRepository archiveQueryRepository;
     private final FriendMapRepository friendMapRepository;
@@ -92,7 +95,7 @@ public class ArchiveService {
 
         // SEQ 3. Banner 파일 연결 (기존에서 순서를 변경 -> 추후 IDOR 취약점 방지 처리 로직 넣을거임)
         if (request.getBannerImageId() != null) {
-            File bannerFile = validateAndGetFile(request.getBannerImageId());
+            File bannerFile = fileService.validateFileOwner(request.getBannerImageId(), foundUser.getId());
             archive.updateBanner(bannerFile);
         }
 
@@ -155,7 +158,7 @@ public class ArchiveService {
         archive.update(request); // 여기서 bannerUrl 은 처리하지 않음
 
         // SEQ 4. 배너 수정
-        String bannerUrl = updateBannerImage(archive, request.getBannerImageId());
+        String bannerUrl = updateBannerImage(archive, request.getBannerImageId(), user.getUserId());
 
         // SEQ 5. 리턴용 조회
         boolean isLiked = likeRepository.existsByArchiveIdAndUserId(archiveId, user.getUserId());
@@ -309,12 +312,12 @@ public class ArchiveService {
         );
     }
 
-    private File validateAndGetFile(Long fileId) {
-        return fileRepository.findById(fileId)
-                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-    }
+    // private File validateAndGetFile(Long fileId) {
+    //     return fileRepository.findById(fileId)
+    //             .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
+    // }
 
-    private String updateBannerImage(Archive archive, Long newFileId) {
+    private String updateBannerImage(Archive archive, Long newFileId, Long userId) {
         if (newFileId == null) return null;
 
         if (newFileId == -1L) {
@@ -323,7 +326,8 @@ public class ArchiveService {
             return null;
         } else {
             // 변경 요청
-            File newBanner = validateAndGetFile(newFileId);
+
+            File newBanner = fileService.validateFileOwner(newFileId, userId);
             archive.updateBanner(newBanner);
             return newBanner.getFilePath();
         }
