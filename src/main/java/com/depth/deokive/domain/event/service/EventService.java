@@ -6,6 +6,8 @@ import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.event.dto.EventDto;
 import com.depth.deokive.domain.event.entity.*;
 import com.depth.deokive.domain.event.repository.*;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -29,6 +31,7 @@ public class EventService {
     private final HashtagRepository hashtagRepository;
     private final EventHashtagMapRepository eventHashtagMapRepository;
     private final ArchiveRepository archiveRepository;
+    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public EventDto.Response createEvent(UserPrincipal user, Long archiveId, EventDto.Request request) {
@@ -40,7 +43,7 @@ public class EventService {
         validateOwner(archive, user);
 
         // SEQ 3. 날짜/시간 병합 로직
-        LocalDateTime recordAt = mergeDateTime(request);
+        LocalDateTime recordAt = getRecordAt(request);
 
         // SEQ 4. Event 저장
         Event event = request.toEntity(archive, recordAt);
@@ -49,7 +52,8 @@ public class EventService {
         // SEQ 5. 스포츠 기록 저장 (필요 시)
         SportRecord sportRecord = null;
         if (request.getIsSportType() && request.getSportInfo() != null) {
-            sportRecord = saveSportRecord(event, request.getSportInfo());
+            sportRecord = request.getSportInfo().toEntity(event);
+            sportRecordRepository.save(sportRecord);
         }
 
         // SEQ 6. 해시태그 저장
@@ -89,13 +93,12 @@ public class EventService {
         validateOwner(event.getArchive(), user);
 
         // SEQ 3. 업데이트
-        LocalDateTime recordAt = mergeDateTime(request);
-        event.update(request, recordAt); // Dirty Checking
+        event.update(request, getRecordAt(request)); // Dirty Checking
 
         // SEQ 4. 스포츠 기록 처리
         SportRecord sportRecord = handleSportRecordUpdate(event, request);
 
-        // SEQ 5. 해시태그 업데이트 (기존 삭제 후 재등록 방식) // TODO: 왜 그렇게 하지?
+        // SEQ 5. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
         eventHashtagMapRepository.deleteByEventId(eventId);
         updateHashtags(event, request.getHashtags());
 
@@ -143,57 +146,38 @@ public class EventService {
         List<Long> eventIds = events.stream().map(Event::getId).toList();
 
         // 4-2. 해당 이벤트들에 속한 모든 해시태그 매핑을 한 번에 조회 (bulk)
-        List<EventHashtagMap> hashtagMaps = eventHashtagMapRepository.findAllByEventIdIn(eventIds);
-
-        // 4-3. 메모리에서 EventId 별로 해시태그 이름 리스트 그룹핑 (Map<EventId, List<TagName>>)
-        Map<Long, List<String>> hashtagsMap = hashtagMaps.stream()
-                .collect(Collectors.groupingBy(
-                        map -> map.getEvent().getId(),
-                        Collectors.mapping(map -> map.getHashtag().getName(), Collectors.toList())
-                ));
+        Map<Long, List<String>> hashtagMap = getHashtagMap(eventIds);
 
         // SEQ 5. DTO 변환 및 반환
         return events.stream()
                 .map(event -> EventDto.Response.of(
                         event,
                         event.getSportRecord(), // Fetch Join 되었으므로 즉시 접근 가능
-                        hashtagsMap.getOrDefault(event.getId(), Collections.emptyList()) // Map에서 O(1) 조회
+                        hashtagMap.getOrDefault(event.getId(), Collections.emptyList()) // Map에서 O(1) 조회
                 ))
                 .toList();
     }
 
     // --- Helper Methods ---
 
-    private LocalDateTime mergeDateTime(EventDto.Request request) {
+    private LocalDateTime getRecordAt(EventDto.Request request) {
         LocalTime time = (request.getHasTime() && request.getTime() != null)
                 ? request.getTime()
                 : LocalTime.of(0, 0);
         return LocalDateTime.of(request.getDate(), time);
     }
 
-    private SportRecord saveSportRecord(Event event, EventDto.SportRequest info) {
-        SportRecord record = SportRecord.builder()
-                .event(event)
-                .team1(info.getTeam1())
-                .team2(info.getTeam2())
-                .score1(info.getScore1())
-                .score2(info.getScore2())
-                .build();
-        return sportRecordRepository.save(record);
-    }
-
     private SportRecord handleSportRecordUpdate(Event event, EventDto.Request request) {
         // Case 1: 스포츠 타입 ON
         if (request.getIsSportType()) {
             EventDto.SportRequest info = request.getSportInfo();
-
             SportRecord existingRecord = event.getSportRecord();
 
             if (existingRecord != null) {
                 existingRecord.update(request.getSportInfo());
                 return existingRecord;
             } else {
-                return saveSportRecord(event, info);
+                return sportRecordRepository.save(info.toEntity(event));
             }
         }
         // Case 2: 스포츠 타입 OFF
@@ -253,13 +237,10 @@ public class EventService {
     private void validateReadPermission(Event event, UserPrincipal userPrincipal) {
         Long ownerId = event.getArchive().getUser().getId();
         Long viewerId = userPrincipal != null ? userPrincipal.getUserId() : null;
-        Visibility visibility = event.getArchive().getVisibility();
 
         if (ownerId.equals(viewerId)) return;
-        // TODO: Visibility.RESTRICTED일 경우 친구 관계 검증 : 아직 친구관계 설정 도메인이 구현안되어있으니 TODO로 남김
-        if (visibility != Visibility.PUBLIC) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
+
+        validateReadPermissionCommon(ownerId, viewerId, event.getArchive().getVisibility());
     }
 
     // validateReadPermission은 단건 조회용(Event 기준)이라, 아카이브 기준 검증 메서드 분리
@@ -269,8 +250,40 @@ public class EventService {
 
         if (ownerId.equals(viewerId)) return;
 
-        if (archive.getVisibility() != Visibility.PUBLIC) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+        validateReadPermissionCommon(ownerId, viewerId, archive.getVisibility());
+    }
+
+    private void validateReadPermissionCommon(Long ownerId, Long viewerId, Visibility visibility) {
+        switch (visibility) {
+            case PRIVATE ->
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 주인 외 접근 불가
+            case RESTRICTED -> {
+                if (!checkFriendRelationship(viewerId, ownerId)) {
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+                }
+            }
+            case PUBLIC -> { /* 모두 허용 */ }
         }
+    }
+
+    private boolean checkFriendRelationship(Long viewerId, Long ownerId) {
+        if (viewerId == null) return false;
+
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewerId,
+                ownerId,
+                FriendStatus.ACCEPTED
+        );
+    }
+
+    private Map<Long, List<String>> getHashtagMap(List<Long> eventIds) {
+        if (eventIds.isEmpty()) return Collections.emptyMap();
+        List<EventHashtagMap> maps = eventHashtagMapRepository.findAllByEventIdIn(eventIds);
+
+        return maps.stream()
+                .collect(Collectors.groupingBy(
+                        map -> map.getEvent().getId(),
+                        Collectors.mapping(map -> map.getHashtag().getName(), Collectors.toList())
+                ));
     }
 }
