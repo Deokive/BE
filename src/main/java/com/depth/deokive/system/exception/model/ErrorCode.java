@@ -61,6 +61,7 @@ public enum ErrorCode {
     FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "FILE STORAGE ERROR", "파일 저장 중 오류가 발생했습니다."),
     FILE_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "FILE INVALID FORMAT", "유효하지 않은 파일 형식입니다."),
     FILE_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "FILE SIZE EXCEEDED", "파일 크기가 허용된 한도를 초과했습니다."),
+    FILE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "FILE ACCESS DENIED", "파일에 접근할 수 있는 권한이 없습니다."),
 
     // POST Errors
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST NOT FOUND", "존재하지 않는 게시글입니다."),
