@@ -59,6 +59,8 @@ public class Event extends TimeBaseEntity {
         this.isSportType = nonBlankOrDefault(request.getIsSportType(), this.isSportType);
     }
 
+    public void deleteSportRecord() { this.sportRecord = null; }
+
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;
     }

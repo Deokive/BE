@@ -184,6 +184,7 @@ public class EventService {
         else {
             if (event.getSportRecord() != null) {
                 sportRecordRepository.deleteById(event.getId());
+                event.deleteSportRecord();
             }
             return null;
         }
