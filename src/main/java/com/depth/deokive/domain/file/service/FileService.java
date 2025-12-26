@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -202,6 +203,30 @@ public class FileService {
         }
 
         return file;
+    }
+
+    @Transactional(readOnly = true)
+    public List<File> validateFileOwners(List<Long> fileIds, Long userId) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<File> files = fileRepository.findAllById(fileIds); // Bulk Fetch
+
+        // 개수 검증
+        if (files.size() != fileIds.stream().distinct().count()) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
+
+        // 소유권 검증
+        boolean isAllMine = files.stream().allMatch(file -> file.getCreatedBy().equals(userId));
+
+        if (!isAllMine) {
+            log.warn("⚠️ IDOR Attempt Detected in Bulk Request! User: {}", userId);
+            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        return files;
     }
 
     // -------- Helper Methods --------
