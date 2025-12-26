@@ -9,6 +9,7 @@ import com.depth.deokive.domain.diary.repository.DiaryFileMapRepository;
 import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -33,6 +34,7 @@ public class DiaryService {
     private final DiaryBookRepository diaryBookRepository;
     private final DiaryFileMapRepository diaryFileMapRepository;
     private final FileRepository fileRepository;
+    private final FileService fileService;
 
     // TODO: private final FriendRepository friendRepository; // 추후 친구 관계 확인용
 
@@ -50,7 +52,7 @@ public class DiaryService {
         diaryRepository.save(diary);
 
         // SEQ 4. 파일 연결
-        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles());
+        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
 
         return DiaryDto.Response.of(diary, maps);
     }
@@ -82,7 +84,7 @@ public class DiaryService {
 
         // SEQ 4. 파일 갈아끼우기 : 전략 -> Full Replacement
         diaryFileMapRepository.deleteAllByDiaryId(diaryId);
-        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles());
+        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
 
         return DiaryDto.Response.of(diary, maps);
     }
@@ -167,7 +169,11 @@ public class DiaryService {
     }
 
     // Refactor : 파일 목록 한 번에 조회하고, 매핑 엔터티 생성해서 일괄 저장, N+1 문제 방지 및 DB 커넥션 비용 최소화
-    private List<DiaryFileMap> connectFiles(Diary diary, List<DiaryDto.AttachedFileRequest> fileRequests) {
+    private List<DiaryFileMap> connectFiles(
+            Diary diary,
+            List<DiaryDto.AttachedFileRequest> fileRequests,
+            Long userId
+    ) {
         // SEQ 1. Validation
         if (fileRequests == null || fileRequests.isEmpty()) {
             return Collections.emptyList();
@@ -178,7 +184,7 @@ public class DiaryService {
                 .map(DiaryDto.AttachedFileRequest::getFileId).toList();
 
         // SEQ 3. File Entity Bulk Fetch
-        List<File> files = fileRepository.findAllById(fileIds);
+        List<File> files = fileService.validateFileOwners(fileIds, userId);
 
         // SEQ 4. Validate Files
         if (files.size() != fileIds.stream().distinct().count()) {
@@ -193,7 +199,6 @@ public class DiaryService {
         List<DiaryFileMap> newMaps = fileRequests.stream()
                 .map(req -> {
                     File file = fileMap.get(req.getFileId());
-                    // TODO: 이런 builder 긴거 싫으니까 추후 리팩터링 단계에서 정적 팩터리 메서드 만들 것
                     return DiaryFileMap.builder()
                             .diary(diary)
                             .file(file)
@@ -205,20 +210,6 @@ public class DiaryService {
 
         // SEQ 7. Bulk Insert
         return diaryFileMapRepository.saveAll(newMaps);
-
-        // N+1 문제 초래하는 코드 -> 비교하라고 남겨둠 -> 나중에 최종 리팩토링 단계에서 지울거임
-        // for (DiaryDto.AttachedFileRequest fileReq : fileRequests) {
-        //     File file = fileRepository.findById(fileReq.getFileId())
-        //             .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-        //
-        //     DiaryFileMap map = DiaryFileMap.builder()
-        //             .diary(diary)
-        //             .file(file)
-        //             .mediaRole(fileReq.getMediaRole())
-        //             .sequence(fileReq.getSequence())
-        //             .build();
-        //     diaryFileMapRepository.save(map);
-        // }
     }
 
     private List<DiaryFileMap> getFileMaps(Long diaryId) {
