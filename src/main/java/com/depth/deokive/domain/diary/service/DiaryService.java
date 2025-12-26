@@ -10,6 +10,8 @@ import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -33,10 +35,8 @@ public class DiaryService {
     private final DiaryRepository diaryRepository;
     private final DiaryBookRepository diaryBookRepository;
     private final DiaryFileMapRepository diaryFileMapRepository;
-    private final FileRepository fileRepository;
     private final FileService fileService;
-
-    // TODO: private final FriendRepository friendRepository; // 추후 친구 관계 확인용
+    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public DiaryDto.Response createDiary(UserPrincipal userPrincipal, Long archiveId, DiaryDto.Request request) {
@@ -64,10 +64,12 @@ public class DiaryService {
                 .orElseThrow(() -> new RestException(ErrorCode.DIARY_NOT_FOUND));
 
         // SEQ 2. 다이어리 접근 권한 점검
-        log.info("🟢 Retrieve diary : {}", diary);
         validateReadPermission(diary, userPrincipal);
 
-        return DiaryDto.Response.of(diary, getFileMaps(diaryId));
+        // SEQ 3. 파일 매핑 조회
+        List<DiaryFileMap> maps = getFileMaps(diaryId);
+
+        return DiaryDto.Response.of(diary, maps);
     }
 
     @Transactional
@@ -134,7 +136,6 @@ public class DiaryService {
 
         // SEQ 1. 작성자 본인이면 통과
         if (Objects.equals(viewerId, writerId) && writerId != null) return;
-        // if (Objects.equals(viewerId, writerId)) return;
 
         log.info("🟢 Let's Check Diary Visibility : {}", diary.getVisibility());
 
@@ -142,9 +143,8 @@ public class DiaryService {
         switch (diary.getVisibility()) {
             case PRIVATE -> throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 본인 제외 접근 불가
             case RESTRICTED -> {
-                // TODO: 친구 관계 확인 로직 추가 필요
                 boolean isFriend = checkFriendRelationship(viewerId, writerId);
-                if (!isFriend) throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+                if (!isFriend) { throw new RestException(ErrorCode.AUTH_FORBIDDEN); }
             }
             case PUBLIC -> {/* 모두 허용 */}
         }
@@ -152,8 +152,12 @@ public class DiaryService {
 
     private boolean checkFriendRelationship(Long viewerId, Long writerId) {
         if (viewerId == null) return false;
-        // return friendRepository.existsByFromUserIdAndToUserId(viewerId, writerId);
-        return false; // 현재는 친구 로직이 없으므로 false 처리
+
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewerId,
+                writerId,
+                FriendStatus.ACCEPTED
+        );
     }
 
     private void validateBookOwner(DiaryBook book, Long userId) {
