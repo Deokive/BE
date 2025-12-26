@@ -65,7 +65,7 @@ public class EventDto {
         }
     }
 
-    @Data @NoArgsConstructor
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "스포츠 경기 정보 요청 DTO")
     public static class SportRequest {
         @Schema(description = "팀 1 이름", example = "한화 이글스")
