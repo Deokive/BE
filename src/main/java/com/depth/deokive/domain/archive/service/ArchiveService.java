@@ -99,11 +99,12 @@ public class ArchiveService {
             archive.updateBanner(bannerFile);
         }
 
-        // SEQ 4. 저장
+        // SEQ 4. Sub Domain Books 생성 및 연결 (Cascade 준비)
+        linkSubDomainBooks(archive);
+
+        // SEQ 5. 저장 (Archive + Books Cascade)
         archiveRepository.save(archive);
 
-        // SEQ 5. Sub Domain Books 자동 생성
-        createSubDomainBooks(archive);
 
         // SEQ 6. Response
         String bannerUrl = (archive.getBannerFile() != null)
@@ -274,14 +275,17 @@ public class ArchiveService {
     }
 
     // -------- Helper Methods
-    private void createSubDomainBooks(Archive archive) {
+    private void linkSubDomainBooks(Archive archive) {
         String baseTitle = archive.getTitle();
 
-        // 이거 때문에 정적 팩터리 메서드 만드는게 좀 귀찮 -> 리펙터링 단계에서 고려하고 바꿔야겠으면 수정하는걸로
-        diaryBookRepository.save(DiaryBook.builder().archive(archive).title(baseTitle + "의 다이어리").build());
-        galleryBookRepository.save(GalleryBook.builder().archive(archive).title(baseTitle + "의 갤러리").build());
-        ticketBookRepository.save(TicketBook.builder().archive(archive).title(baseTitle + "의 티켓북").build());
-        repostBookRepository.save(RepostBook.builder().archive(archive).title(baseTitle + "의 스크랩북").build());
+        // Book 객체 생성 (아직 저장 X)
+        DiaryBook diary = DiaryBook.builder().archive(archive).title(baseTitle + "의 다이어리").build();
+        GalleryBook gallery = GalleryBook.builder().archive(archive).title(baseTitle + "의 갤러리").build();
+        TicketBook ticket = TicketBook.builder().archive(archive).title(baseTitle + "의 티켓북").build();
+        RepostBook repost = RepostBook.builder().archive(archive).title(baseTitle + "의 스크랩북").build();
+
+        // Archive에 연결 (Cascade 동작 트리거)
+        archive.setBooks(diary, ticket, gallery, repost);
     }
 
     private void validateOwner(Archive archive, UserPrincipal user) {

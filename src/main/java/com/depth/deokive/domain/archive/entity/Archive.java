@@ -95,5 +95,13 @@ public class Archive extends TimeBaseEntity {
     public void updateHotScore(Double score) { this.hotScore = score; }
     public void increaseViewCount() { this.viewCount++; }
 
+    // CascadeType.ALL 로 인해 연관된 북들도 함께 저장/삭제됨
+    public void setBooks(DiaryBook diary, TicketBook ticket, GalleryBook gallery, RepostBook repost) {
+        this.diaryBook = diary;
+        this.ticketBook = ticket;
+        this.galleryBook = gallery;
+        this.repostBook = repost;
+    }
+
     private <T> T nonBlankOrDefault(T newValue, T currentValue) { return newValue != null ? newValue : currentValue; }
 }
