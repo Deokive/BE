@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
@@ -30,8 +31,8 @@ import java.util.stream.Collectors;
 public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
-    private final FileRepository fileRepository;
     private final PostFileMapRepository postFileMapRepository;
+    private final FileService fileService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.Request request) {
@@ -44,7 +45,7 @@ public class PostService {
         postRepository.save(post);
 
         // SEQ 3. 파일 연결
-        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles());
+        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
         // SEQ 4. Response
         return PostDto.Response.of(post, maps);
@@ -77,7 +78,7 @@ public class PostService {
 
         // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
         postFileMapRepository.deleteAllByPostId(post.getId());
-        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles());
+        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
         // SEQ 6. Return
         return PostDto.Response.of(post, maps);
@@ -103,7 +104,11 @@ public class PostService {
     // ------ Helper Methods -------
 
     // 파일 목록을 한 번에 조회하고 매핑 엔티티를 생성해서 일괄 저장 -> Repost 시 썸네일 추출을 위해 MediaRole(PREVIEW) 저장이 필수임
-    private List<PostFileMap> connectFilesToPost(Post post, List<PostDto.AttachedFileRequest> fileRequests) {
+    private List<PostFileMap> connectFilesToPost(
+            Post post,
+            List<PostDto.AttachedFileRequest> fileRequests,
+            Long userId
+    ) {
         // SEQ 1. Validation
         if (fileRequests == null || fileRequests.isEmpty()) { return Collections.emptyList(); }
 
@@ -113,7 +118,7 @@ public class PostService {
                 .collect(Collectors.toList());
 
         // SEQ 3. File Entity Bulk Fetch
-        List<File> files = fileRepository.findAllById(fileIds);
+        List<File> files = fileService.validateFileOwners(fileIds, userId);
 
         // SEQ 4. Validate Files
         if (files.size() != fileIds.stream().distinct().count()) {
@@ -139,22 +144,6 @@ public class PostService {
 
         // SEQ 7. Bulk Insert
         return postFileMapRepository.saveAll(newMaps);
-
-        // N+1 문제 지점 -> 비교를 위해 남겨둠 -> 추후 리팩토링 시에 주석 제거
-        // // SEQ 2. 파일 매핑 생성
-        // for (PostDto.AttachedFileRequest fileReq : fileRequests) {
-        //     File file = fileRepository.findById(fileReq.getFileId())
-        //             .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-        //
-        //     PostFileMap map = PostFileMap.builder()
-        //             .post(post)
-        //             .file(file)
-        //             .mediaRole(fileReq.getMediaRole())
-        //             .sequence(fileReq.getSequence())
-        //             .build();
-        //
-        //     postFileMapRepository.save(map);
-        // }
     }
 
     private void validateOwner(Post post, UserPrincipal userPrincipal) {
