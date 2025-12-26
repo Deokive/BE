@@ -3,6 +3,7 @@ package com.depth.deokive.domain.ticket.service;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
@@ -19,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TicketService {
 
+    private final FileService fileService;
+
     private final TicketRepository ticketRepository;
     private final TicketBookRepository ticketBookRepository;
     private final FileRepository fileRepository;
@@ -33,8 +36,7 @@ public class TicketService {
 
         // SEQ 2. 파일 조회 (있으면 찾고, 없으면 null)
         File file = (request.getFileId() != null)
-                ? fileRepository.findById(request.getFileId())
-                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND))
+                ? fileService.validateFileOwner(request.getFileId(), userPrincipal.getUserId())
                 : null;
 
         // SEQ 3. 저장 (Entity에 File 바로 꽂기)
@@ -64,7 +66,7 @@ public class TicketService {
         validateOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 파일 조회 및 결정
-        File newFile = resolveNewFile(ticket.getFile(), request.getFileId());
+        File newFile = resolveNewFile(ticket.getFile(), request.getFileId(), userPrincipal.getUserId());
 
         // SEQ 4. 업데이트
         ticket.update(request, newFile);
@@ -112,11 +114,10 @@ public class TicketService {
         }
     }
 
-    private File resolveNewFile(File currentFile, Long requestFileId) {
+    private File resolveNewFile(File currentFile, Long requestFileId, Long userId) {
         if (requestFileId == null) { return currentFile; } // 변경 없음
         if (requestFileId == -1L) { return null; } // 이미지 삭제 (연결 해제)
 
-        return fileRepository.findById(requestFileId)
-                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND)); // 새 이미지 교체
+        return fileService.validateFileOwner(requestFileId, userId);
     }
 }
