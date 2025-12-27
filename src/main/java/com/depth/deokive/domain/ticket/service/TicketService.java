@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.ticket.service;
 
+import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
@@ -57,7 +58,7 @@ public class TicketService {
         Ticket ticket = ticketRepository.findByIdWithFile(ticketId)
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
 
-        validateReadPermission(ticket, userPrincipal);
+        validateReadPermission(ticket.getTicketBook().getArchive(), userPrincipal);
 
         return TicketDto.Response.of(ticket);
     }
@@ -65,13 +66,16 @@ public class TicketService {
     @Transactional(readOnly = true)
     public TicketDto.PageListResponse getTickets(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
         // SEQ 1. 아카이브 존재 여부 및 타이틀 조회
-        TicketBook ticketBook = ticketBookRepository.findById(archiveId)
+        TicketBook ticketBook = ticketBookRepository.findByIdWithArchiveAndUser(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        // SEQ 2. 페이지네이션 조회
+        // SEQ 2. 공개 범위 검사 -> 만약에 통과되지 않으면 다음 실행 X
+        validateReadPermission(ticketBook.getArchive(), userPrincipal);
+
+        // SEQ 3. 페이지네이션 조회
         Page<TicketDto.TicketElementResponse> ticketPage = ticketQueryRepository.searchTicketsByBook(archiveId, pageable);
 
-        // SEQ 3. Index 범위 벗어나면 404에러
+        // SEQ 4. Index 범위 벗어나면 404에러
         if(pageable.getPageNumber() > 0 && pageable.getPageNumber() >= ticketPage.getTotalPages()) {
             throw new RestException(ErrorCode.DB_DATA_NOT_FOUND);
         }
@@ -126,14 +130,14 @@ public class TicketService {
         }
     }
 
-    private void validateReadPermission(Ticket ticket, UserPrincipal userPrincipal) {
-        Long ownerId = ticket.getTicketBook().getArchive().getUser().getId();
-        Long viewerId = userPrincipal != null ? userPrincipal.getUserId() : null;
-        Visibility visibility = ticket.getTicketBook().getArchive().getVisibility();
+    private void validateReadPermission(Archive archive, UserPrincipal userPrincipal) {
+        Long ownerId = archive.getUser().getId();
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        //Visibility visibility = ticket.getTicketBook().getArchive().getVisibility();
 
         if (ownerId.equals(viewerId)) return;
 
-        switch (visibility) {
+        switch (archive.getVisibility()) {
             case PRIVATE ->
                     throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 주인 외 접근 불가
             case RESTRICTED -> {
