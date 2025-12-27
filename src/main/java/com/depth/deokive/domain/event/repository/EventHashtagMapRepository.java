@@ -13,7 +13,7 @@ public interface EventHashtagMapRepository extends JpaRepository<EventHashtagMap
     @Query("SELECT ehm.hashtag.name FROM EventHashtagMap ehm WHERE ehm.event.id = :eventId")
     List<String> findHashtagNamesByEventId(@Param("eventId") Long eventId);
 
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("DELETE FROM EventHashtagMap ehm WHERE ehm.event.id = :eventId")
     void deleteByEventId(@Param("eventId") Long eventId); // 보통 Hashtags 는 많을 수 있음 -> 한번에 날림
 

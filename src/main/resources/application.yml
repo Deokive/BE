@@ -7,6 +7,10 @@ spring:
   profiles:
     active: dev # 개발할 때는 dev, 배포할 때는 prod
 
+  batch:
+    jdbc:
+      initialize-schema: always # 실행 시 BATCH_ 관련 테이블이 없으면 자동 생성
+
   mail:
     host: smtp.gmail.com
     port: 587
@@ -117,5 +121,6 @@ cdn:
   base-url: ${CDN_BASE_URL:} # CDN이 있다면 설정, 없으면 빈 문자열 (S3 URL 사용)
 
 scheduler:
-  hot-score-cron: "0 0 * * * *"  # 1시간 간격으로 핫스코어 갱신
-  badge-cron: "0 0 0 * * *"      # 자정마다 배지 갱신
+  hot-score-cron: "0 0 * * * *"     # 1시간 간격으로 핫스코어 갱신
+  badge-cron: "0 0 0 * * *"         # 자정마다 배지 갱신
+  file-cleanup-cron: "0 0 3 * * *"  # 매일 새벽 3시에 파일 정리

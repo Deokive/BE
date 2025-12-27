@@ -65,7 +65,7 @@ public class EventDto {
         }
     }
 
-    @Data @NoArgsConstructor
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "스포츠 경기 정보 요청 DTO")
     public static class SportRequest {
         @Schema(description = "팀 1 이름", example = "한화 이글스")
@@ -79,6 +79,16 @@ public class EventDto {
         
         @Schema(description = "팀 2 점수", example = "3")
         private Integer score2;
+
+        public SportRecord toEntity(Event event) {
+            return SportRecord.builder()
+                    .event(event)
+                    .team1(team1)
+                    .team2(team2)
+                    .score1(score1)
+                    .score2(score2)
+                    .build();
+        }
     }
 
     @Data @Builder @AllArgsConstructor

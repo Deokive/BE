@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.archive.service;
 
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -46,6 +47,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ArchiveService {
 
+    private final FileService fileService;
+
     private final ArchiveQueryRepository archiveQueryRepository;
     private final FriendMapRepository friendMapRepository;
 
@@ -90,19 +93,23 @@ public class ArchiveService {
                 .badge(Badge.NEWBIE) // 생성 시점에선 기본 뱃지로 들어감
                 .build();
 
+        // SEQ 3. Banner 파일 연결 (기존에서 순서를 변경 -> 추후 IDOR 취약점 방지 처리 로직 넣을거임)
+        if (request.getBannerImageId() != null) {
+            File bannerFile = fileService.validateFileOwner(request.getBannerImageId(), foundUser.getId());
+            archive.updateBanner(bannerFile);
+        }
+
+        // SEQ 4. Sub Domain Books 생성 및 연결 (Cascade 준비)
+        linkSubDomainBooks(archive);
+
+        // SEQ 5. 저장 (Archive + Books Cascade)
         archiveRepository.save(archive);
 
-        // SEQ 3. Sub Domain Books 자동 생성
-        createSubDomainBooks(archive);
 
-        // SEQ 4. 배너 이미지 연결
-        String bannerUrl = null;
-        if (request.getBannerImageId() != null) {
-            File banner = fileRepository.findById(request.getBannerImageId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-            archive.updateBanner(banner);
-            bannerUrl = banner.getFilePath();
-        }
+        // SEQ 6. Response
+        String bannerUrl = (archive.getBannerFile() != null)
+                ? archive.getBannerFile().getFilePath()
+                : null;
 
         // p: archive, bannerUrl, viewCount, likeCount, isLiked, isOwner
         return ArchiveDto.Response.of(archive, bannerUrl, 0, 0, false, true);
@@ -152,18 +159,7 @@ public class ArchiveService {
         archive.update(request); // 여기서 bannerUrl 은 처리하지 않음
 
         // SEQ 4. 배너 수정
-        String bannerUrl = (archive.getBannerFile() != null) ? archive.getBannerFile().getFilePath() : null;
-        if (request.getBannerImageId() != null) {
-            if (request.getBannerImageId() == -1L) {
-                archive.updateBanner(null);
-                bannerUrl = null;
-            } else {
-                File newBanner = fileRepository.findById(request.getBannerImageId())
-                        .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-                archive.updateBanner(newBanner);
-                bannerUrl = newBanner.getFilePath();
-            }
-        }
+        String bannerUrl = updateBannerImage(archive, request.getBannerImageId(), user.getUserId());
 
         // SEQ 5. 리턴용 조회
         boolean isLiked = likeRepository.existsByArchiveIdAndUserId(archiveId, user.getUserId());
@@ -256,7 +252,8 @@ public class ArchiveService {
             pageTitle = "마이 아카이브";
         } else {
             // 친구 확인 (Stub: 추후 친구 로직 구현 시 대체)
-            boolean isFriend = isFriendCheck(userPrincipal, targetUserId);
+            Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+            boolean isFriend = isFriendCheck(viewerId, targetUserId);
             visibilities = isFriend
                     ? List.of(Visibility.PUBLIC, Visibility.RESTRICTED)
                     : List.of(Visibility.PUBLIC);
@@ -278,14 +275,17 @@ public class ArchiveService {
     }
 
     // -------- Helper Methods
-    private void createSubDomainBooks(Archive archive) {
+    private void linkSubDomainBooks(Archive archive) {
         String baseTitle = archive.getTitle();
 
-        // 이거 때문에 정적 팩터리 메서드 만드는게 좀 귀찮 -> 리펙터링 단계에서 고려하고 바꿔야겠으면 수정하는걸로
-        diaryBookRepository.save(DiaryBook.builder().archive(archive).title(baseTitle + "의 다이어리").build());
-        galleryBookRepository.save(GalleryBook.builder().archive(archive).title(baseTitle + "의 갤러리").build());
-        ticketBookRepository.save(TicketBook.builder().archive(archive).title(baseTitle + "의 티켓북").build());
-        repostBookRepository.save(RepostBook.builder().archive(archive).title(baseTitle + "의 스크랩북").build());
+        // Book 객체 생성 (아직 저장 X)
+        DiaryBook diary = DiaryBook.builder().archive(archive).title(baseTitle + "의 다이어리").build();
+        GalleryBook gallery = GalleryBook.builder().archive(archive).title(baseTitle + "의 갤러리").build();
+        TicketBook ticket = TicketBook.builder().archive(archive).title(baseTitle + "의 티켓북").build();
+        RepostBook repost = RepostBook.builder().archive(archive).title(baseTitle + "의 스크랩북").build();
+
+        // Archive에 연결 (Cascade 동작 트리거)
+        archive.setBooks(diary, ticket, gallery, repost);
     }
 
     private void validateOwner(Archive archive, UserPrincipal user) {
@@ -294,6 +294,7 @@ public class ArchiveService {
         }
     }
 
+    // TODO: 다른 도메인과 메서드 규칙 일관성 맞춰둘 것
     private void checkVisibility(Long viewerId, boolean isOwner, Archive archive) {
         if (isOwner) return; // 주인은 모든 상태 볼 수 있음
 
@@ -302,18 +303,36 @@ public class ArchiveService {
         }
 
         if (archive.getVisibility() == Visibility.RESTRICTED) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+            if (!isFriendCheck(viewerId, archive.getUser().getId())) {
+                throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+            }
         }
     }
 
-    private boolean isFriendCheck(UserPrincipal viewer, Long ownerId) {
-        if (viewer == null) return false;
+    private boolean isFriendCheck(Long viewerId, Long ownerId) {
+        if (viewerId == null) return false;
 
         // JPQL 쿼리를 통해 친구 여부 확인
         return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
-                viewer.getUserId(),
+                viewerId,
                 ownerId,
                 FriendStatus.ACCEPTED
         );
+    }
+
+    private String updateBannerImage(Archive archive, Long newFileId, Long userId) {
+        if (newFileId == null) return null;
+
+        if (newFileId == -1L) {
+            // 삭제 요청: 기존 파일 연결 해제
+            archive.updateBanner(null); // 실제 S3 삭제는 배치 처리로 위임 (Lazy Deletion)
+            return null;
+        } else {
+            // 변경 요청
+
+            File newBanner = fileService.validateFileOwner(newFileId, userId);
+            archive.updateBanner(newBanner);
+            return newBanner.getFilePath();
+        }
     }
 }

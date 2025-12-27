@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
@@ -18,7 +19,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,8 +31,8 @@ import java.util.List;
 public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
-    private final FileRepository fileRepository;
     private final PostFileMapRepository postFileMapRepository;
+    private final FileService fileService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.Request request) {
@@ -40,12 +45,9 @@ public class PostService {
         postRepository.save(post);
 
         // SEQ 3. 파일 연결
-        connectFilesToPost(post, request.getFiles());
+        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 4. 해당 게시글의 파일 매핑 조회
-        List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
-
-        // SEQ 5. Return
+        // SEQ 4. Response
         return PostDto.Response.of(post, maps);
     }
 
@@ -76,10 +78,7 @@ public class PostService {
 
         // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
         postFileMapRepository.deleteAllByPostId(post.getId());
-        connectFilesToPost(post, request.getFiles());
-
-        // SEQ 5. 파일 매핑 조회
-        List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
+        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
         // SEQ 6. Return
         return PostDto.Response.of(post, maps);
@@ -103,24 +102,48 @@ public class PostService {
     }
 
     // ------ Helper Methods -------
-    private void connectFilesToPost(Post post, List<PostDto.AttachedFileRequest> fileRequests) {
-        // SEQ 1. 파일 매핑이 없으면 종료
-        if (fileRequests == null || fileRequests.isEmpty()) { return; }
 
-        // SEQ 2. 파일 매핑 생성
-        for (PostDto.AttachedFileRequest fileReq : fileRequests) {
-            File file = fileRepository.findById(fileReq.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
+    // 파일 목록을 한 번에 조회하고 매핑 엔티티를 생성해서 일괄 저장 -> Repost 시 썸네일 추출을 위해 MediaRole(PREVIEW) 저장이 필수임
+    private List<PostFileMap> connectFilesToPost(
+            Post post,
+            List<PostDto.AttachedFileRequest> fileRequests,
+            Long userId
+    ) {
+        // SEQ 1. Validation
+        if (fileRequests == null || fileRequests.isEmpty()) { return Collections.emptyList(); }
 
-            PostFileMap map = PostFileMap.builder()
-                    .post(post)
-                    .file(file)
-                    .mediaRole(fileReq.getMediaRole())
-                    .sequence(fileReq.getSequence())
-                    .build();
+        // SEQ 2. 요청된 File ID 추출
+        List<Long> fileIds = fileRequests.stream()
+                .map(PostDto.AttachedFileRequest::getFileId)
+                .collect(Collectors.toList());
 
-            postFileMapRepository.save(map);
+        // SEQ 3. File Entity Bulk Fetch
+        List<File> files = fileService.validateFileOwners(fileIds, userId);
+
+        // SEQ 4. Validate Files
+        if (files.size() != fileIds.stream().distinct().count()) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
         }
+
+        // SEQ 5. List -> Map 변환 (조회 성능 O(1))
+        Map<Long, File> fileMap = files.stream()
+                .collect(Collectors.toMap(File::getId, Function.identity()));
+
+        // SEQ 6. Create Mapping Entities (요청 순서 유지)
+        List<PostFileMap> newMaps = fileRequests.stream()
+                .map(req -> {
+                    File file = fileMap.get(req.getFileId());
+                    return PostFileMap.builder()
+                            .post(post)
+                            .file(file)
+                            .mediaRole(req.getMediaRole())
+                            .sequence(req.getSequence())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // SEQ 7. Bulk Insert
+        return postFileMapRepository.saveAll(newMaps);
     }
 
     private void validateOwner(Post post, UserPrincipal userPrincipal) {

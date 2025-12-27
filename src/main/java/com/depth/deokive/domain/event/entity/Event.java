@@ -45,7 +45,7 @@ public class Event extends TimeBaseEntity {
     @JoinColumn(name = "archive_id", nullable = false)
     private Archive archive;
 
-    @OneToOne(mappedBy = "event", fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "event", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private SportRecord sportRecord;
 
     public void update(EventDto.Request request, LocalDateTime recordAt) {
@@ -58,6 +58,9 @@ public class Event extends TimeBaseEntity {
         this.color = nonBlankOrDefault(request.getColor(), this.color);
         this.isSportType = nonBlankOrDefault(request.getIsSportType(), this.isSportType);
     }
+
+    public void deleteSportRecord() { this.sportRecord = null; }
+    public void registerSportRecord(SportRecord record) { this.sportRecord = record; }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;

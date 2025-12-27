@@ -3,6 +3,9 @@ package com.depth.deokive.domain.ticket.service;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
@@ -19,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TicketService {
 
+    private final FileService fileService;
+
     private final TicketRepository ticketRepository;
     private final TicketBookRepository ticketBookRepository;
-    private final FileRepository fileRepository;
+    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public TicketDto.Response createTicket(UserPrincipal userPrincipal, Long archiveId, TicketDto.Request request) {
@@ -32,11 +37,9 @@ public class TicketService {
         validateOwner(ticketBook.getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 2. 파일 조회 (있으면 찾고, 없으면 null)
-        File file = null;
-        if (request.getFileId() != null) {
-            file = fileRepository.findById(request.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-        }
+        File file = (request.getFileId() != null)
+                ? fileService.validateFileOwner(request.getFileId(), userPrincipal.getUserId())
+                : null;
 
         // SEQ 3. 저장 (Entity에 File 바로 꽂기)
         Ticket ticket = request.toEntity(ticketBook, file);
@@ -57,19 +60,17 @@ public class TicketService {
 
     @Transactional
     public TicketDto.Response updateTicket(UserPrincipal userPrincipal, Long ticketId, TicketDto.Request request) {
+        // SEQ 1. 티켓 조회
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
 
+        // SEQ 2. 소유자 검증
         validateOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
-        // 파일 교체 로직
-        File newFile = null;
-        if (request.getFileId() != null) {
-            newFile = fileRepository.findById(request.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-        }
+        // SEQ 3. 파일 조회 및 결정
+        File newFile = resolveNewFile(ticket.getFile(), request.getFileId(), userPrincipal.getUserId());
 
-        // 업데이트 (내부적으로 File 참조 변경)
+        // SEQ 4. 업데이트
         ticket.update(request, newFile);
 
         return TicketDto.Response.of(ticket);
@@ -110,8 +111,33 @@ public class TicketService {
         Visibility visibility = ticket.getTicketBook().getArchive().getVisibility();
 
         if (ownerId.equals(viewerId)) return;
-        if (visibility != Visibility.PUBLIC) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+
+        switch (visibility) {
+            case PRIVATE ->
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 주인 외 접근 불가
+            case RESTRICTED -> {
+                if (!checkFriendRelationship(viewerId, ownerId)) {
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+                }
+            }
+            case PUBLIC -> { /* 모두 허용 */ }
         }
+    }
+
+    private boolean checkFriendRelationship(Long viewerId, Long ownerId) {
+        if (viewerId == null) return false;
+
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewerId,
+                ownerId,
+                FriendStatus.ACCEPTED
+        );
+    }
+
+    private File resolveNewFile(File currentFile, Long requestFileId, Long userId) {
+        if (requestFileId == null) { return currentFile; } // 변경 없음
+        if (requestFileId == -1L) { return null; } // 이미지 삭제 (연결 해제)
+
+        return fileService.validateFileOwner(requestFileId, userId);
     }
 }

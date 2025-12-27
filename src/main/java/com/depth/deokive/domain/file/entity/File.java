@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.file.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.auditor.UserBaseEntity;
 import com.depth.deokive.domain.file.entity.enums.MediaType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -15,7 +16,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Getter
 @Table(name = "files")
-public class File extends TimeBaseEntity {
+public class File extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 

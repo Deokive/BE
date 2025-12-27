@@ -7,6 +7,8 @@ import com.depth.deokive.domain.file.entity.enums.MediaType;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
 import com.depth.deokive.domain.s3.service.S3Service;
+import com.depth.deokive.system.exception.model.ErrorCode;
+import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -185,6 +188,45 @@ public class FileService {
                 .build();
         s3Service.abortUpload(request);
         log.info("✅ [FileService] 멀티파트 업로드 취소 완료 - key: {}, uploadId: {}", key, uploadId);
+    }
+
+    @Transactional(readOnly = true)
+    public File validateFileOwner(Long fileId, Long userId) {
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
+
+        // 생성자(createdBy)와 요청자(userId) 비교
+        if (!file.getCreatedBy().equals(userId)) {
+            log.warn("⚠️ IDOR Attempt Detected! FileId: {}, RequestUser: {}, Owner: {}",
+                    fileId, userId, file.getCreatedBy());
+            throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 혹은 FILE_ACCESS_DENIED
+        }
+
+        return file;
+    }
+
+    @Transactional(readOnly = true)
+    public List<File> validateFileOwners(List<Long> fileIds, Long userId) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<File> files = fileRepository.findAllById(fileIds); // Bulk Fetch
+
+        // 개수 검증
+        if (files.size() != fileIds.stream().distinct().count()) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
+
+        // 소유권 검증
+        boolean isAllMine = files.stream().allMatch(file -> file.getCreatedBy().equals(userId));
+
+        if (!isAllMine) {
+            log.warn("⚠️ IDOR Attempt Detected in Bulk Request! User: {}", userId);
+            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        return files;
     }
 
     // -------- Helper Methods --------

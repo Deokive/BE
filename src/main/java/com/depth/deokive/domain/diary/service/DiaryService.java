@@ -9,6 +9,9 @@ import com.depth.deokive.domain.diary.repository.DiaryFileMapRepository;
 import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -17,8 +20,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,9 +35,8 @@ public class DiaryService {
     private final DiaryRepository diaryRepository;
     private final DiaryBookRepository diaryBookRepository;
     private final DiaryFileMapRepository diaryFileMapRepository;
-    private final FileRepository fileRepository;
-
-    // TODO: private final FriendRepository friendRepository; // 추후 친구 관계 확인용
+    private final FileService fileService;
+    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public DiaryDto.Response createDiary(UserPrincipal userPrincipal, Long archiveId, DiaryDto.Request request) {
@@ -46,9 +52,9 @@ public class DiaryService {
         diaryRepository.save(diary);
 
         // SEQ 4. 파일 연결
-        connectFiles(diary, request.getFiles());
+        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
 
-        return DiaryDto.Response.of(diary, getFileMaps(diary.getId()));
+        return DiaryDto.Response.of(diary, maps);
     }
 
     @Transactional(readOnly = true)
@@ -58,10 +64,12 @@ public class DiaryService {
                 .orElseThrow(() -> new RestException(ErrorCode.DIARY_NOT_FOUND));
 
         // SEQ 2. 다이어리 접근 권한 점검
-        log.info("🟢 Retrieve diary : {}", diary);
         validateReadPermission(diary, userPrincipal);
 
-        return DiaryDto.Response.of(diary, getFileMaps(diaryId));
+        // SEQ 3. 파일 매핑 조회
+        List<DiaryFileMap> maps = getFileMaps(diaryId);
+
+        return DiaryDto.Response.of(diary, maps);
     }
 
     @Transactional
@@ -76,11 +84,11 @@ public class DiaryService {
         // SEQ 3. 업데이트 (Dirty Checking 기반)
         diary.update(request);
 
-        // SEQ 4. 파일 갈아끼우기 (Post와 똑같이 처리)
+        // SEQ 4. 파일 갈아끼우기 : 전략 -> Full Replacement
         diaryFileMapRepository.deleteAllByDiaryId(diaryId);
-        connectFiles(diary, request.getFiles());
+        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
 
-        return DiaryDto.Response.of(diary, getFileMaps(diaryId));
+        return DiaryDto.Response.of(diary, maps);
     }
 
     @Transactional
@@ -128,7 +136,6 @@ public class DiaryService {
 
         // SEQ 1. 작성자 본인이면 통과
         if (Objects.equals(viewerId, writerId) && writerId != null) return;
-        // if (Objects.equals(viewerId, writerId)) return;
 
         log.info("🟢 Let's Check Diary Visibility : {}", diary.getVisibility());
 
@@ -136,9 +143,8 @@ public class DiaryService {
         switch (diary.getVisibility()) {
             case PRIVATE -> throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 본인 제외 접근 불가
             case RESTRICTED -> {
-                // TODO: 친구 관계 확인 로직 추가 필요
                 boolean isFriend = checkFriendRelationship(viewerId, writerId);
-                if (!isFriend) throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+                if (!isFriend) { throw new RestException(ErrorCode.AUTH_FORBIDDEN); }
             }
             case PUBLIC -> {/* 모두 허용 */}
         }
@@ -146,8 +152,12 @@ public class DiaryService {
 
     private boolean checkFriendRelationship(Long viewerId, Long writerId) {
         if (viewerId == null) return false;
-        // return friendRepository.existsByFromUserIdAndToUserId(viewerId, writerId);
-        return false; // 현재는 친구 로직이 없으므로 false 처리
+
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewerId,
+                writerId,
+                FriendStatus.ACCEPTED
+        );
     }
 
     private void validateBookOwner(DiaryBook book, Long userId) {
@@ -162,21 +172,48 @@ public class DiaryService {
         }
     }
 
-    private void connectFiles(Diary diary, List<DiaryDto.AttachedFileRequest> files) {
-        if (files == null || files.isEmpty()) return;
-
-        for (DiaryDto.AttachedFileRequest fileReq : files) {
-            File file = fileRepository.findById(fileReq.getFileId())
-                    .orElseThrow(() -> new RestException(ErrorCode.FILE_NOT_FOUND));
-
-            DiaryFileMap map = DiaryFileMap.builder()
-                    .diary(diary)
-                    .file(file)
-                    .mediaRole(fileReq.getMediaRole())
-                    .sequence(fileReq.getSequence())
-                    .build();
-            diaryFileMapRepository.save(map);
+    // Refactor : 파일 목록 한 번에 조회하고, 매핑 엔터티 생성해서 일괄 저장, N+1 문제 방지 및 DB 커넥션 비용 최소화
+    private List<DiaryFileMap> connectFiles(
+            Diary diary,
+            List<DiaryDto.AttachedFileRequest> fileRequests,
+            Long userId
+    ) {
+        // SEQ 1. Validation
+        if (fileRequests == null || fileRequests.isEmpty()) {
+            return Collections.emptyList();
         }
+
+        // SEQ 2. 파일 ID 목록 추출
+        List<Long> fileIds = fileRequests.stream()
+                .map(DiaryDto.AttachedFileRequest::getFileId).toList();
+
+        // SEQ 3. File Entity Bulk Fetch
+        List<File> files = fileService.validateFileOwners(fileIds, userId);
+
+        // SEQ 4. Validate Files
+        if (files.size() != fileIds.stream().distinct().count()) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
+
+        // SEQ 5. List to Map (ID를 Key로 해서 O(1) 접근 가능하게 할라고 함)
+        Map<Long, File> fileMap = files.stream()
+                .collect(Collectors.toMap(File::getId, Function.identity()));
+
+        // SEQ 6. Mapping Entities Creation (요청 순서 유지)
+        List<DiaryFileMap> newMaps = fileRequests.stream()
+                .map(req -> {
+                    File file = fileMap.get(req.getFileId());
+                    return DiaryFileMap.builder()
+                            .diary(diary)
+                            .file(file)
+                            .mediaRole(req.getMediaRole())
+                            .sequence(req.getSequence())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // SEQ 7. Bulk Insert
+        return diaryFileMapRepository.saveAll(newMaps);
     }
 
     private List<DiaryFileMap> getFileMaps(Long diaryId) {
