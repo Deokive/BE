@@ -74,7 +74,7 @@ public class TicketController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("//{archiveId}")
+    @GetMapping("/book/{archiveId}")
     @Operation(summary = "티켓북 페이지네이션 조회")
     public ResponseEntity<TicketDto.PageListResponse> getTicketBookPage(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
