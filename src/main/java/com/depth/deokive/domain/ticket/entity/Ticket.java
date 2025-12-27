@@ -16,7 +16,11 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "ticket")
+@Table(name = "ticket", indexes = {
+        @Index(name = "idx_ticket_book_created", columnList = "ticket_book_id, created_at DESC"),
+        @Index(name = "idx_ticket_book_date", columnList = "ticket_book_id, date DESC"),
+        @Index(name = "idx_ticket_book_visibility_date", columnList = "ticket_book_id, visibility, date DESC")
+})
 public class Ticket extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -55,7 +59,7 @@ public class Ticket extends TimeBaseEntity {
         this.date = nonBlankOrDefault(request.getDate(), this.date);
         this.location = nonBlankOrDefault(request.getLocation(), this.location);
         this.seat = nonBlankOrDefault(request.getSeat(), this.seat);
-        this.casting = nonBlankOrDefault(request.getSeat(), this.casting);
+        this.casting = nonBlankOrDefault(request.getCasting(), this.casting); // getSeat() -> getCasting() 수정
         this.score = nonBlankOrDefault(request.getScore(), this.score);
         this.review = nonBlankOrDefault(request.getReview(), this.review);
         this.file = nonBlankOrDefault(newFile, this.file);
