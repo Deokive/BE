@@ -177,13 +177,14 @@ public class EventService {
                 existingRecord.update(request.getSportInfo());
                 return existingRecord;
             } else {
-                return sportRecordRepository.save(info.toEntity(event));
+                SportRecord newRecord = info.toEntity(event);
+                event.registerSportRecord(newRecord); // 양방향 정합성
+                return sportRecordRepository.save(newRecord);
             }
         }
         // Case 2: 스포츠 타입 OFF
         else {
             if (event.getSportRecord() != null) {
-                sportRecordRepository.deleteById(event.getId());
                 event.deleteSportRecord();
             }
             return null;
