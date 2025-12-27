@@ -10,11 +10,14 @@ import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
 import com.depth.deokive.domain.ticket.repository.TicketBookRepository;
+import com.depth.deokive.domain.ticket.repository.TicketQueryRepository;
 import com.depth.deokive.domain.ticket.repository.TicketRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketBookRepository ticketBookRepository;
     private final FriendMapRepository friendMapRepository;
+    private final TicketQueryRepository ticketQueryRepository;
 
     @Transactional
     public TicketDto.Response createTicket(UserPrincipal userPrincipal, Long archiveId, TicketDto.Request request) {
@@ -56,6 +60,23 @@ public class TicketService {
         validateReadPermission(ticket, userPrincipal);
 
         return TicketDto.Response.of(ticket);
+    }
+
+    @Transactional(readOnly = true)
+    public TicketDto.PageListResponse getTickets(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
+        // SEQ 1. 아카이브 존재 여부 및 타이틀 조회
+        TicketBook ticketBook = ticketBookRepository.findById(archiveId)
+                .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+
+        // SEQ 2. 페이지네이션 조회
+        Page<TicketDto.TicketElementResponse> ticketPage = ticketQueryRepository.searchTicketsByBook(archiveId, pageable);
+
+        // SEQ 3. Index 범위 벗어나면 404에러
+        if(pageable.getPageNumber() > 0 && pageable.getPageNumber() >= ticketPage.getTotalPages()) {
+            throw new RestException(ErrorCode.DB_DATA_NOT_FOUND);
+        }
+
+        return TicketDto.PageListResponse.of(ticketBook.getTitle(), ticketPage);
     }
 
     @Transactional
