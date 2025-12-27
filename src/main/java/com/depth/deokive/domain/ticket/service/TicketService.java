@@ -4,6 +4,8 @@ import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
@@ -24,7 +26,7 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final TicketBookRepository ticketBookRepository;
-    private final FileRepository fileRepository;
+    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public TicketDto.Response createTicket(UserPrincipal userPrincipal, Long archiveId, TicketDto.Request request) {
@@ -109,9 +111,27 @@ public class TicketService {
         Visibility visibility = ticket.getTicketBook().getArchive().getVisibility();
 
         if (ownerId.equals(viewerId)) return;
-        if (visibility != Visibility.PUBLIC) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+
+        switch (visibility) {
+            case PRIVATE ->
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 주인 외 접근 불가
+            case RESTRICTED -> {
+                if (!checkFriendRelationship(viewerId, ownerId)) {
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+                }
+            }
+            case PUBLIC -> { /* 모두 허용 */ }
         }
+    }
+
+    private boolean checkFriendRelationship(Long viewerId, Long ownerId) {
+        if (viewerId == null) return false;
+
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewerId,
+                ownerId,
+                FriendStatus.ACCEPTED
+        );
     }
 
     private File resolveNewFile(File currentFile, Long requestFileId, Long userId) {
