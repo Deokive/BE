@@ -224,21 +224,21 @@ public class TicketDto {
     @Schema(description = "티켓 목록 조회 요청 DTO")
     public static class TicketPageRequest {
         @Min(value = 0, message = "페이지 번호는 0 이상이어야 합니다.")
-        @Schema(description = "페이지 번호 (Zero-Index Based)", defaultValue = "0", example = "0")
+        @Schema(description = "페이지 번호 (0부터 시작)", defaultValue = "0", example = "?page=1")
         private int page = 0;
 
         @Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다.")
         @Max(value = 1000, message = "페이지 크기는 1000을 초과할 수 없습니다.")
-        @Schema(description = "페이지 크기", defaultValue = "10", example = "10")
+        @Schema(description = "페이지 크기", defaultValue = "10", example = "?page=1&size=9")
         private int size = 10;
 
         @Pattern(regexp = "^(createdAt|date)$", message = "정렬은 'createdAt' 또는 'date' 만 가능합니다.")
-        @Schema(description = "정렬 기준 (createdAt: 생성일, date: 공연일)", defaultValue = "createdAt", example = "createdAt")
+        @Schema(description = "정렬 기준 (createdAt: 생성일, date: 공연일)", defaultValue = "createdAt", example = "?sort=createdAt")
         private String sort = "createdAt";
 
-        @Pattern(regexp = "^(ASC|DESC|asc|desc)$", message = "정렬 순서는 'asc' 또는 'desc' 여야 합니다.")
-        @Schema(description = "정렬 순서", defaultValue = "desc", example = "desc")
-        private String direction = "desc";
+        @Pattern(regexp = "^(ASC|DESC|asc|desc)$", message = "정렬 순서는 'ASC' 또는 'DESC' 여야 합니다.")
+        @Schema(description = "정렬 순서", defaultValue = "DESC", example = "?direction=asc")
+        private String direction = "DESC";
 
         public Pageable toPageable() {
             Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
@@ -251,14 +251,31 @@ public class TicketDto {
     @AllArgsConstructor
     @Schema(description = "페이지 정보 메타데이터 DTO")
     public static class PageInfo {
+        @Schema(description = "페이지 크기", example = "10")
         private int size;
+
+        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
         private int pageNumber;
+
+        @Schema(description = "전체 요소 개수", example = "100")
         private long totalElements;
+
+        @Schema(description = "전체 페이지 수", example = "10")
         private int totalPages;
+
+        @Schema(description = "이전 페이지 존재 여부", example = "false")
         private boolean hasPrev;
+
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
         private boolean hasNext;
+
+        @Schema(description = "빈 페이지 여부", example = "false")
         private boolean empty;
+
+        @Schema(description = "정렬 기준 여부", example = "createdAt")
         private String sort;
+
+        @Schema(description = "정렬 순서 여부", example = "DESC")
         private String direction;
 
         public PageInfo(Page<?> page) {
