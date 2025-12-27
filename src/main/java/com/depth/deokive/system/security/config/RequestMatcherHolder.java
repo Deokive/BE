@@ -36,22 +36,6 @@ public class RequestMatcherHolder {
             // posts
             new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId}", null),
 
-            // gallery
-            new RequestInfo(HttpMethod.GET, "/api/v1/gallery/{archiveId}", null),
-
-            // ticket
-            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId}", null),
-
-            // diary
-            new RequestInfo(HttpMethod.GET, "/api/v1/diary/{diaryId}", null),
-
-            // event
-            new RequestInfo(HttpMethod.GET, "/api/v1/events/{eventId}", null),
-            new RequestInfo(HttpMethod.GET, "/api/v1/events/monthly/{archiveId}", null),
-
-            // archive
-            new RequestInfo(HttpMethod.GET, "/api/v1/archives/{archiveId}", null),
-
             // test
             new RequestInfo(HttpMethod.POST, "/api/system/test/scheduler/**", null),
 
@@ -74,6 +58,24 @@ public class RequestMatcherHolder {
 
     );
 
+    private static final List<RequestInfo> VISIBILITY_REQUEST_INFO_LIST = List.of(
+            // diary
+            new RequestInfo(HttpMethod.GET, "/api/v1/diary/{diaryId}", null),
+
+            // event
+            new RequestInfo(HttpMethod.GET, "/api/v1/events/{eventId}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/events/monthly/{archiveId}", null),
+
+            // archive
+            new RequestInfo(HttpMethod.GET, "/api/v1/archives/{archiveId}", null),
+
+            // gallery
+            new RequestInfo(HttpMethod.GET, "/api/v1/gallery/{archiveId}", null),
+
+    // ticket
+            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId}", null)
+    );
+
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
 
     /**
@@ -83,6 +85,17 @@ public class RequestMatcherHolder {
         var key = (minRole == null ? "VISITOR" : minRole.name());
         return reqMatcherCacheMap.computeIfAbsent(key, k -> {
             var matchers = REQUEST_INFO_LIST.stream()
+                    .filter(req -> Objects.equals(req.minRole(), minRole))
+                    .map(this::toRequestMatcher)     // ← PathPattern 기반 매처로 변환
+                    .toArray(RequestMatcher[]::new);
+            return new OrRequestMatcher(matchers);
+        });
+    }
+
+    public RequestMatcher getRequestMatchersForVisibilityByMinRole(@Nullable Role minRole) {
+        var key = (minRole == null ? "VISITOR" : minRole.name());
+        return reqMatcherCacheMap.computeIfAbsent(key, k -> {
+            var matchers = VISIBILITY_REQUEST_INFO_LIST.stream()
                     .filter(req -> Objects.equals(req.minRole(), minRole))
                     .map(this::toRequestMatcher)     // ← PathPattern 기반 매처로 변환
                     .toArray(RequestMatcher[]::new);

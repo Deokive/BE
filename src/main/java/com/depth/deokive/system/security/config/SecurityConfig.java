@@ -67,6 +67,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests((auth) -> auth
                         // 1. 비인증 경로들 (RequestMatcherHolder에서 관리)
                         .requestMatchers(requestMatcherHolder.getRequestMatchersByMinRole(null)).permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/diary/{diaryId}",
+                                "/api/v1/events/{eventId}",
+                                "/api/v1/events/monthly/{archiveId}",
+                                "/api/v1/archives/{archiveId}",
+                                "/api/v1/gallery/{archiveId}",
+                                "/api/v1/tickets/{ticketId}").permitAll()
+                        // .requestMatchers(requestMatcherHolder.getRequestMatchersForVisibilityByMinRole(null)).permitAll()
                         // 2. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
                         .requestMatchers(requestMatcherHolder.getApiRequestMatcher()).authenticated()
                         // 3. 그 외 모든 요청 차단
