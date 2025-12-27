@@ -16,7 +16,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "ticket")
+@Table(name = "ticket", indexes = {
+        @Index(name = "idx_ticket_book_created", columnList = "ticket_book_id, created_at DESC")
+})
 public class Ticket extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
