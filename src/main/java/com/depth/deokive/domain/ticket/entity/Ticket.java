@@ -55,7 +55,7 @@ public class Ticket extends TimeBaseEntity {
         this.date = nonBlankOrDefault(request.getDate(), this.date);
         this.location = nonBlankOrDefault(request.getLocation(), this.location);
         this.seat = nonBlankOrDefault(request.getSeat(), this.seat);
-        this.casting = nonBlankOrDefault(request.getSeat(), this.casting);
+        this.casting = nonBlankOrDefault(request.getCasting(), this.casting); // getSeat() -> getCasting() 수정
         this.score = nonBlankOrDefault(request.getScore(), this.score);
         this.review = nonBlankOrDefault(request.getReview(), this.review);
         this.file = nonBlankOrDefault(newFile, this.file);
