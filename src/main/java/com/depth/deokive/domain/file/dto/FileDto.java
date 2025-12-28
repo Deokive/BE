@@ -1,5 +1,7 @@
 package com.depth.deokive.domain.file.dto;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
+import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -41,10 +43,10 @@ public class FileDto {
         
         @Schema(description = "저장된 파일명", example = "uuid_filename.jpg")
         private String filename;
-        
+
         @Schema(description = "CDN URL (파일 경로)", example = "https://cdn.example.com/files/uuid_filename.jpg")
         private String cdnUrl; // filePath
-        
+
         @Schema(description = "파일 크기 (bytes)", example = "102400")
         private Long fileSize;
         
@@ -56,8 +58,24 @@ public class FileDto {
         
         @Schema(description = "정렬 순서", example = "0")
         private Integer sequence;
+
+        public static FileDto.UploadFileResponse of (
+                File file,
+                FileDto.CompleteMultipartUploadRequest request
+        ) {
+            return FileDto.UploadFileResponse.builder()
+                    .fileId(file.getId())
+                    .filename(file.getFilename())
+                    .cdnUrl(file.getFilePath())
+                    .fileSize(file.getFileSize())
+                    .mediaType(file.getMediaType().name())
+                    .mediaRole(request.getMediaRole())
+                    .sequence(request.getSequence())
+                    .build();
+        }
     }
 
+    // DESCRIPTION: 단일 업로드를 병렬 처리하는게 더 속도 있음 -> 불필요한 DTO일 지도 모름
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "다중 파일 업로드 응답 DTO")
     public static class UploadFilesResponse {
