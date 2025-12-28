@@ -130,8 +130,8 @@ public class PostDto {
                     .category(post.getCategory())
                     .createdAt(post.getCreatedAt())
                     .lastModifiedAt(post.getLastModifiedAt())
-                    .createdBy(post.getUser().getId())
-                    .lastModifiedBy(post.getUser().getId())
+                    .createdBy(post.getCreatedBy())
+                    .lastModifiedBy(post.getLastModifiedBy())
                     .files(toFileResponses(maps))
                     .build();
         }

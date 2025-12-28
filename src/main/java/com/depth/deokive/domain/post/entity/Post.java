@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.post.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.auditor.UserBaseEntity;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.enums.Category;
@@ -29,7 +30,7 @@ import lombok.experimental.SuperBuilder;
         @Index(name = "idx_post_user_new", columnList = "user_id, created_at DESC")
     }
 )
-public class Post extends TimeBaseEntity {
+public class Post extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
