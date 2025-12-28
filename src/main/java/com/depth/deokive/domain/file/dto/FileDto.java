@@ -193,4 +193,14 @@ public class FileDto {
         @Schema(description = "정렬 순서", example = "0")
         private Integer sequence;
     }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "멀티파트 업로드 취소 요청 DTO")
+    public static class MultipartUploadAbortRequest {
+        @Schema(description = "S3 객체 키")
+        private String key;
+
+        @Schema(description = "업로드 ID")
+        private String uploadId;
+    }
 }
