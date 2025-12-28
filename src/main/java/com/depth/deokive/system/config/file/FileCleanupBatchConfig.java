@@ -1,8 +1,8 @@
 package com.depth.deokive.system.config.file;
 
 import com.depth.deokive.domain.file.entity.File;
+import com.depth.deokive.domain.file.entity.enums.MediaType;
 import com.depth.deokive.domain.file.repository.FileRepository;
-import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
@@ -12,18 +12,18 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
-import org.springframework.batch.item.database.JpaPagingItemReader;
-import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
+import org.springframework.batch.item.database.JdbcCursorItemReader;
+import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import javax.sql.DataSource;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.Collections;
 
 @Slf4j
 @Configuration
@@ -32,12 +32,24 @@ public class FileCleanupBatchConfig {
 
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
-    private final EntityManagerFactory entityManagerFactory;
     private final S3Client s3Client;
     private final FileRepository fileRepository;
+    private final DataSource dataSource;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
+
+    @Value("${scheduler.file-cleanup.threshold-hours:24}")
+    private int thresholdHours;
+
+    @Value("${scheduler.file-cleanup.skip-limit:10}")
+    private int skipLimit;
+
+    @Value("${scheduler.file-cleanup.retry.max-attempts:3}")
+    private int maxRetryAttempts;
+
+    @Value("${scheduler.file-cleanup.retry.delay-ms:1000}")
+    private long retryDelayMs;
 
     private static final int CHUNK_SIZE = 100;
 
@@ -52,70 +64,101 @@ public class FileCleanupBatchConfig {
     public Step fileCleanupStep() {
         return new StepBuilder("fileCleanupStep", jobRepository)
                 .<File, File>chunk(CHUNK_SIZE, transactionManager)
-                .reader(orphanedFileReader())
+                .reader(orphanedFileCursorReader())
                 .processor(s3DeleteProcessor())
                 .writer(fileDeleteWriter())
                 .faultTolerant()
-                .skip(S3Exception.class) // S3 네트워크 에러 등은 Skip하고 다음 파일 진행
-                .skipLimit(10)
+                .skip(S3Exception.class)
+                .skipLimit(skipLimit)
                 .build();
     }
 
-    // Reader: 24시간 지난 고아 파일 조회
-    // JPQL을 사용하여 5개의 도메인 테이블에 참조되지 않은 파일을 필터링
+    // Reader: JdbcCursorItemReader (Streaming) + Native SQL (Left Join Anti-Pattern)
     @Bean
-    public JpaPagingItemReader<File> orphanedFileReader() {
-        LocalDateTime threshold = LocalDateTime.now().minusHours(24); // 배치 실행 시점 기준 24시간 전
+    public JdbcCursorItemReader<File> orphanedFileCursorReader() {
+        LocalDateTime threshold = LocalDateTime.now().minusHours(thresholdHours);
 
-        return new JpaPagingItemReaderBuilder<File>()
-            .name("orphanedFileReader")
-            .entityManagerFactory(entityManagerFactory)
-            .pageSize(CHUNK_SIZE)
-            .queryString(
-                "SELECT f FROM File f " +
-                    "WHERE f.createdAt < :threshold " +
-                    // 1. Archive 배너
-                    "AND f.id NOT IN (SELECT a.bannerFile.id FROM Archive a WHERE a.bannerFile.id IS NOT NULL) " +
-                    // 2. Ticket 이미지
-                    "AND f.id NOT IN (SELECT t.file.id FROM Ticket t WHERE t.file.id IS NOT NULL) " +
-                    // 3. Diary 이미지 (Map 테이블)
-                    "AND f.id NOT IN (SELECT dfm.file.id FROM DiaryFileMap dfm) " +
-                    // 4. Post 이미지 (Map 테이블)
-                    "AND f.id NOT IN (SELECT pfm.file.id FROM PostFileMap pfm) " +
-                    // 5. Gallery 이미지
-                    "AND f.id NOT IN (SELECT g.file.id FROM Gallery g)"
-            )
-            .parameterValues(Collections.singletonMap("threshold", threshold))
-            .build();
+        return new JdbcCursorItemReaderBuilder<File>()
+                .name("orphanedFileCursorReader")
+                .fetchSize(CHUNK_SIZE)
+                .dataSource(dataSource)
+                .rowMapper((rs, rowNum) -> File.builder()
+                        .id(rs.getLong("id"))
+                        .s3ObjectKey(rs.getString("s3Object_key"))
+                        .filename(rs.getString("filename"))
+                        .filePath(rs.getString("file_path"))
+                        .fileSize(rs.getLong("file_size"))
+                        .mediaType(MediaType.valueOf(rs.getString("media_type")))
+                        .build()
+                )
+                .sql("""
+                    SELECT f.id, f.s3Object_key, f.filename, f.file_path, f.file_size, f.media_type
+                    FROM files f
+                    -- 1. Archive Banner
+                    LEFT JOIN archive a ON f.id = a.banner_file_id
+                    -- 2. Ticket Image
+                    LEFT JOIN ticket t ON f.id = t.file_id
+                    -- 3. Diary Image
+                    LEFT JOIN diary_file_map dfm ON f.id = dfm.file_id
+                    -- 4. Post Image (Content/Preview in Map)
+                    LEFT JOIN post_file_map pfm ON f.id = pfm.file_id
+                    -- 5. [중요] Post Thumbnail (Denormalized Column) - FK 제약조건 방어
+                    LEFT JOIN post p ON f.id = p.thumbnail_file_id
+                    -- 6. Gallery Image
+                    LEFT JOIN gallery g ON f.id = g.file_id
+                    WHERE f.created_at < ?
+                      AND a.id IS NULL
+                      AND t.id IS NULL
+                      AND dfm.id IS NULL
+                      AND pfm.id IS NULL
+                      AND p.id IS NULL -- 썸네일로도 쓰이지 않아야 함
+                      AND g.id IS NULL
+                """)
+                .queryArguments(Timestamp.valueOf(threshold))
+                .build();
     }
 
-    // Processor: S3 객체 삭제 -> DB 삭제 전 S3에서 먼저 지움
     @Bean
     public ItemProcessor<File, File> s3DeleteProcessor() {
         return file -> {
-            try {
-                log.info("🟢 [Batch] Deleting S3 Object: {}", file.getS3ObjectKey());
+            int attempt = 0;
+            Exception lastException = null;
 
-                DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
-                        .bucket(bucketName)
-                        .key(file.getS3ObjectKey())
-                        .build();
+            while (attempt < maxRetryAttempts) {
+                try {
+                    attempt++;
+                    log.info("🟢 [Batch] Deleting S3 Object: {} (Attempt {}/{})",
+                            file.getS3ObjectKey(), attempt, maxRetryAttempts);
 
-                s3Client.deleteObject(deleteRequest);
+                    s3Client.deleteObject(builder -> builder
+                            .bucket(bucketName)
+                            .key(file.getS3ObjectKey())
+                    );
 
-                return file;
+                    return file; // 성공 시 파일 객체 반환
 
-            } catch (Exception e) {
-                // 여기서 예외를 던지면 Transaction이 롤백되어 DB 삭제도 안 일어남 (의도된 동작)
-                log.error("🔴 [Batch] Failed to delete S3 Object: {}", file.getS3ObjectKey(), e);
-                throw e;
+                } catch (Exception e) {
+                    lastException = e;
+                    log.warn("⚠️ [Batch] Failed to delete S3 Object (Attempt {}/{}): {} - {}",
+                            attempt, maxRetryAttempts, file.getS3ObjectKey(), e.getMessage());
+
+                    if (attempt < maxRetryAttempts) {
+                        try {
+                            Thread.sleep(retryDelayMs);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Retry delay interrupted", ie);
+                        }
+                    }
+                }
             }
+
+            log.error("🔴 [Batch] Failed to delete S3 Object after {} attempts: {}",
+                    maxRetryAttempts, file.getS3ObjectKey(), lastException);
+            throw lastException != null ? lastException : new RuntimeException("S3 delete failed after retries");
         };
     }
 
-    /**
-     * Writer: DB 메타데이터 삭제
-     */
     @Bean
     public ItemWriter<File> fileDeleteWriter() {
         return files -> {
