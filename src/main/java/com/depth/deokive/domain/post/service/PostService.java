@@ -111,7 +111,7 @@ public class PostService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public PostDto.PageListResponse getPostFeed(PostDto.FeedRequest request) {
+    public PostDto.PageListResponse getPosts(PostDto.FeedRequest request) {
         // TODO: Check -> QueryDSL을 사용한 No-Offset Optimization (Category Filter 적용)
         Page<PostDto.FeedResponse> page = postQueryRepository.searchPostFeed(
                 request.getCategory(),

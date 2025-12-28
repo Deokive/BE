@@ -66,12 +66,17 @@ public class PostController {
     }
 
     @GetMapping
-    @Operation(summary = "게시글 피드 목록 조회", description = "카테고리별 게시글을 페이징하여 조회합니다. (정렬: createdAt, viewCount, likeCount, hotScore)")
-    @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = PostDto.PageListResponse.class)))
-    public ResponseEntity<PostDto.PageListResponse> getPostFeed(
+    @Operation(
+            summary = "게시글 피드 목록 조회",
+            description = "카테고리별 게시글을 페이징하여 조회합니다. (정렬: createdAt, viewCount, likeCount, hotScore)")
+    @ApiResponse(
+            responseCode = "200",
+            description = "조회 성공",
+            content = @Content(schema = @Schema(implementation = PostDto.PageListResponse.class)))
+    public ResponseEntity<PostDto.PageListResponse> getPosts(
             @Valid @ModelAttribute PostDto.FeedRequest request
     ) {
-        PostDto.PageListResponse response = postService.getPostFeed(request);
+        PostDto.PageListResponse response = postService.getPosts(request);
         return ResponseEntity.ok(response);
     }
 }
