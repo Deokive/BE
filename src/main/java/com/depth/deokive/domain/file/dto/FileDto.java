@@ -154,6 +154,9 @@ public class FileDto {
         
         @Schema(description = "미디어 역할", example = "CONTENT")
         private MediaRole mediaRole;
+
+        @Schema(description = "정렬 순서", example = "0")
+        private Integer sequence;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
