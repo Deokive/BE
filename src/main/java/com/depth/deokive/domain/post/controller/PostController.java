@@ -5,6 +5,9 @@ import com.depth.deokive.domain.post.service.PostService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,5 +63,15 @@ public class PostController {
     ) {
         postService.deletePost(userPrincipal, postId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping
+    @Operation(summary = "게시글 피드 목록 조회", description = "카테고리별 게시글을 페이징하여 조회합니다. (정렬: createdAt, viewCount, likeCount, hotScore)")
+    @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = PostDto.PageListResponse.class)))
+    public ResponseEntity<PostDto.PageListResponse> getPostFeed(
+            @Valid @ModelAttribute PostDto.FeedRequest request
+    ) {
+        PostDto.PageListResponse response = postService.getPostFeed(request);
+        return ResponseEntity.ok(response);
     }
 }
