@@ -26,10 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * FileService 단위 테스트
- * Post 도메인 없이 File 도메인만 독립적으로 테스트
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FileService 테스트")
 class FileServiceTest {
@@ -219,9 +215,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result).isNotNull();
@@ -294,9 +297,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result).isNotNull();
@@ -365,9 +375,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result).isNotNull();
@@ -387,15 +404,15 @@ class FileServiceTest {
         assertThat(savedEntity.getFilePath()).contains(key);
 
         // Verify - S3Service에 전달된 CompleteUploadRequest의 parts 검증
-        verify(s3Service, times(1)).completeUpload(argThat(request -> {
-            S3ServiceDto.CompleteUploadRequest req = (S3ServiceDto.CompleteUploadRequest) request;
-            return req.getParts().size() == 3 &&
-                    req.getParts().get(0).getPartNumber() == 1 &&
-                    req.getParts().get(0).getEtag().equals("\"etag-part-1\"") &&
-                    req.getParts().get(1).getPartNumber() == 2 &&
-                    req.getParts().get(1).getEtag().equals("\"etag-part-2\"") &&
-                    req.getParts().get(2).getPartNumber() == 3 &&
-                    req.getParts().get(2).getEtag().equals("\"etag-part-3\"");
+        verify(s3Service, times(1)).completeUpload(argThat(req -> {
+            S3ServiceDto.CompleteUploadRequest s3Req = (S3ServiceDto.CompleteUploadRequest) req;
+            return s3Req.getParts().size() == 3 &&
+                    s3Req.getParts().get(0).getPartNumber() == 1 &&
+                    s3Req.getParts().get(0).getEtag().equals("\"etag-part-1\"") &&
+                    s3Req.getParts().get(1).getPartNumber() == 2 &&
+                    s3Req.getParts().get(1).getEtag().equals("\"etag-part-2\"") &&
+                    s3Req.getParts().get(2).getPartNumber() == 3 &&
+                    s3Req.getParts().get(2).getEtag().equals("\"etag-part-3\"");
         }));
     }
 
@@ -526,9 +543,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result.getMediaType()).isEqualTo(MediaType.IMAGE);
@@ -581,9 +605,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result.getMediaType()).isEqualTo(MediaType.VIDEO);
@@ -636,9 +667,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result.getMediaType()).isEqualTo(MediaType.MUSIC);
@@ -692,9 +730,16 @@ class FileServiceTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
 
         // When
-        File result = fileService.completeMultipartUpload(
-                key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-        );
+        FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                .key(key)
+                .uploadId(uploadId)
+                .parts(parts)
+                .originalFileName(originalFileName)
+                .fileSize(fileSize)
+                .mimeType(mimeType)
+                .mediaRole(mediaRole)
+                .build();
+        File result = fileService.completeMultipartUpload(request);
 
         // Then - 반환된 결과 검증
         assertThat(result.getFilePath()).isNotNull();
@@ -739,9 +784,16 @@ class FileServiceTest {
         // When & Then
         // CDN이 없으면 예외가 발생해야 함 (보안: 버킷명 노출 방지)
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> {
-            fileService.completeMultipartUpload(
-                    key, uploadId, parts, originalFileName, fileSize, mimeType, mediaRole
-            );
+            FileDto.CompleteMultipartUploadRequest request = FileDto.CompleteMultipartUploadRequest.builder()
+                    .key(key)
+                    .uploadId(uploadId)
+                    .parts(parts)
+                    .originalFileName(originalFileName)
+                    .fileSize(fileSize)
+                    .mimeType(mimeType)
+                    .mediaRole(mediaRole)
+                    .build();
+            fileService.completeMultipartUpload(request);
         });
     }
 }
