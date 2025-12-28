@@ -104,38 +104,26 @@ public class FileService {
      * 멀티파트 업로드 완료 및 DB 저장
      * 순수 파일 업로드만 담당, Entity-File 연결은 FileAttachmentService에서 처리
      *
-     * @param key S3 object key
-     * @param uploadId 업로드 ID
-     * @param parts Part 목록
-     * @param originalFileName 원본 파일명
-     * @param fileSize 파일 크기
-     * @param mimeType MIME 타입
-     * @param mediaRole MediaRole (PREVIEW인 경우 isThumbnail = true로 설정)
-     * @return 업로드된 File 엔티티
+     * @param request CompleteMultipartUploadRequest
+     * @return 저장된 File 엔티티
      */
     public File completeMultipartUpload(
-            String key,
-            String uploadId,
-            List<FileDto.Part> parts,
-            String originalFileName,
-            Long fileSize,
-            String mimeType,
-            MediaRole mediaRole
+            FileDto.CompleteMultipartUploadRequest request
     ) {
         log.info("🏁 [FileService] 멀티파트 업로드 완료 요청 - key: {}, uploadId: {}, parts 개수: {}",
-                key, uploadId, parts.size());
+                request.getKey(), request.getUploadId(), request.getParts().size());
 
         // ETag 로깅
         log.info("🏷️ [FileService] ETag 목록:");
-        parts.forEach(part ->
+        request.getParts().forEach(part ->
                 log.info("  - Part {}: ETag = {}", part.getPartNumber(), part.getEtag())
         );
 
         // S3 멀티파트 업로드 완료
         S3ServiceDto.CompleteUploadRequest s3Request = S3ServiceDto.CompleteUploadRequest.builder()
-                .key(key)
-                .uploadId(uploadId)
-                .parts(parts.stream()
+                .key(request.getKey())
+                .uploadId(request.getUploadId())
+                .parts(request.getParts().stream()
                         .map(p -> S3ServiceDto.CompleteUploadRequest.Part.builder()
                                 .partNumber(p.getPartNumber())
                                 .etag(p.getEtag())
@@ -152,18 +140,18 @@ public class FileService {
         String cdnUrl = generateCdnUrl(s3Url);
 
         // MediaType 결정
-        MediaType mediaType = determineMediaType(mimeType, originalFileName);
+        MediaType mediaType = determineMediaType(request.getMimeType(), request.getOriginalFileName());
 
         // MediaRole.PREVIEW인 경우 isThumbnail = true로 설정 (대표 이미지로 지정)
-        boolean isThumbnail = (mediaRole == MediaRole.PREVIEW);
+        boolean isThumbnail = (request.getMediaRole() == MediaRole.PREVIEW);
 
         // File 엔티티 저장 (원본 파일만 저장, 썸네일은 DB에 저장하지 않음 - 패턴 4)
         // 단, MediaRole.PREVIEW인 경우 isThumbnail = true로 설정하여 대표 이미지임을 표시
         File fileEntity = File.builder()
-                .s3ObjectKey(key)
-                .filename(originalFileName)
+                .s3ObjectKey(request.getKey())
+                .filename(request.getOriginalFileName())
                 .filePath(cdnUrl)
-                .fileSize(fileSize)
+                .fileSize(request.getFileSize())
                 .mediaType(mediaType)
                 .isThumbnail(isThumbnail)
                 .build();
