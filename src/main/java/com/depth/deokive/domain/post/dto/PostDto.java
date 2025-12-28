@@ -218,7 +218,7 @@ public class PostDto {
         private String thumbnailUrl;
 
         @Schema(description = "작성자 닉네임", example = "홍길동")
-        private String writerNickname;
+        private String writerNickname; // 🧐왜 id로 안내보내죠? -> 게시글 목록에선 사용자 프로필이 불필요
 
         @Schema(description = "좋아요 수", example = "10")
         private Long likeCount;
