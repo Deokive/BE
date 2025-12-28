@@ -1,12 +1,14 @@
 package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.domain.file.entity.File;
+import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
+import com.depth.deokive.domain.post.repository.PostQueryRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -16,10 +18,12 @@ import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -33,6 +37,7 @@ public class PostService {
     private final UserRepository userRepository;
     private final PostFileMapRepository postFileMapRepository;
     private final FileService fileService;
+    private final PostQueryRepository postQueryRepository;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.Request request) {
@@ -60,7 +65,10 @@ public class PostService {
         // SEQ 2. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
 
-        // SEQ 3. Return
+        // SEQ 4. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
+        post.increaseViewCount();
+
+        // SEQ 5. Return
         return PostDto.Response.of(post, maps);
     }
 
@@ -101,6 +109,22 @@ public class PostService {
         postRepository.delete(post);
     }
 
+    @ExecutionTime
+    @Transactional(readOnly = true)
+    public PostDto.PageListResponse getPostFeed(PostDto.FeedRequest request) {
+        // TODO: Check -> QueryDSL을 사용한 No-Offset Optimization (Category Filter 적용)
+        Page<PostDto.FeedResponse> page = postQueryRepository.searchPostFeed(
+                request.getCategory(),
+                request.toPageable()
+        );
+
+        String title = (request.getCategory() != null)
+                ? request.getCategory().name() + " 게시판"
+                : "전체 게시판";
+
+        return PostDto.PageListResponse.of(title, page);
+    }
+
     // ------ Helper Methods -------
 
     // 파일 목록을 한 번에 조회하고 매핑 엔티티를 생성해서 일괄 저장 -> Repost 시 썸네일 추출을 위해 MediaRole(PREVIEW) 저장이 필수임
@@ -109,8 +133,11 @@ public class PostService {
             List<PostDto.AttachedFileRequest> fileRequests,
             Long userId
     ) {
-        // SEQ 1. Validation
-        if (fileRequests == null || fileRequests.isEmpty()) { return Collections.emptyList(); }
+        // SEQ 1. Null Check
+        if (fileRequests == null || fileRequests.isEmpty()) {
+            post.updateThumbnail(null); // 파일 없으면 썸네일도 제거
+            return Collections.emptyList();
+        }
 
         // SEQ 2. 요청된 File ID 추출
         List<Long> fileIds = fileRequests.stream()
@@ -143,7 +170,23 @@ public class PostService {
                 .collect(Collectors.toList());
 
         // SEQ 7. Bulk Insert
-        return postFileMapRepository.saveAll(newMaps);
+        List<PostFileMap> savedMaps = postFileMapRepository.saveAll(newMaps);
+
+        // SEQ 8. 대표 썸네일 선정 로직
+        // 1순위: MediaRole.PREVIEW
+        // 2순위: Sequence (0번)
+        File thumbnailCandidate = savedMaps.stream()
+                .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
+                .findFirst()
+                .map(PostFileMap::getFile)
+                .orElseGet(() -> savedMaps.stream()
+                        .min(Comparator.comparingInt(PostFileMap::getSequence))
+                        .map(PostFileMap::getFile)
+                        .orElse(null));
+
+        post.updateThumbnail(thumbnailCandidate); // Post 엔티티에 역정규화 저장
+
+        return savedMaps;
     }
 
     private void validateOwner(Post post, UserPrincipal userPrincipal) {
