@@ -73,4 +73,15 @@ public class TicketController {
         TicketDto.UpdateBookTitleResponse response = ticketService.updateTicketBookTitle(userPrincipal, archiveId, request);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/book/{archiveId}")
+    @Operation(summary = "티켓북 페이지네이션 조회")
+    public ResponseEntity<TicketDto.PageListResponse> getTicketBookPage(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long archiveId,
+            @Valid @ModelAttribute TicketDto.TicketPageRequest pageRequest
+    ) {
+        TicketDto.PageListResponse response = ticketService.getTickets(userPrincipal, archiveId, pageRequest.toPageable());
+        return ResponseEntity.ok(response);
+    }
 }
