@@ -35,7 +35,7 @@ public class RepostService {
     private final RepostQueryRepository repostQueryRepository;
     private final FriendMapRepository friendMapRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public RepostDto.Response createRepost(UserPrincipal userPrincipal, Long tabId, RepostDto.CreateRequest request) {
         // SEQ 1. 탭 조회
         RepostTab tab = repostTabRepository.findById(tabId)
@@ -73,7 +73,7 @@ public class RepostService {
         return RepostDto.Response.of(repost);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public RepostDto.Response updateRepost(UserPrincipal userPrincipal, Long repostId, RepostDto.UpdateRequest request) {
         // SEQ 1. 리포스트 조회
         Repost repost = repostRepository.findById(repostId)
@@ -87,7 +87,7 @@ public class RepostService {
         return RepostDto.Response.of(repost);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public void deleteRepost(UserPrincipal userPrincipal, Long repostId) {
         // SEQ 1. 리포스트 조회
         Repost repost = repostRepository.findById(repostId)
@@ -100,7 +100,7 @@ public class RepostService {
         repostRepository.delete(repost);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public RepostDto.TabResponse createRepostTab(UserPrincipal userPrincipal, Long archiveId) {
         // SEQ 1. 리포스트북 조회 (= Archive와 1:1)
         RepostBook book = repostBookRepository.findById(archiveId)
@@ -126,7 +126,7 @@ public class RepostService {
         return RepostDto.TabResponse.of(tab);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public RepostDto.TabResponse updateRepostTab(UserPrincipal userPrincipal, Long tabId, RepostDto.UpdateTabRequest request) {
         // SEQ 1. 리포스트 탭 조회
         RepostTab tab = repostTabRepository.findById(tabId)
@@ -141,7 +141,7 @@ public class RepostService {
         return RepostDto.TabResponse.of(tab);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public void deleteRepostTab(UserPrincipal userPrincipal, Long tabId) {
         // SEQ 1. 리포스트 탭 조회
         RepostTab tab = repostTabRepository.findById(tabId)
@@ -158,7 +158,7 @@ public class RepostService {
     /**
      * 리포스트 목록 페이징 조회
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public RepostDto.RepostListResponse getReposts(UserPrincipal userPrincipal, Long archiveId, Long tabId, Pageable pageable) {
         // SEQ 1. 리포스트북 제목 조회
         RepostBook book = repostBookRepository.findById(archiveId)
