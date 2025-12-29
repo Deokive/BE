@@ -7,9 +7,7 @@ import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.entity.enums.Category;
-import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.User;
-import com.depth.deokive.domain.user.entity.enums.Role;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -89,6 +87,9 @@ public class PostDto {
         @Schema(description = "좋아요 수", example = "25")
         private Long likeCount;
 
+        @Schema(description = "핫 스코어", example = "50.5")
+        private Double hotScore;
+
         @Schema(description = "첨부 파일 객체 리스트", example = """
             [
               {
@@ -132,6 +133,9 @@ public class PostDto {
                     .lastModifiedAt(post.getLastModifiedAt())
                     .createdBy(post.getCreatedBy())
                     .lastModifiedBy(post.getLastModifiedBy())
+                    .viewCount(post.getViewCount())
+                    .likeCount(post.getLikeCount())
+                    .hotScore(post.getHotScore())
                     .files(toFileResponses(maps))
                     .build();
         }
@@ -156,10 +160,6 @@ public class PostDto {
         }
     }
 
-    /**
-     * 게시글 생성 시 파일 연결을 위한 내부 DTO
-     * 이미 업로드된 File Entity의 ID만 받는다.
-     */
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class AttachedFileRequest {
         @NotNull(message = "파일 ID는 필수입니다.")
@@ -185,14 +185,18 @@ public class PostDto {
         @Schema(description = "페이지 크기", example = "10")
         private int size = 10;
 
-        @Schema(description = "카테고리 필터 (없을 시 전체 조회)", example = "IDOL")
+        @Schema(description = "카테고리 필터 (없을 시 전체 조회)",
+                example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
         private Category category;
 
         @Pattern(regexp = "^(createdAt|viewCount|likeCount|hotScore)$")
-        @Schema(description = "정렬 기준", defaultValue = "createdAt", allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"})
+        @Schema(description = "정렬 기준",
+                defaultValue = "createdAt",
+                allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"})
         private String sort = "createdAt";
 
-        @Schema(description = "정렬 방향", defaultValue = "DESC")
+        @Schema(description = "정렬 방향", defaultValue = "DESC",
+                allowableValues = {"ASC", "asc", "DESC", "desc"}, example = "DESC")
         private String direction = "DESC";
 
         public Pageable toPageable() {
@@ -229,10 +233,10 @@ public class PostDto {
         @Schema(description = "핫 스코어", example = "50.5")
         private Double hotScore;
 
-        @Schema(description = "생성 시간")
+        @Schema(description = "생성 시간", example = "KST Datetime")
         private LocalDateTime createdAt;
 
-        @Schema(description = "수정 시간")
+        @Schema(description = "수정 시간", example = "KST Datetime")
         private LocalDateTime lastModifiedAt;
 
         @QueryProjection // Q-Class 생성용
@@ -257,7 +261,11 @@ public class PostDto {
     public static class PageListResponse {
         @Schema(description = "페이지 제목", example = "아이돌 게시판")
         private String pageTitle;
+        
+        @Schema(description = "게시글 목록")
         private List<FeedResponse> content;
+        
+        @Schema(description = "페이징 정보")
         private PageInfo page;
 
         public static PageListResponse of(String pageTitle, Page<FeedResponse> pageData) {
@@ -270,13 +278,27 @@ public class PostDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "페이징 정보")
     public static class PageInfo {
+        @Schema(description = "페이지 크기", example = "10")
         private int size;
+        
+        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
         private int pageNumber;
+        
+        @Schema(description = "전체 요소 개수", example = "100")
         private long totalElements;
+        
+        @Schema(description = "전체 페이지 수", example = "10")
         private int totalPages;
+        
+        @Schema(description = "이전 페이지 존재 여부", example = "false")
         private boolean hasPrev;
+        
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
         private boolean hasNext;
+        
+        @Schema(description = "빈 페이지 여부", example = "false")
         private boolean empty;
 
         public PageInfo(Page<?> page) {
