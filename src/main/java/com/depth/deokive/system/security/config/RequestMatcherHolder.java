@@ -35,6 +35,7 @@ public class RequestMatcherHolder {
 
             // posts
             new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/posts", null),
 
             // test
             new RequestInfo(HttpMethod.POST, "/api/system/test/scheduler/**", null),

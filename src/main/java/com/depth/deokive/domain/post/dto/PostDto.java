@@ -1,21 +1,24 @@
 package com.depth.deokive.domain.post.dto;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.entity.enums.Category;
-import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.User;
-import com.depth.deokive.domain.user.entity.enums.Role;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -78,6 +81,15 @@ public class PostDto {
         @Schema(description = "게시글 수정자 아이디", example = "5")
         private Long lastModifiedBy;
 
+        @Schema(description = "조회수", example = "150")
+        private Long viewCount;
+
+        @Schema(description = "좋아요 수", example = "25")
+        private Long likeCount;
+
+        @Schema(description = "핫 스코어", example = "50.5")
+        private Double hotScore;
+
         @Schema(description = "첨부 파일 객체 리스트", example = """
             [
               {
@@ -119,16 +131,17 @@ public class PostDto {
                     .category(post.getCategory())
                     .createdAt(post.getCreatedAt())
                     .lastModifiedAt(post.getLastModifiedAt())
-                    .createdBy(post.getUser().getId())
-                    .lastModifiedBy(post.getUser().getId())
+                    .createdBy(post.getCreatedBy())
+                    .lastModifiedBy(post.getLastModifiedBy())
+                    .viewCount(post.getViewCount())
+                    .likeCount(post.getLikeCount())
+                    .hotScore(post.getHotScore())
                     .files(toFileResponses(maps))
                     .build();
         }
 
         private static List<FileDto.UploadFileResponse> toFileResponses(List<PostFileMap> maps) {
-            if (maps == null || maps.isEmpty()) {
-                return Collections.emptyList();
-            }
+            if (maps == null || maps.isEmpty()) { return Collections.emptyList(); }
 
             return maps.stream()
                 .map(map -> {
@@ -147,10 +160,6 @@ public class PostDto {
         }
     }
 
-    /**
-     * 게시글 생성 시 파일 연결을 위한 내부 DTO
-     * 이미 업로드된 File Entity의 ID만 받는다.
-     */
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class AttachedFileRequest {
         @NotNull(message = "파일 ID는 필수입니다.")
@@ -162,5 +171,144 @@ public class PostDto {
 
         @Schema(description = "파일 정렬 순서", example = "1")
         private Integer sequence;
+    }
+
+    // DESCRIPTION: PAGINATION DTOS
+    @Data @NoArgsConstructor
+    @Schema(description = "게시글 피드 목록 조회 요청 DTO")
+    public static class FeedRequest {
+        @Min(value = 0)
+        @Schema(description = "페이지 번호 (0부터 시작)", example = "0")
+        private int page = 0;
+
+        @Min(value = 1) @Max(value = 1000)
+        @Schema(description = "페이지 크기", example = "10")
+        private int size = 10;
+
+        @Schema(description = "카테고리 필터 (없을 시 전체 조회)",
+                example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
+        private Category category;
+
+        @Pattern(regexp = "^(createdAt|viewCount|likeCount|hotScore)$")
+        @Schema(description = "정렬 기준",
+                defaultValue = "createdAt",
+                allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"})
+        private String sort = "createdAt";
+
+        @Schema(description = "정렬 방향", defaultValue = "DESC",
+                allowableValues = {"ASC", "asc", "DESC", "desc"}, example = "DESC")
+        private String direction = "DESC";
+
+        public Pageable toPageable() {
+            Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
+            return PageRequest.of(page, size, sortDirection, sort);
+        }
+    }
+
+    @Data @NoArgsConstructor
+    @Schema(description = "게시글 피드 응답 DTO (Lightweight)")
+    public static class FeedResponse {
+        @Schema(description = "게시글 ID", example = "1")
+        private Long postId;
+
+        @Schema(description = "제목", example = "게시글 제목")
+        private String title;
+
+        @Schema(description = "카테고리", example = "IDOL")
+        private Category category;
+
+        @Schema(description = "썸네일 URL",
+                example = "https://cdn.example.com/files/thumbnails/thumbnail/thumbnail123.jpg")
+        private String thumbnailUrl;
+
+        @Schema(description = "작성자 닉네임", example = "홍길동")
+        private String writerNickname; // 🧐왜 id로 안내보내죠? -> 게시글 목록에선 사용자 프로필이 불필요
+
+        @Schema(description = "좋아요 수", example = "10")
+        private Long likeCount;
+
+        @Schema(description = "조회수", example = "100")
+        private Long viewCount;
+
+        @Schema(description = "핫 스코어", example = "50.5")
+        private Double hotScore;
+
+        @Schema(description = "생성 시간", example = "KST Datetime")
+        private LocalDateTime createdAt;
+
+        @Schema(description = "수정 시간", example = "KST Datetime")
+        private LocalDateTime lastModifiedAt;
+
+        @QueryProjection // Q-Class 생성용
+        public FeedResponse(Long postId, String title, Category category, String thumbnailUrl,
+                            String writerNickname, Long likeCount, Long viewCount, Double hotScore,
+                            LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
+            this.postId = postId;
+            this.title = title;
+            this.category = category;
+            this.thumbnailUrl = ThumbnailUtils.getSmallThumbnailUrl(thumbnailUrl); // TODO: Check isOrigin or realThumbnail
+            this.writerNickname = writerNickname;
+            this.likeCount = likeCount;
+            this.viewCount = viewCount;
+            this.hotScore = hotScore;
+            this.createdAt = createdAt;
+            this.lastModifiedAt = lastModifiedAt;
+        }
+    }
+
+    @Data @Builder @AllArgsConstructor
+    @Schema(description = "게시글 피드 페이징 응답 Wrapper")
+    public static class PageListResponse {
+        @Schema(description = "페이지 제목", example = "아이돌 게시판")
+        private String pageTitle;
+        
+        @Schema(description = "게시글 목록")
+        private List<FeedResponse> content;
+        
+        @Schema(description = "페이징 정보")
+        private PageInfo page;
+
+        public static PageListResponse of(String pageTitle, Page<FeedResponse> pageData) {
+            return PageListResponse.builder()
+                    .pageTitle(pageTitle)
+                    .content(pageData.getContent())
+                    .page(new PageInfo(pageData))
+                    .build();
+        }
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "페이징 정보")
+    public static class PageInfo {
+        @Schema(description = "페이지 크기", example = "10")
+        private int size;
+        
+        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
+        private int pageNumber;
+        
+        @Schema(description = "전체 요소 개수", example = "100")
+        private long totalElements;
+        
+        @Schema(description = "전체 페이지 수", example = "10")
+        private int totalPages;
+        
+        @Schema(description = "이전 페이지 존재 여부", example = "false")
+        private boolean hasPrev;
+        
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
+        private boolean hasNext;
+        
+        @Schema(description = "빈 페이지 여부", example = "false")
+        private boolean empty;
+
+        public PageInfo(Page<?> page) {
+            this.size = page.getSize();
+            this.pageNumber = page.getNumber();
+            this.totalElements = page.getTotalElements();
+            this.totalPages = page.getTotalPages();
+            this.hasPrev = page.hasPrevious();
+            this.hasNext = page.hasNext();
+            this.empty = page.isEmpty();
+        }
     }
 }
