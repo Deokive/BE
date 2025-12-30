@@ -73,7 +73,9 @@ public class SecurityConfig {
                                 "/api/v1/events/monthly/{archiveId}",
                                 "/api/v1/archives/{archiveId}",
                                 "/api/v1/gallery/{archiveId}",
-                                "/api/v1/tickets/{ticketId}").permitAll()
+                                "/api/v1/tickets/{ticketId}",
+                                "/api/v1/tickets/book/{archiveId}",
+                                "/api/v1/repost/{archiveId}").permitAll()
                         // .requestMatchers(requestMatcherHolder.getRequestMatchersForVisibilityByMinRole(null)).permitAll()
                         // 2. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
                         .requestMatchers(requestMatcherHolder.getApiRequestMatcher()).authenticated()

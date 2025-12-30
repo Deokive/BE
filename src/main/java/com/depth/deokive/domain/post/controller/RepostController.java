@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -80,5 +82,19 @@ public class RepostController {
     ) {
         repostService.deleteRepost(user, repostId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{archiveId}")
+    @Operation(summary = "리포스트 목록 조회")
+    public ResponseEntity<RepostDto.RepostListResponse> getRepost(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable("archiveId") Long archiveId,
+            @ParameterObject @ModelAttribute @Valid RepostDto.RepostPageRequest request
+    ) {
+        Pageable pageable = request.toPageable();
+        Long tabId = request.getTabId();
+        RepostDto.RepostListResponse response = repostService.getReposts(userPrincipal, archiveId, tabId, pageable);
+
+        return ResponseEntity.ok(response);
     }
 }
