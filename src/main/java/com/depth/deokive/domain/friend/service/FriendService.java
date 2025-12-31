@@ -82,6 +82,45 @@ public class FriendService {
 
         // SEQ 5. 비동기 알림
         notificationService.sendFriendRequestNotification(friendId, userId);
+    }
 
+    @Transactional
+    public void acceptFriendRequest(UserPrincipal userPrincipal, Long friendId) {
+        Long userId = userPrincipal.getUserId();
+
+        // SEQ 1. 요청 데이터 확인
+        // 상대방이 나한테 보내는 요청 찾기
+        FriendMap requestMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_NOT_FOUND));
+
+        // SEQ 2. 상태 검증
+        if(requestMap.getFriendStatus() != FriendStatus.PENDING) {
+            throw new RestException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        }
+
+        // SEQ 3. 상대방 관계 ACCEPTED로 최신화(상대방 -> 나(ACCEPTED))
+        requestMap.updateStatus(FriendStatus.ACCEPTED);
+
+        // SEQ 4. 내 관계 생성/업데이트(나 -> 상대방(ACCEPTED))
+        User me = userRepository.getReferenceById(userId);
+        User friend = userRepository.getReferenceById(friendId);
+
+        Optional<FriendMap> myMapOptional = friendMapRepository.findByUserIdAndFriendId(userId, friendId);
+
+        if(myMapOptional.isPresent()) {
+            FriendMap myMap = myMapOptional.get();
+            myMap.updateStatus(FriendStatus.ACCEPTED);
+        } else {
+            FriendMap newMap = FriendMap.builder()
+                    .user(me)
+                    .friend(friend)
+                    .friendStatus(FriendStatus.ACCEPTED)
+                    .requestedBy(me)
+                    .build();
+            friendMapRepository.save(newMap);
+        }
+
+        // SEQ 5. 알림
+        notificationService.sendFriendRequestNotification(friendId, userId);
     }
 }
