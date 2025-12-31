@@ -1,29 +1,31 @@
 package com.depth.deokive.domain.diary.service;
 
+import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
 import com.depth.deokive.domain.diary.entity.DiaryFileMap;
 import com.depth.deokive.domain.diary.repository.DiaryBookRepository;
 import com.depth.deokive.domain.diary.repository.DiaryFileMapRepository;
+import com.depth.deokive.domain.diary.repository.DiaryQueryRepository;
 import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.file.entity.File;
+import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
+import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,7 @@ public class DiaryService {
     private final DiaryFileMapRepository diaryFileMapRepository;
     private final FileService fileService;
     private final FriendMapRepository friendMapRepository;
+    private final DiaryQueryRepository diaryQueryRepository;
 
     @Transactional
     public DiaryDto.Response createDiary(UserPrincipal userPrincipal, Long archiveId, DiaryDto.Request request) {
@@ -53,6 +56,9 @@ public class DiaryService {
 
         // SEQ 4. 파일 연결
         List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
+
+        // SEQ 5. 썸네일 업데이트
+        updateDiaryThumbnail(diary, maps);
 
         return DiaryDto.Response.of(diary, maps);
     }
@@ -88,6 +94,9 @@ public class DiaryService {
         diaryFileMapRepository.deleteAllByDiaryId(diaryId);
         List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
 
+        // SEQ 5. 썸네일 업데이트
+        updateDiaryThumbnail(diary, maps);
+
         return DiaryDto.Response.of(diary, maps);
     }
 
@@ -122,6 +131,54 @@ public class DiaryService {
                 .diaryBookId(archiveId)
                 .updatedTitle(diaryBook.getTitle())
                 .build();
+    }
+
+    // Pagination
+    @Transactional(readOnly = true)
+    public DiaryDto.PageListResponse getDiaries(UserPrincipal userPrincipal, Long archiveId, DiaryDto.DiaryPageRequest request) {
+        // SEQ 1. 아카이브(Book) 존재 여부 확인
+        DiaryBook diaryBook = diaryBookRepository.findById(archiveId)
+                .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        Long ownerId = diaryBook.getArchive().getUser().getId();
+        Visibility archiveVisibility = diaryBook.getArchive().getVisibility();
+
+        // SEQ 2. Archive Level Security (Layer 1) -> 아카이브 접근 권한 확인
+        if (archiveVisibility == Visibility.PRIVATE && !Objects.equals(viewerId, ownerId)) {
+            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+        }
+        if (archiveVisibility == Visibility.RESTRICTED) {
+            boolean isFriend = checkFriendRelationship(viewerId, ownerId);
+            if (!isFriend && !Objects.equals(viewerId, ownerId)) {
+                throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+            }
+        }
+
+        // SEQ 3. Diary Level Security (Layer 2) - 필터링 조건 계산
+        List<Visibility> allowedVisibilities;
+        if (Objects.equals(viewerId, ownerId)) {
+            // 본인: 모두 조회
+            allowedVisibilities = List.of(Visibility.PUBLIC, Visibility.RESTRICTED, Visibility.PRIVATE);
+        } else {
+            boolean isFriend = checkFriendRelationship(viewerId, ownerId);
+            if (isFriend) {
+                // 친구: 전체공개 + 친구공개
+                allowedVisibilities = List.of(Visibility.PUBLIC, Visibility.RESTRICTED);
+            } else {
+                // 타인: 전체공개만
+                allowedVisibilities = List.of(Visibility.PUBLIC);
+            }
+        }
+
+        // SEQ 4. QueryDSL Pagination 실행
+        Page<DiaryDto.DiaryPageResponse> page = diaryQueryRepository.findDiaries(
+                archiveId,
+                allowedVisibilities,
+                request.toPageable()
+        );
+
+        return DiaryDto.PageListResponse.of(diaryBook.getTitle(), page);
     }
 
     // --- Helper Methods ---
@@ -218,5 +275,25 @@ public class DiaryService {
 
     private List<DiaryFileMap> getFileMaps(Long diaryId) {
         return diaryFileMapRepository.findAllByDiaryIdOrderBySequenceAsc(diaryId);
+    }
+
+    private void updateDiaryThumbnail(Diary diary, List<DiaryFileMap> maps) {
+        if (maps == null || maps.isEmpty()) {
+            diary.updateThumbnail(null);
+            return;
+        }
+
+        // TODO: 썸네일 선정을 Post와 달리 String으로 해봄 -> 성능 비교해보자 -> 어차피 리팩터링 단계 별도로 있으니까
+        String thumbnailUrl = maps.stream()
+                .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
+                .findFirst()
+                .map(map -> map.getFile().getFilePath())
+                .orElseGet(() -> maps.stream()
+                        .min(Comparator.comparingInt(DiaryFileMap::getSequence))
+                        .map(map -> map.getFile().getFilePath())
+                        .orElse(null)
+                );
+
+        diary.updateThumbnail(thumbnailUrl);
     }
 }

@@ -73,4 +73,15 @@ public class DiaryController {
         DiaryDto.UpdateBookTitleResponse response = diaryService.updateDiaryBookTitle(userPrincipal, archiveId, request);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/book/{archiveId}")
+    @Operation(summary = "다이어리 목록 조회 (페이지네이션)", description = "아카이브 내의 다이어리 목록을 조회합니다.")
+    public ResponseEntity<DiaryDto.PageListResponse> getDiaryFeed(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long archiveId,
+            @Valid @ModelAttribute DiaryDto.DiaryPageRequest pageRequest
+    ) {
+        DiaryDto.PageListResponse response = diaryService.getDiaries(userPrincipal, archiveId, pageRequest);
+        return ResponseEntity.ok(response);
+    }
 }

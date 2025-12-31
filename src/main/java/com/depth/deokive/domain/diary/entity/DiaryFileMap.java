@@ -17,10 +17,11 @@ import lombok.experimental.SuperBuilder;
 @Table(
     name= "diary_file_map",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_diary_file_map", columnNames = {"diary_id", "file_id"})
+            @UniqueConstraint(name = "uk_diary_file_map", columnNames = {"diary_id", "file_id"})
     },
     indexes = {
-        @Index(name = "idx_diary_file_map_role_seq", columnList = "diary_id, media_role, sequence")
+            @Index(name = "idx_diary_file_map_seq", columnList = "diary_id, sequence, media_role"),
+
     }
 )
 public class DiaryFileMap extends TimeBaseEntity {

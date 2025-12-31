@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Getter
 @Table(name = "diary", indexes = {
-    @Index(name = "idx_diary_book_recorded_at", columnList = "diary_book_id, recorded_at DESC")
+        @Index(name = "idx_diary_book_recorded_at", columnList = "diary_book_id, recorded_at DESC, visibility")
 })
 public class Diary extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,6 +43,9 @@ public class Diary extends UserBaseEntity {
     @JoinColumn(name = "diary_book_id", nullable = false)
     private DiaryBook diaryBook;
 
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl; // Denormalization Field for Pagination Performance
+
     public void update(DiaryDto.Request request) {
         if (request == null) return;
 
@@ -52,6 +55,8 @@ public class Diary extends UserBaseEntity {
         this.color = nonBlankOrDefault(request.getColor(), this.color);
         this.visibility = nonBlankOrDefault(request.getVisibility(), this.visibility);
     }
+
+    public void updateThumbnail(String url) { this.thumbnailUrl = url; }
 
     // TODO: 사실 이게 PATCH 패턴 처리 방식. Validation 에서 체크를 해줘서 빈 값 들어올 일은 없긴 한데... 일단 보류. 리팩토링 단계에서 고려
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {

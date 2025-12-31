@@ -1,5 +1,7 @@
 package com.depth.deokive.domain.diary.dto;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
+import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
@@ -7,16 +9,20 @@ import com.depth.deokive.domain.diary.entity.DiaryFileMap;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -133,5 +139,70 @@ public class DiaryDto {
         @NotNull private Long fileId;
         private MediaRole mediaRole;
         private Integer sequence;
+    }
+
+    // For Pagination
+    @Data @NoArgsConstructor
+    @Schema(description = "다이어리 목록 페이징 요청")
+    public static class DiaryPageRequest {
+        @Min(0) @Schema(description = "페이지 번호 (0부터 시작)", example = "0")
+        private int page = 0;
+
+        @Min(1) @Max(100) @Schema(description = "페이지 크기", example = "12") // 3x4 그리드 고려
+        private int size = 12;
+
+        public Pageable toPageable() {
+            return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "recordedAt"));
+        }
+    }
+
+    @Data @NoArgsConstructor
+    @Schema(description = "다이어리 페이지네이션 응답 항목 (경량화)")
+    public static class DiaryPageResponse {
+        @Schema(description = "다이어리 ID", example = "1")
+        private Long diaryId;
+
+        @Schema(description = "일기 제목", example = "오늘의 기록")
+        private String title;
+
+        @Schema(description = "대표 이미지 URL (썸네일)",
+                example = "https://cdn.exanmple.com/files/thumbnails/thumbnail/dummy.jpg")
+        private String thumbnailUrl;
+
+        @Schema(description = "다이어리 일정", example = "KST DateTime")
+        private LocalDate recordedAt;
+
+        @Schema(description = "공개 범위 (아이콘 표시용)", example = "PUBLIC")
+        private Visibility visibility;
+
+        @QueryProjection
+        public DiaryPageResponse(Long diaryId, String title, String thumbnailUrl, LocalDate recordedAt, Visibility visibility) {
+            this.diaryId = diaryId;
+            this.title = title;
+            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(thumbnailUrl);
+            this.recordedAt = recordedAt;
+            this.visibility = visibility;
+        }
+    }
+
+    @Data @Builder @AllArgsConstructor
+    @Schema(description = "다이어리 목록 페이징 응답")
+    public static class PageListResponse {
+        @Schema(description = "아카이브(다이어리북) 제목", example = "2025년 나의 기록")
+        private String bookTitle;
+
+        @Schema(description = "다이어리 목록")
+        private List<DiaryPageResponse> content;
+
+        @Schema(description = "페이징 메타데이터")
+        private ArchiveDto.PageInfo page; // ArchiveDto 재사용을 일단 여기서 했는데, 리팩터링 때 아예 common 쪽으로 옮겨버릴 것
+
+        public static PageListResponse of(String bookTitle, Page<DiaryPageResponse> pageData) {
+            return PageListResponse.builder()
+                    .bookTitle(bookTitle)
+                    .content(pageData.getContent())
+                    .page(new ArchiveDto.PageInfo(pageData))
+                    .build();
+        }
     }
 }
