@@ -30,4 +30,14 @@ public class FriendController {
         friendService.sendFriendRequest(userPrincipal, friendId);
         return ResponseEntity.ok().build();
     }
+
+    @Operation(summary = "친구 요청 수락하기", description = "특정 유저의 친구 요청을 수락합니다.")
+    @PostMapping("/{friendId}/accept")
+    public ResponseEntity<Void> acceptFriendRequest(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long friendId
+    ) {
+        friendService.acceptFriendRequest(userPrincipal, friendId);
+        return ResponseEntity.ok().build();
+    }
 }
