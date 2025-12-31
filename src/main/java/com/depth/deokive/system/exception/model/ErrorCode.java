@@ -120,7 +120,14 @@ public enum ErrorCode {
     DB_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "DB DATA NOT FOUND", "존재하지 않는 데이터입니다."),
     DB_DATA_TOO_LONG(HttpStatus.BAD_REQUEST, "DB DATA TOO LONG", "데이터 길이가 허용된 한도를 초과했습니다."),
     DB_NOT_NULL_VIOLATION(HttpStatus.BAD_REQUEST, "DB NOT NULL VIOLATION", "필수 필드가 누락되었습니다."),
-    DB_FOREIGN_KEY_VIOLATION(HttpStatus.BAD_REQUEST, "DB FOREIGN KEY VIOLATION", "참조 무결성 제약 조건을 위반했습니다.");
+    DB_FOREIGN_KEY_VIOLATION(HttpStatus.BAD_REQUEST, "DB FOREIGN KEY VIOLATION", "참조 무결성 제약 조건을 위반했습니다."),
+
+    // FRIEND Error
+    FRIEND_SELF_BAD_REQUEST(HttpStatus.BAD_REQUEST, "FRIEND_SELF_BAD_REQUEST", "자기 자신에게 친구 요청을 보낼 수 없습니다."),
+    FRIEND_REQUEST_CONFLICT(HttpStatus.CONFLICT, "FRIEND_REQUEST_CONFLICT", "상대방이 이미 친구 요청을 한 상태입니다."), // 409에러
+    FRIEND_ALREADY_REQUESTED(HttpStatus.BAD_REQUEST, "FRIEND_ALREADY_REQUESTED", "이미 친구 요청을 보냈습니다."),
+    FRIEND_ALREADY_EXISTS(HttpStatus.CONFLICT, "FRIEND_ALREADY_EXISTS", "이미 친구 관계입니다."), // 409 에러
+    FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIEND_NOT_FOUND", "존재하지 않는 친구입니다.");
 
     private final HttpStatus status;
     private final String error;
