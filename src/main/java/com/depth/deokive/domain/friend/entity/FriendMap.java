@@ -50,4 +50,13 @@ public class FriendMap extends TimeBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requested_by", nullable = false)
     private User requestedBy;
+
+    public void updateStatus(FriendStatus friendStatus) {
+        this.friendStatus = friendStatus;
+    }
+
+    public void updateRequestedBy(User requestedBy) {
+        this.requestedBy = requestedBy;
+    }
 }
+
