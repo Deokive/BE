@@ -84,6 +84,9 @@ public class FriendService {
         notificationService.sendFriendRequestNotification(friendId, userId);
     }
 
+    /**
+     * 친구 요청 수락
+     */
     @Transactional
     public void acceptFriendRequest(UserPrincipal userPrincipal, Long friendId) {
         Long userId = userPrincipal.getUserId();
@@ -122,5 +125,25 @@ public class FriendService {
 
         // SEQ 5. 알림
         notificationService.sendFriendRequestNotification(friendId, userId);
+    }
+
+    /**
+     * 친구 요청 거절
+     */
+    @Transactional
+    public void rejectFriendRequest(UserPrincipal userPrincipal, Long friendId) {
+        Long userId = userPrincipal.getUserId();
+
+        // SEQ 1. 거절할 요청 데이터 확인(상대방 -> 나)
+        FriendMap requestMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
+
+        // SEQ 2. 상태 검증
+        if(requestMap.getFriendStatus() != FriendStatus.PENDING) {
+            throw new RestException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        }
+
+        // SEQ 3. 상태 변경
+        requestMap.updateStatus(FriendStatus.REJECTED);
     }
 }
