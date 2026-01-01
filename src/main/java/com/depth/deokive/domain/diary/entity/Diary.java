@@ -46,7 +46,7 @@ public class Diary extends UserBaseEntity {
     @Column(name = "thumbnail_url")
     private String thumbnailUrl; // Denormalization Field for Pagination Performance
 
-    public void update(DiaryDto.Request request) {
+    public void update(DiaryDto.UpdateRequest request) {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
@@ -58,7 +58,6 @@ public class Diary extends UserBaseEntity {
 
     public void updateThumbnail(String url) { this.thumbnailUrl = url; }
 
-    // TODO: 사실 이게 PATCH 패턴 처리 방식. Validation 에서 체크를 해줘서 빈 값 들어올 일은 없긴 한데... 일단 보류. 리팩토링 단계에서 고려
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;
     }

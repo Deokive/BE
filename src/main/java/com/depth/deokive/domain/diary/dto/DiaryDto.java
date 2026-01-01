@@ -29,21 +29,15 @@ import java.util.stream.Collectors;
 
 public class DiaryDto {
 
-    /* TODO:: Trade-Off 고려
-        file 처리는 내부적으로 일괄처리가 깔끔함 -> PUT의 성격이 강함.
-        근데 파일 외의 데이터 업데이트는 PATCH 성격이 강함 -> 공통으로 묶지 말고 CreateRequest, UpdateRequest가 더 나을 수 있음
-        Post에서는 PUT으로 갔지만, 여전히 마음 한 켠에 남은 찜찜함이 존재함.
-        FE 관점에서도 PATCH로 이해하는게 편하긴 할거임. 1000자 수준의 일기를 수정도 안했는데 요청에 실어보내는것도 좀 부담이고.
-        그래서 Post와의 일관성을 위해서 일단은 PUT으로 가지만 추후 분리할 수도 있음.
-        요청 필드는 동일한데, Validation 수준만 조절될거임 -> 코드 중복의 이슈도 있긴함
-    */
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "일기 작성/수정 요청 DTO")
-    public static class Request {
+    @Schema(description = "일기 작성 요청 DTO")
+    public static class CreateRequest {
         @NotBlank(message = "일기 제목은 필수입니다.")
+        @Schema(description = "일기 제목", example = "오늘의 일기")
         private String title;
 
         @NotBlank(message = "일기 내용은 필수입니다.")
+        @Schema(description = "일기 내용", example = "일기 내용")
         private String content;
 
         @NotNull(message = "날짜는 필수입니다.")
@@ -72,6 +66,29 @@ public class DiaryDto {
                     .diaryBook(diaryBook)
                     .build();
         }
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "일기 수정 요청 DTO")
+    public static class UpdateRequest {
+        @Schema(description = "일기 제목", example = "오늘의 일기")
+        private String title;
+
+        @Schema(description = "일기 내용", example = "일기 내용")
+        private String content;
+
+        @Schema(description = "일기 기록 날짜 (사용자 지정)", example = "2024-12-25")
+        private LocalDate recordedAt;
+
+        @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "올바른 HEX 컬러 코드가 아닙니다.")
+        @Schema(description = "일기 배경/테마 색상", example = "#FF5733")
+        private String color;
+
+        @Schema(description = "공개 범위 (PUBLIC, RESTRICTED, PRIVATE)", example = "PUBLIC")
+        private Visibility visibility;
+
+        @Schema(description = "첨부 파일 리스트")
+        private List<AttachedFileRequest> files;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

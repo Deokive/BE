@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.archive.repository;
 
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
-import com.depth.deokive.domain.archive.dto.QArchiveDto_FeedResponse;
+import com.depth.deokive.domain.archive.dto.QArchiveDto_ArchivePageResponse;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -52,7 +52,7 @@ public class ArchiveQueryRepository {
 
         if (!ids.isEmpty()) {
             content = queryFactory
-                    .select(new QArchiveDto_FeedResponse(
+                    .select(new QArchiveDto_ArchivePageResponse(
                             archive.id,
                             archive.title,
                             archive.bannerFile.filePath, // 1:1 Banner Join

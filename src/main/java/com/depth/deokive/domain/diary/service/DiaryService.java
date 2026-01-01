@@ -11,16 +11,13 @@ import com.depth.deokive.domain.diary.repository.DiaryQueryRepository;
 import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
-import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +26,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DiaryService {
@@ -42,7 +38,7 @@ public class DiaryService {
     private final DiaryQueryRepository diaryQueryRepository;
 
     @Transactional
-    public DiaryDto.Response createDiary(UserPrincipal userPrincipal, Long archiveId, DiaryDto.Request request) {
+    public DiaryDto.Response createDiary(UserPrincipal userPrincipal, Long archiveId, DiaryDto.CreateRequest request) {
         // SEQ 1. 다이어리 북(아카이브) 조회
         DiaryBook diaryBook = diaryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
@@ -79,7 +75,7 @@ public class DiaryService {
     }
 
     @Transactional
-    public DiaryDto.Response updateDiary(UserPrincipal userPrincipal, Long diaryId, DiaryDto.Request request) {
+    public DiaryDto.Response updateDiary(UserPrincipal userPrincipal, Long diaryId, DiaryDto.UpdateRequest request) {
         // SEQ 1. 다이어리 조회
         Diary diary = diaryRepository.findById(diaryId)
                 .orElseThrow(() -> new RestException(ErrorCode.DIARY_NOT_FOUND));
@@ -90,12 +86,15 @@ public class DiaryService {
         // SEQ 3. 업데이트 (Dirty Checking 기반)
         diary.update(request);
 
-        // SEQ 4. 파일 갈아끼우기 : 전략 -> Full Replacement
-        diaryFileMapRepository.deleteAllByDiaryId(diaryId);
-        List<DiaryFileMap> maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
-
-        // SEQ 5. 썸네일 업데이트
-        updateDiaryThumbnail(diary, maps);
+        // SEQ 4. File Full Replacement
+        List<DiaryFileMap> maps;
+        if (request.getFiles() != null) {
+            diaryFileMapRepository.deleteAllByDiaryId(diaryId);
+            maps = connectFiles(diary, request.getFiles(), userPrincipal.getUserId());
+            updateDiaryThumbnail(diary, maps);
+        } else {
+            maps = getFileMaps(diaryId);
+        }
 
         return DiaryDto.Response.of(diary, maps);
     }
@@ -187,14 +186,8 @@ public class DiaryService {
         Long viewerId = userPrincipal != null ? userPrincipal.getUserId() : null;
         Long writerId = diary.getCreatedBy();
 
-        log.info("🟢 Diary Visibility : {}", diary.getVisibility());
-        log.info("🟢 Diary WriterId : {}", writerId);
-        log.info("🟢 Diary ViewerId : {}", viewerId);
-
         // SEQ 1. 작성자 본인이면 통과
         if (Objects.equals(viewerId, writerId) && writerId != null) return;
-
-        log.info("🟢 Let's Check Diary Visibility : {}", diary.getVisibility());
 
         // SEQ 2. 공개 범위 체크
         switch (diary.getVisibility()) {
@@ -283,7 +276,6 @@ public class DiaryService {
             return;
         }
 
-        // TODO: 썸네일 선정을 Post와 달리 String으로 해봄 -> 성능 비교해보자 -> 어차피 리팩터링 단계 별도로 있으니까
         String thumbnailUrl = maps.stream()
                 .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
                 .findFirst()

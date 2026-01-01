@@ -26,7 +26,7 @@ public class DiaryController {
     public ResponseEntity<DiaryDto.Response> createDiary(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
-            @Valid @RequestBody DiaryDto.Request request
+            @Valid @RequestBody DiaryDto.CreateRequest request
     ) {
         DiaryDto.Response response = diaryService.createDiary(userPrincipal, archiveId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -42,12 +42,12 @@ public class DiaryController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{diaryId}")
+    @PatchMapping("/{diaryId}")
     @Operation(summary = "일기 수정")
     public ResponseEntity<DiaryDto.Response> updateDiary(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long diaryId,
-            @Valid @RequestBody DiaryDto.Request request
+            @Valid @RequestBody DiaryDto.UpdateRequest request
     ) {
         DiaryDto.Response response = diaryService.updateDiary(userPrincipal, diaryId, request);
         return ResponseEntity.ok(response);
