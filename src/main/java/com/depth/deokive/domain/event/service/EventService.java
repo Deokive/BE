@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collections;
@@ -34,7 +35,7 @@ public class EventService {
     private final FriendMapRepository friendMapRepository;
 
     @Transactional
-    public EventDto.Response createEvent(UserPrincipal user, Long archiveId, EventDto.Request request) {
+    public EventDto.Response createEvent(UserPrincipal user, Long archiveId, EventDto.CreateRequest request) {
         // SEQ 1. 아카이브 조회
         Archive archive = archiveRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
@@ -84,7 +85,7 @@ public class EventService {
     }
 
     @Transactional
-    public EventDto.Response updateEvent(UserPrincipal user, Long eventId, EventDto.Request request) {
+    public EventDto.Response updateEvent(UserPrincipal user, Long eventId, EventDto.UpdateRequest request) {
         // SEQ 1. Event 조회
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RestException(ErrorCode.EVENT_NOT_FOUND));
@@ -93,16 +94,23 @@ public class EventService {
         validateOwner(event.getArchive(), user);
 
         // SEQ 3. 업데이트
-        event.update(request, getRecordAt(request)); // Dirty Checking
+        event.update(request, getRecordAt(request, event)); // Dirty Checking
 
         // SEQ 4. 스포츠 기록 처리
         SportRecord sportRecord = handleSportRecordUpdate(event, request);
 
         // SEQ 5. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
-        eventHashtagMapRepository.deleteByEventId(eventId);
-        saveHashtags(event, request.getHashtags());
+        if (request.getHashtags() != null) {
+            eventHashtagMapRepository.deleteByEventId(eventId);
+            saveHashtags(event, request.getHashtags());
+        }
 
-        return EventDto.Response.of(event, sportRecord, request.getHashtags());
+        // SEQ 6. 현재 해시태그 조회 (업데이트 안하는 경우 고려)
+        List<String> currentHashtags = (request.getHashtags() != null)
+                ? request.getHashtags()
+                : eventHashtagMapRepository.findHashtagNamesByEventId(eventId);
+
+        return EventDto.Response.of(event, sportRecord, currentHashtags);
     }
 
     @Transactional
@@ -160,27 +168,48 @@ public class EventService {
 
     // --- Helper Methods ---
 
-    private LocalDateTime getRecordAt(EventDto.Request request) {
-        LocalTime time = (request.getHasTime() && request.getTime() != null)
-                ? request.getTime()
-                : LocalTime.of(0, 0);
-        return LocalDateTime.of(request.getDate(), time);
+    private LocalDateTime getRecordAt(EventDto.CreateRequest r) {
+        LocalTime time = (Boolean.TRUE.equals(r.getHasTime()) && r.getTime() != null) ? r.getTime() : LocalTime.MIDNIGHT;
+        return LocalDateTime.of(r.getDate(), time);
     }
 
-    private SportRecord handleSportRecordUpdate(Event event, EventDto.Request request) {
-        // Case 1: 스포츠 타입 ON
-        if (request.getIsSportType()) {
-            EventDto.SportRequest info = request.getSportInfo();
-            SportRecord existingRecord = event.getSportRecord();
+    private LocalDateTime getRecordAt(EventDto.UpdateRequest r, Event event) {
+        LocalDate date = r.getDate() != null ? r.getDate() : event.getDate().toLocalDate();
+        LocalTime time;
 
-            if (existingRecord != null) {
-                existingRecord.update(request.getSportInfo());
-                return existingRecord;
-            } else {
-                SportRecord newRecord = info.toEntity(event);
-                event.registerSportRecord(newRecord); // 양방향 정합성
-                return sportRecordRepository.save(newRecord);
+        boolean effectiveHasTime = r.getHasTime() != null ? r.getHasTime() : event.isHasTime();
+
+        if (effectiveHasTime) {
+            if (r.getTime() != null) time = r.getTime();
+            else if (event.isHasTime()) time = event.getDate().toLocalTime();
+            else time = LocalTime.of(0, 0);
+        } else {
+            time = LocalTime.of(0, 0);
+        }
+
+        return LocalDateTime.of(date, time);
+    }
+
+    private SportRecord handleSportRecordUpdate(Event event, EventDto.UpdateRequest request) {
+
+        boolean shouldBeSportType = (request.getIsSportType() != null)
+                ? request.getIsSportType() // 변경 대상
+                : event.isSportType(); // 기존
+
+        // Case 1: 스포츠 타입 ON
+        if (shouldBeSportType) {
+            if(request.getSportInfo() != null){
+                SportRecord existingRecord = event.getSportRecord();
+                if(existingRecord != null) {
+                    existingRecord.update(request.getSportInfo());
+                    return existingRecord;
+                } else {
+                    SportRecord newRecord = request.getSportInfo().toEntity(event);
+                    event.registerSportRecord(newRecord); // 양방향 정합성
+                    return sportRecordRepository.save(newRecord);
+                }
             }
+            return event.getSportRecord(); // 정보 업데이트 요청이 없던 경우
         }
         // Case 2: 스포츠 타입 OFF
         else {

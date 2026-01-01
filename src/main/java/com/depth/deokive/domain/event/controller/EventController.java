@@ -28,7 +28,7 @@ public class EventController {
     public ResponseEntity<EventDto.Response> createEvent(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long archiveId,
-            @Valid @RequestBody EventDto.Request request
+            @Valid @RequestBody EventDto.CreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(eventService.createEvent(user, archiveId, request));
@@ -48,7 +48,7 @@ public class EventController {
     public ResponseEntity<EventDto.Response> updateEvent(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long eventId,
-            @Valid @RequestBody EventDto.Request request
+            @Valid @RequestBody EventDto.UpdateRequest request
     ) {
         return ResponseEntity.ok(eventService.updateEvent(user, eventId, request));
     }

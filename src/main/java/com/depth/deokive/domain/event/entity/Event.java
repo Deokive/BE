@@ -48,12 +48,11 @@ public class Event extends TimeBaseEntity {
     @OneToOne(mappedBy = "event", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private SportRecord sportRecord;
 
-    public void update(EventDto.Request request, LocalDateTime recordAt) {
+    public void update(EventDto.UpdateRequest request, LocalDateTime recordAt) {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
         this.date = nonBlankOrDefault(recordAt, this.date);
-
         this.hasTime = nonBlankOrDefault(request.getHasTime(), this.hasTime);
         this.color = nonBlankOrDefault(request.getColor(), this.color);
         this.isSportType = nonBlankOrDefault(request.getIsSportType(), this.isSportType);
