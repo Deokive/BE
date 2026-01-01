@@ -27,7 +27,7 @@ public class ArchiveQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<ArchiveDto.FeedResponse> searchArchiveFeed(
+    public Page<ArchiveDto.ArchivePageResponse> searchArchiveFeed(
             Long filterUserId,
             List<Visibility> allowedVisibilities,
             Pageable pageable
@@ -48,7 +48,7 @@ public class ArchiveQueryRepository {
 
         // STEP 2. 데이터 조회 (WHERE IN)
         // 찾아낸 소수의 ID에 대해서만 Banner File 및 User 조인을 수행합니다.
-        List<ArchiveDto.FeedResponse> content = new ArrayList<>();
+        List<ArchiveDto.ArchivePageResponse> content = new ArrayList<>();
 
         if (!ids.isEmpty()) {
             content = queryFactory

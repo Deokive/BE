@@ -131,7 +131,7 @@ public class ArchiveController {
     @Operation(summary = "전역 아카이브 피드 조회", description = "공개 아카이브를 조회합니다. (정렬: LATEST, HOT, VIEW, LIKE)")
     @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = ArchiveDto.PageListResponse.class)))
     public ResponseEntity<ArchiveDto.PageListResponse> getGlobalFeed(
-            @Valid @ModelAttribute ArchiveDto.FeedRequest request
+            @Valid @ModelAttribute ArchiveDto.ArchivePageRequest request
     ) {
         ArchiveDto.PageListResponse response = archiveService.getGlobalFeed(request);
         return ResponseEntity.ok(response);
@@ -148,7 +148,7 @@ public class ArchiveController {
     public ResponseEntity<ArchiveDto.PageListResponse> getUserArchives(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser,
             @Parameter(description = "조회할 대상 유저 ID", example = "1") @PathVariable Long userId,
-            @Valid @ModelAttribute ArchiveDto.FeedRequest request
+            @Valid @ModelAttribute ArchiveDto.ArchivePageRequest request
     ) {
         ArchiveDto.PageListResponse response = archiveService.getUserArchives(currentUser, userId, request);
         return ResponseEntity.ok(response);

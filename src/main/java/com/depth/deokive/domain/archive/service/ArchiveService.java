@@ -223,9 +223,9 @@ public class ArchiveService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getGlobalFeed(ArchiveDto.FeedRequest request) {
+    public ArchiveDto.PageListResponse getGlobalFeed(ArchiveDto.ArchivePageRequest request) {
         // 무조건 PUBLIC & 전체 유저 대상
-        Page<ArchiveDto.FeedResponse> page = archiveQueryRepository.searchArchiveFeed(
+        Page<ArchiveDto.ArchivePageResponse> page = archiveQueryRepository.searchArchiveFeed(
                 null, // filterUserId
                 List.of(Visibility.PUBLIC),
                 request.toPageable()
@@ -241,7 +241,7 @@ public class ArchiveService {
     public ArchiveDto.PageListResponse getUserArchives(
             UserPrincipal userPrincipal,
             Long targetUserId,
-            ArchiveDto.FeedRequest request
+            ArchiveDto.ArchivePageRequest request
     ) {
         List<Visibility> visibilities;
         String pageTitle;
@@ -265,7 +265,7 @@ public class ArchiveService {
             pageTitle = nickname + "님의 아카이브";
         }
 
-        Page<ArchiveDto.FeedResponse> page = archiveQueryRepository.searchArchiveFeed(
+        Page<ArchiveDto.ArchivePageResponse> page = archiveQueryRepository.searchArchiveFeed(
                 targetUserId,
                 visibilities,
                 request.toPageable()

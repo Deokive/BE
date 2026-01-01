@@ -108,7 +108,7 @@ public class ArchiveDto {
 
     @Data @NoArgsConstructor
     @Schema(description = "아카이브 피드 목록 조회 요청 DTO")
-    public static class FeedRequest { // TODO: 나중에 FeedPageRequest 로 바꾸자
+    public static class ArchivePageRequest {
         @Min(value = 0, message = "페이지 번호는 0 이상이어야 합니다.")
         @Schema(description = "페이지 번호 (0부터 시작)", example = "0", defaultValue = "0")
         private int page = 0;
@@ -134,8 +134,8 @@ public class ArchiveDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "아카이브 피드 목록 조회용 경량 DTO") // ✅ 최적화된 DTO
-    public static class FeedResponse { // TODO: 나중에 FeedResponse 로 바꾸자
+    @Schema(description = "아카이브 피드 목록 조회용 경량 DTO")
+    public static class ArchivePageResponse {
         @Schema(description = "아카이브 아이디", example = "1")
         private Long archiveId;
         
@@ -167,9 +167,9 @@ public class ArchiveDto {
         private String ownerNickname;
 
         @QueryProjection // Q-Class 재생성 필요
-        public FeedResponse(Long archiveId, String title, String bannerUrl,
-                            Long viewCount, Long likeCount, Double hotScore, Visibility visibility,
-                            LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
+        public ArchivePageResponse(Long archiveId, String title, String bannerUrl,
+                                   Long viewCount, Long likeCount, Double hotScore, Visibility visibility,
+                                   LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
             this.archiveId = archiveId;
             this.title = title;
             this.bannerUrl = ThumbnailUtils.getSmallThumbnailUrl(bannerUrl); // 동적 변환
@@ -190,12 +190,12 @@ public class ArchiveDto {
         private String pageTitle;
 
         @Schema(description = "아카이브 피드 목록")
-        private List<FeedResponse> content;
+        private List<ArchivePageResponse> content;
         
         @Schema(description = "페이지 메타데이터")
         private PageInfo page;
 
-        public static PageListResponse of(String pageTitle, Page<FeedResponse> pageData) {
+        public static PageListResponse of(String pageTitle, Page<ArchivePageResponse> pageData) {
             return PageListResponse.builder()
                     .pageTitle(pageTitle)
                     .content(pageData.getContent())

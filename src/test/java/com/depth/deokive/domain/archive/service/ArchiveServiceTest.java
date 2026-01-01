@@ -710,7 +710,7 @@ class ArchiveServiceTest {
             Statistics stats = getStatistics();
             stats.clear();
 
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(20);
             request.setSort("createdAt");
@@ -734,7 +734,7 @@ class ArchiveServiceTest {
             entityManager.clear();
             System.gc(); // GC로 메모리 정리
 
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(20);
             request.setSort("createdAt");
@@ -757,7 +757,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 두번째 페이지 요청 시간 검증")
         void globalFeed_SecondPage_Performance() {
             // given - 첫 페이지 조회로 캐시 워밍업
-            ArchiveDto.FeedRequest firstRequest = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest firstRequest = new ArchiveDto.ArchivePageRequest();
             firstRequest.setPage(0);
             firstRequest.setSize(20);
             firstRequest.setSort("LATEST");
@@ -765,7 +765,7 @@ class ArchiveServiceTest {
 
             entityManager.clear();
 
-            ArchiveDto.FeedRequest secondRequest = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest secondRequest = new ArchiveDto.ArchivePageRequest();
             secondRequest.setPage(1);
             secondRequest.setSize(20);
             secondRequest.setSort("LATEST");
@@ -795,7 +795,7 @@ class ArchiveServiceTest {
             entityManager.flush();
             entityManager.clear();
 
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(100);
             request.setSort("createdAt");
@@ -816,7 +816,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 정렬 조건별 검증 - HOT")
         void globalFeed_Sort_HOT() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(10);
             request.setSort("HOT");
@@ -833,7 +833,7 @@ class ArchiveServiceTest {
             assertThat(elapsedMs).isLessThan(PERFORMANCE_THRESHOLD_MS);
 
             // HOT 정렬 확인 (hotScore 내림차순)
-            List<ArchiveDto.FeedResponse> content = response.getContent();
+            List<ArchiveDto.ArchivePageResponse> content = response.getContent();
             for (int i = 0; i < content.size() - 1; i++) {
                 // hotScore는 스케줄러에 의해 갱신되므로, 여기서는 정렬이 적용되었는지만 확인
                 assertThat(content.get(i).getArchiveId()).isNotNull();
@@ -844,7 +844,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 정렬 조건별 검증 - VIEW")
         void globalFeed_Sort_VIEW() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(10);
             request.setSort("viewCount");
@@ -867,7 +867,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 정렬 조건별 검증 - LIKE")
         void globalFeed_Sort_LIKE() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(10);
             request.setSort("likeCount");
@@ -890,7 +890,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 정렬 조건별 검증 - MODIFIED")
         void globalFeed_Sort_MODIFIED() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(10);
             request.setSort("lastModifiedAt");
@@ -941,7 +941,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 본인 아카이브 조회 - 모든 Visibility 포함")
         void getUserArchives_Owner_AllVisibility() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(50);
             request.setSort("LATEST");
@@ -959,7 +959,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 친구 아카이브 조회 - PUBLIC + RESTRICTED 포함")
         void getUserArchives_Friend_PublicAndRestricted() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(50);
             request.setSort("LATEST");
@@ -980,7 +980,7 @@ class ArchiveServiceTest {
         @DisplayName("성능: 타인 아카이브 조회 - PUBLIC만 포함")
         void getUserArchives_Stranger_PublicOnly() {
             // given
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(50);
             request.setSort("LATEST");
@@ -1004,7 +1004,7 @@ class ArchiveServiceTest {
             Statistics stats = getStatistics();
             stats.clear();
 
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(20);
             request.setSort("createdAt");
@@ -1083,7 +1083,7 @@ class ArchiveServiceTest {
             entityManager.flush();
             entityManager.clear();
 
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(0);
             request.setSize(10);
             request.setSort("hotScore");
@@ -1175,7 +1175,7 @@ class ArchiveServiceTest {
             entityManager.clear(); // 영속성 컨텍스트 비우기 (캐시 영향 제거)
 
             // When: Deep Pagination 조회 (9만번째 데이터부터 10개)
-            ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+            ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
             request.setPage(DEEP_PAGE_NUMBER);
             request.setSize(PAGE_SIZE);
             request.setSort("createdAt");
@@ -1219,7 +1219,7 @@ class ArchiveServiceTest {
             String[] sortTypes = {"createdAt", "hotScore", "viewCount", "likeCount", "lastModifiedAt"};
 
             for (String sortType : sortTypes) {
-                ArchiveDto.FeedRequest request = new ArchiveDto.FeedRequest();
+                ArchiveDto.ArchivePageRequest request = new ArchiveDto.ArchivePageRequest();
                 request.setPage(DEEP_PAGE_NUMBER);
                 request.setSize(PAGE_SIZE);
                 request.setSort(sortType);
