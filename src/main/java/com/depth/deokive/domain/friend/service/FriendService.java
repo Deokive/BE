@@ -148,7 +148,7 @@ public class FriendService {
     }
 
     /**
-     * 4단계: 친구 요청 취소
+     * 친구 요청 취소
      */
     @Transactional
     public void friendRequest(UserPrincipal userPrincipal, Long friendId) {
@@ -170,5 +170,30 @@ public class FriendService {
 
         // SEQ 4. 상태 변경
         sentMap.updateStatus(FriendStatus.CANCELED);
+    }
+
+    /**
+     * 친구 끊기
+     */
+    @Transactional
+    public void cancelFriendRequest(UserPrincipal userPrincipal, Long friendId) {
+        Long userId = userPrincipal.getUserId(); // 나
+
+        // SEQ 1. 관계 조회(나 -> 친구)
+        FriendMap myMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_NOT_FOUND));
+
+        // SEQ 2. 친구 관계 조회(친구 -> 나)
+        FriendMap friendMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_NOT_FOUND));
+
+        // SEQ 3. 상태 검증(나, 친구 둘 다 ACCEPTED가 아니라면 에러)
+        if(myMap.getFriendStatus() != FriendStatus.ACCEPTED || friendMap.getFriendStatus() != FriendStatus.ACCEPTED) {
+            throw new RestException(ErrorCode.FRIEND_NOT_FOUND);
+        }
+
+        // SEQ 4. 상태 변경
+        myMap.updateStatus(FriendStatus.CANCELED);
+        friendMap.updateStatus(FriendStatus.CANCELED);
     }
 }
