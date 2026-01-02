@@ -82,6 +82,9 @@ public enum ErrorCode {
     REPOST_TAB_LIMIT_EXCEED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB LIMIT EXCEED", "가능한 리포스트 탭 갯수를 초과했습니다."),
     REPOST_TAB_AND_POST_DUPLICATED(HttpStatus.CONFLICT, "REPOST_TAB_AND_POST_DUPLICATED", "중복된 리포스트입니다."),
 
+    // PAGE Errors
+    PAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "PAGE NOT FOUND", "존재하지 않는 페이지입니다."),
+
     // ARCHIVE Errors
     ARCHIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "ARCHIVE_NOT_FOUND", "존재하지 않는 아카이브입니다."),
     ARCHIVE_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARCHIVE_CREATION_FAILED", "아카이브 생성에 실패했습니다."),
