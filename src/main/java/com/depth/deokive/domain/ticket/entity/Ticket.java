@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
 @Table(name = "ticket", indexes = {
         @Index(name = "idx_ticket_book_created", columnList = "ticket_book_id, created_at DESC"),
         @Index(name = "idx_ticket_book_date", columnList = "ticket_book_id, date DESC"),
-        @Index(name = "idx_ticket_book_visibility_date", columnList = "ticket_book_id, visibility, date DESC")
 })
 public class Ticket extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
