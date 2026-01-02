@@ -22,14 +22,14 @@ import java.util.List;
 public class TicketDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 생성/수정 요청 DTO")
-    public static class Request {
+    @Schema(description = "티켓 생성 요청 DTO")
+    public static class CreateRequest {
         @NotBlank(message = "공연명은 필수입니다.")
         @Schema(description = "공연명", example = "BTS 월드투어 2024")
         private String title;
 
         @NotNull(message = "날짜는 필수입니다.")
-        @Schema(description = "공연 날짜 및 시간", example = "2024-12-25T19:00:00")
+        @Schema(description = "공연 날짜 및 시간", example = "KST DateTime")
         private LocalDateTime date;
 
         @Size(max = 20)
@@ -70,6 +70,41 @@ public class TicketDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "티켓 수정 요청 DTO (변경할 필드만 전송)")
+    public static class UpdateRequest {
+        @Schema(description = "변경할 공연명", example = "수정된 공연명")
+        private String title;
+
+        @Schema(description = "변경할 공연 날짜")
+        private LocalDateTime date;
+
+        @Size(max = 20)
+        @Schema(description = "변경할 공연 장소")
+        private String location;
+
+        @Size(max = 20)
+        @Schema(description = "변경할 좌석 정보")
+        private String seat;
+
+        @Schema(description = "변경할 출연진 정보")
+        private String casting;
+
+        @Min(0) @Max(5)
+        @Schema(description = "변경할 평점")
+        private Integer score;
+
+        @Size(max = 100)
+        @Schema(description = "변경할 후기")
+        private String review;
+
+        @Schema(description = "변경할 이미지 파일 ID (null이면 기존 유지, 값 있으면 교체)")
+        private Long fileId;
+
+        @Schema(description = "기존 이미지 삭제 여부 (true일 경우 fileId가 null이어도 이미지 삭제)", defaultValue = "false")
+        private Boolean deleteFile;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "티켓 상세 응답 DTO")
     public static class Response {
         @Schema(description = "티켓 아이디", example = "1")
@@ -78,7 +113,7 @@ public class TicketDto {
         @Schema(description = "공연명", example = "BTS 월드투어 2024")
         private String title;
         
-        @Schema(description = "공연 날짜 및 시간", example = "2024-12-25T19:00:00")
+        @Schema(description = "공연 날짜 및 시간", example = "KST DateTime")
         private LocalDateTime date;
         
         @Schema(description = "공연 장소", example = "올림픽공원")
@@ -154,7 +189,7 @@ public class TicketDto {
         @Schema(description = "티켓 타이틀", example = "티켓 타이틀입니다.")
         private String title;
 
-        @Schema(description = "썸네일 URL (동적 생성됨)", example = "https://cdn.../thumbnails/small/...")
+        @Schema(description = "썸네일 URL (동적 생성됨)", example = "https://cdn.../thumbnails/medium/...")
         private String thumbnail;
 
         @Schema(description = "공연 날짜", example = "2024-12-25T19:00:00")
@@ -184,11 +219,7 @@ public class TicketDto {
             this.location = ticket.getLocation();
             this.createdAt = ticket.getCreatedAt();
             this.lastModifiedAt = ticket.getLastModifiedAt();
-
-            if (ticket.getFile() != null) {
-                this.thumbnail = ThumbnailUtils.getSmallThumbnailUrl(ticket.getFile().getFilePath());
-            }
-
+            this.thumbnail = ThumbnailUtils.getMediumThumbnailUrl(ticket.getFile().getFilePath());
             this.casting = truncateCasting(ticket.getCasting());
         }
 

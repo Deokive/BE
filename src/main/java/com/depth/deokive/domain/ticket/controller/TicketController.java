@@ -26,7 +26,7 @@ public class TicketController {
     public ResponseEntity<TicketDto.Response> createTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
-            @Valid @RequestBody TicketDto.Request request
+            @Valid @RequestBody TicketDto.CreateRequest request
     ) {
         TicketDto.Response response = ticketService.createTicket(userPrincipal, archiveId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -47,7 +47,7 @@ public class TicketController {
     public ResponseEntity<TicketDto.Response> updateTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId,
-            @Valid @RequestBody TicketDto.Request request
+            @Valid @RequestBody TicketDto.UpdateRequest request
     ) {
         TicketDto.Response response = ticketService.updateTicket(userPrincipal, ticketId, request);
         return ResponseEntity.ok(response);

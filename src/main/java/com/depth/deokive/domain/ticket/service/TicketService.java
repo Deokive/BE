@@ -34,7 +34,7 @@ public class TicketService {
     private final TicketQueryRepository ticketQueryRepository;
 
     @Transactional
-    public TicketDto.Response createTicket(UserPrincipal userPrincipal, Long archiveId, TicketDto.Request request) {
+    public TicketDto.Response createTicket(UserPrincipal userPrincipal, Long archiveId, TicketDto.CreateRequest request) {
         // SEQ 1. 티켓북 조회
         TicketBook ticketBook = ticketBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
@@ -84,7 +84,7 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketDto.Response updateTicket(UserPrincipal userPrincipal, Long ticketId, TicketDto.Request request) {
+    public TicketDto.Response updateTicket(UserPrincipal userPrincipal, Long ticketId, TicketDto.UpdateRequest request) {
         // SEQ 1. 티켓 조회
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
@@ -93,10 +93,10 @@ public class TicketService {
         validateOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 파일 조회 및 결정
-        File newFile = resolveNewFile(ticket.getFile(), request.getFileId(), userPrincipal.getUserId());
+        File finalFile = resolveUpdatedFile(ticket.getFile(), request, userPrincipal.getUserId());
 
         // SEQ 4. 업데이트
-        ticket.update(request, newFile);
+        ticket.update(request, finalFile);
 
         return TicketDto.Response.of(ticket);
     }
@@ -159,10 +159,18 @@ public class TicketService {
         );
     }
 
-    private File resolveNewFile(File currentFile, Long requestFileId, Long userId) {
-        if (requestFileId == null) { return currentFile; } // 변경 없음
-        if (requestFileId == -1L) { return null; } // 이미지 삭제 (연결 해제)
+    private File resolveUpdatedFile(File currentFile, TicketDto.UpdateRequest request, Long userId) {
+        // 1. 삭제 요청인 경우 -> null 리턴 (DB에서 관계 끊김)
+        if (Boolean.TRUE.equals(request.getDeleteFile())) {
+            return null;
+        }
 
-        return fileService.validateFileOwner(requestFileId, userId);
+        // 2. 교체 요청인 경우 (fileId가 있음) -> 새 파일 리턴
+        if (request.getFileId() != null) {
+            return fileService.validateFileOwner(request.getFileId(), userId);
+        }
+
+        // 3. 아무 요청 없음 -> 기존 파일 리턴 (유지)
+        return currentFile;
     }
 }
