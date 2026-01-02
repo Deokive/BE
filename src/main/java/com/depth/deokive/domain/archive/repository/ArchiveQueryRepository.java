@@ -65,7 +65,6 @@ public class ArchiveQueryRepository {
                             archive.user.nickname
                     ))
                     .from(archive)
-                    .leftJoin(archive.bannerFile, file) // 배너 이미지 조인
                     .join(archive.user) // 작성자 조인
                     .where(archive.id.in(ids))
                     .orderBy(getOrderSpecifiers(pageable)) // ID IN 순서 보장을 위해 재정렬

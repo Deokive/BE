@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.archive.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
@@ -82,6 +83,9 @@ public class Archive extends TimeBaseEntity {
     @OneToOne(mappedBy = "archive", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private TicketBook ticketBook;
 
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl;
+
     public void update(ArchiveDto.UpdateRequest request) {
         if (request == null) return;
 
@@ -91,7 +95,14 @@ public class Archive extends TimeBaseEntity {
 
     public void updateBanner(File file) {
         this.bannerFile = file;
+
+        if (file != null) {
+            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(file.getFilePath());
+        } else {
+            this.thumbnailUrl = null;
+        }
     }
+
     public void updateHotScore(Double score) { this.hotScore = score; }
     public void increaseViewCount() { this.viewCount++; }
 

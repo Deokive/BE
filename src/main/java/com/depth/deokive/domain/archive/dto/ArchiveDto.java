@@ -167,12 +167,12 @@ public class ArchiveDto {
         private String ownerNickname;
 
         @QueryProjection // Q-Class 재생성 필요
-        public ArchivePageResponse(Long archiveId, String title, String bannerUrl,
+        public ArchivePageResponse(Long archiveId, String title, String thumbnailUrl,
                                    Long viewCount, Long likeCount, Double hotScore, Visibility visibility,
                                    LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
             this.archiveId = archiveId;
             this.title = title;
-            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(bannerUrl); // 동적 변환
+            this.thumbnailUrl = thumbnailUrl;
             this.viewCount = viewCount;
             this.likeCount = likeCount;
             this.hotScore = hotScore;

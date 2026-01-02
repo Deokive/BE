@@ -96,7 +96,7 @@ public class ArchiveService {
         // SEQ 3. Banner 파일 연결 (기존에서 순서를 변경 -> 추후 IDOR 취약점 방지 처리 로직 넣을거임)
         if (request.getBannerImageId() != null) {
             File bannerFile = fileService.validateFileOwner(request.getBannerImageId(), foundUser.getId());
-            archive.updateBanner(bannerFile);
+            archive.updateBanner(bannerFile); // 여기서 자동으로 썸네일도 업데이트 될거임 ㅇㅇ
         }
 
         // SEQ 4. Sub Domain Books 생성 및 연결 (Cascade 준비)
@@ -321,7 +321,9 @@ public class ArchiveService {
     }
 
     private String updateBannerImage(Archive archive, Long newFileId, Long userId) {
-        if (newFileId == null) return null;
+        if (newFileId == null) {
+            return archive.getBannerFile() != null ? archive.getBannerFile().getFilePath() : null;
+        }
 
         if (newFileId == -1L) {
             // 삭제 요청: 기존 파일 연결 해제
