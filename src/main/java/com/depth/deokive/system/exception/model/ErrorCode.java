@@ -129,7 +129,8 @@ public enum ErrorCode {
     FRIEND_ALREADY_EXISTS(HttpStatus.CONFLICT, "FRIEND_ALREADY_EXISTS", "이미 친구 관계입니다."), // 409 에러
     FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIEND_NOT_FOUND", "존재하지 않는 친구입니다."),
     FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND,"FRIEND_REQUEST_NOT_FOUND", "받은 친구 요청이 존재하지 않습니다."),
-    FRIEND_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "FRIEND_REQUEST_NOT_PENDING", "대기 상태의 친구 요청이 아닙니다.");
+    FRIEND_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "FRIEND_REQUEST_NOT_PENDING", "대기 상태의 친구 요청이 아닙니다."),
+    FRIEND_NOT_CANCELED_BAD_REQUEST(HttpStatus.BAD_REQUEST, "FRIEND_NOT_CANCELED_BAD_REQUEST", "CANCELED만 친청을 복구할 수 있습니다.");
 
     private final HttpStatus status;
     private final String error;
