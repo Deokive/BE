@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.repository.FileRepository;
@@ -193,7 +194,7 @@ public class PostService {
                         .map(map -> map.getFile().getFilePath()) // 경로 추출
                         .orElse(null));
 
-        post.updateThumbnail(thumbnailPath);
+        post.updateThumbnail(ThumbnailUtils.getMediumThumbnailUrl(thumbnailPath));
 
         return savedMaps;
     }

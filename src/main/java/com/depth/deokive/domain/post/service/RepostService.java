@@ -55,18 +55,14 @@ public class RepostService {
 
         // SEQ 5. 스냅샷 데이터 추출 (제목 & 썸네일)
         String titleSnapshot = post.getTitle(); // 생성 시점에선 자동으로 원본 게시글의 제목을 저장
-        String thumbnailSnapshot = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId()).stream()
-                .filter(map -> map.getMediaRole() == MediaRole.PREVIEW || map.getMediaRole() == MediaRole.CONTENT)
-                .findFirst() // 첫 번째 이미지를 썸네일로 사용
-                .map(map -> map.getFile().getFilePath())
-                .orElse(null);
+        String thumbnailSnapshot = post.getThumbnailUrl();
 
         // SEQ 6. 저장
         Repost repost = Repost.builder()
                 .repostTab(tab)
                 .postId(post.getId())
                 .title(titleSnapshot)
-                .thumbnailUrl(ThumbnailUtils.getSmallThumbnailUrl(thumbnailSnapshot)) // 썸네일 URL로 저장 (원본 게시글이 아니므로)
+                .thumbnailUrl(thumbnailSnapshot)
                 .build();
         repostRepository.save(repost);
 

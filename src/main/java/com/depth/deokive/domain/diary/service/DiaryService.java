@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.diary.service;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.entity.Diary;
@@ -286,6 +287,6 @@ public class DiaryService {
                         .orElse(null)
                 );
 
-        diary.updateThumbnail(thumbnailUrl);
+        diary.updateThumbnail(ThumbnailUtils.getMediumThumbnailUrl(thumbnailUrl));
     }
 }
