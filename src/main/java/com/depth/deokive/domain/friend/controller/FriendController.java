@@ -8,10 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Friend API", description = "친구 관련 API")
 @RestController
@@ -48,6 +45,16 @@ public class FriendController {
             @PathVariable Long friendId
     ) {
         friendService.rejectFriendRequest(userPrincipal, friendId);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "친구 요청 취소하기", description = "특정 유저에게 보낸 친구 요청을 취소합니다.")
+    @DeleteMapping("/request/{friendId}")
+    public ResponseEntity<Void> friendRequest(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long friendId
+    ) {
+        friendService.friendRequest(userPrincipal, friendId);
         return ResponseEntity.ok().build();
     }
 }
