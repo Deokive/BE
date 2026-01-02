@@ -1,6 +1,5 @@
 package com.depth.deokive.domain.post.dto;
 
-import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
@@ -262,7 +261,7 @@ public class PostDto {
             this.postId = postId;
             this.title = title;
             this.category = category;
-            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(thumbnailUrl);
+            this.thumbnailUrl = thumbnailUrl;
             this.writerNickname = writerNickname;
             this.likeCount = likeCount;
             this.viewCount = viewCount;
