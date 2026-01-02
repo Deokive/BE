@@ -67,4 +67,14 @@ public class FriendController {
         friendService.cancelFriendRequest(userPrincipal, friendId);
         return ResponseEntity.ok().build();
     }
+
+    @Operation(summary = "친구 끊기", description = "특정 유저와의 친구 관계를 끊습니다.")
+    @PostMapping("/{friendId}/recover")
+    public ResponseEntity<Void> recoverFriendRequest(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long friendId
+    ) {
+        friendService.recoverFriendRequest(userPrincipal, friendId);
+        return ResponseEntity.ok().build();
+    }
 }
