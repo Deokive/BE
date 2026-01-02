@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.diary.service;
 
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
@@ -177,6 +178,9 @@ public class DiaryService {
                 allowedVisibilities,
                 request.toPageable()
         );
+
+        // SEQ 5. Page Validation
+        PageUtils.validatePageRange(page);
 
         return DiaryDto.PageListResponse.of(diaryBook.getTitle(), page);
     }

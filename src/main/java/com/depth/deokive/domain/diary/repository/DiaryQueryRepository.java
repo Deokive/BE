@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,28 +37,28 @@ public class DiaryQueryRepository {
                         diary.diaryBook.id.eq(bookId),
                         eqVisibility(allowedVisibilities) // 친구 사이여도 Private는 안옴
                 )
-                .orderBy(diary.recordedAt.desc())
+                .orderBy(diary.recordedAt.desc(), diary.id.desc()) // Tie-Breaker 추가
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        if (ids.isEmpty()) {
-            return PageableExecutionUtils.getPage(Collections.emptyList(), pageable, () -> 0L);
-        }
+        List<DiaryDto.DiaryPageResponse> content = new ArrayList<>();
 
         // SEQ 2. Data Fetch Using IDs
-        List<DiaryDto.DiaryPageResponse> content = queryFactory
-                .select(new QDiaryDto_DiaryPageResponse(
-                        diary.id,
-                        diary.title,
-                        diary.thumbnailUrl,
-                        diary.recordedAt,
-                        diary.visibility
-                ))
-                .from(diary)
-                .where(diary.id.in(ids))
-                .orderBy(diary.recordedAt.desc())
-                .fetch();
+        if (!ids.isEmpty()) {
+            content = queryFactory
+                    .select(new QDiaryDto_DiaryPageResponse(
+                            diary.id,
+                            diary.title,
+                            diary.thumbnailUrl, // 역정규화 컬럼 사용 (Zero-Join)
+                            diary.recordedAt,
+                            diary.visibility
+                    ))
+                    .from(diary)
+                    .where(diary.id.in(ids))
+                    .orderBy(diary.recordedAt.desc(), diary.id.desc())
+                    .fetch();
+        }
 
         // SEQ 3. Count Query
         JPAQuery<Long> countQuery = queryFactory
