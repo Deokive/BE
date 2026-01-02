@@ -142,8 +142,8 @@ public class ArchiveDto {
         @Schema(description = "아카이브 제목", example = "나의 첫 아카이브")
         private String title;
         
-        @Schema(description = "배너 이미지 URL", example = "https://cdn.example.com/files/banner.jpg")
-        private String bannerUrl;
+        @Schema(description = "배너 썸네일 이미지 URL", example = "https://cdn.example.com/files/thumbnails/medium/banner.jpg")
+        private String thumbnailUrl;
         
         @Schema(description = "조회수", example = "150")
         private Long viewCount;
@@ -172,7 +172,7 @@ public class ArchiveDto {
                                    LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
             this.archiveId = archiveId;
             this.title = title;
-            this.bannerUrl = ThumbnailUtils.getSmallThumbnailUrl(bannerUrl); // 동적 변환
+            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(bannerUrl); // 동적 변환
             this.viewCount = viewCount;
             this.likeCount = likeCount;
             this.hotScore = hotScore;

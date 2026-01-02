@@ -234,7 +234,7 @@ public class PostDto {
         private Category category;
 
         @Schema(description = "썸네일 URL",
-                example = "https://cdn.example.com/files/thumbnails/thumbnail/thumbnail123.jpg")
+                example = "https://cdn.example.com/files/thumbnails/medium/thumbnail123.jpg")
         private String thumbnailUrl;
 
         @Schema(description = "작성자 닉네임", example = "홍길동")

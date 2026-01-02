@@ -23,16 +23,16 @@ public class GalleryDto {
         private Long id;
         
         @Schema(description = "썸네일 이미지 URL",
-                example = "https://cdn.deokive.hooby-server.com/files/thumbnails/thumbnail/uuid_filename.jpg")
+                example = "https://cdn.deokive.hooby-server.com/files/thumbnails/medium/uuid_filename.jpg")
         private String thumbnailUrl;
 
         @Schema(description = "원본 이미지 URL", example = "https://cdn.deokive.hooby-server.com/files/uuid_filename.jpg")
         private String originalUrl; // 사용자가 클릭 시 원본 이미지를 띄움
         
-        @Schema(description = "생성 시간", example = "2024-01-01T00:00:00")
+        @Schema(description = "생성 시간", example = "KST DateTime")
         private LocalDateTime createdAt;
         
-        @Schema(description = "수정 시간", example = "2024-01-01T00:00:00")
+        @Schema(description = "수정 시간", example = "KST DateTime")
         private LocalDateTime lastModifiedAt;
 
         @Builder
