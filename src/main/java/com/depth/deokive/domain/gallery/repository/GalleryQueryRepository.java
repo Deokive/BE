@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.depth.deokive.domain.archive.entity.QArchive.archive;
 import static com.depth.deokive.domain.file.entity.QFile.file;
 import static com.depth.deokive.domain.gallery.entity.QGallery.gallery;
 
@@ -85,6 +86,9 @@ public class GalleryQueryRepository {
         if (orders.isEmpty()) {
             orders.add(new OrderSpecifier<>(Order.DESC, gallery.createdAt));
         }
+
+        // Tie-Breaker -> for Integrity
+        orders.add(new OrderSpecifier<>(Order.DESC, gallery.id));
 
         return orders.toArray(new OrderSpecifier[0]);
     }
