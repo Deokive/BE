@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.archive.service;
 
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
@@ -10,6 +11,7 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.depth.deokive.domain.archive.entity.*;
@@ -231,6 +233,8 @@ public class ArchiveService {
                 request.toPageable()
         );
 
+        PageUtils.validatePageRange(page);
+
         String title = "hotScore".equals(request.getSort()) ? "지금 핫한 피드" : "최신 아카이브 피드";
 
         return ArchiveDto.PageListResponse.of(title, page);
@@ -270,6 +274,8 @@ public class ArchiveService {
                 visibilities,
                 request.toPageable()
         );
+
+        PageUtils.validatePageRange(page);
 
         return ArchiveDto.PageListResponse.of(pageTitle, page);
     }
