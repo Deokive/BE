@@ -28,7 +28,7 @@ public class PostController {
     @Operation(summary = "게시글 생성", description = "파일 선업로드 후 받은 fileId들을 포함하여 게시글을 생성합니다.")
     public ResponseEntity<PostDto.Response> createPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Valid @RequestBody PostDto.Request request
+            @Valid @RequestBody PostDto.CreateRequest request
     ) {
         PostDto.Response response = postService.createPost(userPrincipal, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -43,13 +43,12 @@ public class PostController {
         return ResponseEntity.ok(response);
     }
 
-    // DESIGN: PATCH를 고려했는데, 파일 처리의 복잡성을 완화하기 위해 연결을 갈아끼는 방식을 썼음 -> 이때는 PUT이 더 적절하다.
-    @PutMapping("/{postId}")
+    @PatchMapping("/{postId}")
     @Operation(summary = "게시글 수정", description = "게시글 제목, 내용, 카테고리 및 첨부파일 목록을 수정합니다.")
     public ResponseEntity<PostDto.Response> updatePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId,
-            @Valid @RequestBody PostDto.Request request
+            @Valid @RequestBody PostDto.UpdateRequest request
     ) {
         PostDto.Response response = postService.updatePost(userPrincipal, postId, request);
         return ResponseEntity.ok(response);

@@ -73,7 +73,7 @@ public class Post extends UserBaseEntity {
     @Column(nullable = false)
     private Double hotScore = 0.0;
 
-    public void update(PostDto.Request request) {
+    public void update(PostDto.UpdateRequest request) {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
@@ -81,11 +81,9 @@ public class Post extends UserBaseEntity {
         this.content = nonBlankOrDefault(request.getContent(), this.content);
     }
 
-    // TODO: 서비스 로직 Update 로직 점검
     public void updateThumbnail(File file) { this.thumbnailFile = file; }
     public void increaseViewCount() { this.viewCount++; }
 
-    // TODO: 사실 이게 PATCH 패턴 처리 방식. Validation 에서 체크를 해줘서 빈 값 들어올 일은 없긴 한데... 일단 보류. 리팩토링 단계에서 고려
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;
     }

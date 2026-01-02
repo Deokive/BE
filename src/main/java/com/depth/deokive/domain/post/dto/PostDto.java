@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 public class PostDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "게시글 작성 요청 DTO")
-    public static class Request {
+    public static class CreateRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "게시글 제목", example = "짱구는 못말려: 어른 제국의 역습 후기")
         private String title;
@@ -44,7 +44,7 @@ public class PostDto {
         @Schema(description = "첨부된 파일 연결 정보 리스트")
         private List<AttachedFileRequest> files;
 
-        public static Post from(PostDto.Request request, User user) {
+        public static Post from(PostDto.CreateRequest request, User user) {
             return Post.builder()
                     .title(request.getTitle())
                     .content(request.getContent())
@@ -52,6 +52,22 @@ public class PostDto {
                     .user(user)
                     .build();
         }
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "게시글 수정 요청 DTO")
+    public static class UpdateRequest {
+        @Schema(description = "변경할 제목", example = "수정된 제목")
+        private String title;
+
+        @Schema(description = "변경할 본문", example = "수정된 본문 내용")
+        private String content;
+
+        @Schema(description = "변경할 카테고리")
+        private Category category;
+
+        @Schema(description = "변경할 첨부 파일 리스트 (null일 경우 파일 유지, 빈 리스트일 경우 모든 파일 삭제, 값이 있으면 전체 교체)")
+        private List<AttachedFileRequest> files;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -246,7 +262,7 @@ public class PostDto {
             this.postId = postId;
             this.title = title;
             this.category = category;
-            this.thumbnailUrl = ThumbnailUtils.getSmallThumbnailUrl(thumbnailUrl); // TODO: Check isOrigin or realThumbnail
+            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(thumbnailUrl);
             this.writerNickname = writerNickname;
             this.likeCount = likeCount;
             this.viewCount = viewCount;

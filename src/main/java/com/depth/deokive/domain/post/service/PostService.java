@@ -40,13 +40,13 @@ public class PostService {
     private final PostQueryRepository postQueryRepository;
 
     @Transactional
-    public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.Request request) {
+    public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
         // SEQ 1. 작성자 조회
         User foundUser = userRepository.findById(userPrincipal.getUserId())
                 .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
 
         // SEQ 2. 게시글 저장
-        Post post = PostDto.Request.from(request, foundUser);
+        Post post = PostDto.CreateRequest.from(request, foundUser);
         postRepository.save(post);
 
         // SEQ 3. 파일 연결
@@ -73,7 +73,7 @@ public class PostService {
     }
 
     @Transactional
-    public PostDto.Response updatePost(UserPrincipal userPrincipal, Long postId, PostDto.Request request) {
+    public PostDto.Response updatePost(UserPrincipal userPrincipal, Long postId, PostDto.UpdateRequest request) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
@@ -85,8 +85,17 @@ public class PostService {
         post.update(request);
 
         // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
-        postFileMapRepository.deleteAllByPostId(post.getId());
-        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
+        List<PostFileMap> maps;
+
+        // request.getFiles()가 null이면 파일 변경 없음.
+        // 빈 리스트([])가 오면 모든 파일 삭제, 값이 있으면 교체.
+        if (request.getFiles() != null) {
+            postFileMapRepository.deleteAllByPostId(post.getId());
+            maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
+        } else {
+            // 변경사항 없으면 기존 매핑 조회하여 반환
+            maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
+        }
 
         // SEQ 6. Return
         return PostDto.Response.of(post, maps);
