@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
@@ -151,9 +152,6 @@ public class RepostService {
         repostTabRepository.delete(tab);
     }
 
-    /**
-     * 리포스트 목록 페이징 조회
-     */
     @Transactional
     public RepostDto.RepostListResponse getReposts(UserPrincipal userPrincipal, Long archiveId, Long tabId, Pageable pageable) {
         // SEQ 1. 리포스트북 제목 조회
@@ -186,18 +184,16 @@ public class RepostService {
         }
 
         // SEQ 5. 페이지네이션 쿼리
-        Page<RepostDto.Response> pageResult = repostQueryRepository.findByTabId(targetTabId, pageable);
+        Page<RepostDto.Response> page = repostQueryRepository.findByTabId(targetTabId, pageable);
+
+        PageUtils.validatePageRange(page);
 
         List<RepostDto.TabResponse> tabDtos = tabs.stream()
                 .map(RepostDto.TabResponse::of)
                 .toList();
 
-        if (pageable.getPageNumber() > 0 && pageResult.isEmpty()) {
-            throw new RestException(ErrorCode.DB_DATA_NOT_FOUND);
-        }
-
         // SEQ 6. 리턴
-        return RepostDto.RepostListResponse.of(book.getTitle(), targetTabId, tabDtos, pageResult);
+        return RepostDto.RepostListResponse.of(book.getTitle(), targetTabId, tabDtos, page);
     }
 
     // --- Helpers ---
