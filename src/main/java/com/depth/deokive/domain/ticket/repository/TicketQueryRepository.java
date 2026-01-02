@@ -43,16 +43,22 @@ public class TicketQueryRepository {
         List<TicketDto.TicketElementResponse> content = new ArrayList<>();
 
         if (!ids.isEmpty()) {
-            var tickets = queryFactory
-                    .selectFrom(ticket)
-                    .leftJoin(ticket.file, file).fetchJoin() // N+1 방지
+            content = queryFactory
+                    .select(Projections.constructor(TicketDto.TicketElementResponse.class,
+                            ticket.id,
+                            ticket.title,
+                            ticket.date,
+                            ticket.seat,
+                            ticket.location,
+                            ticket.casting,
+                            ticket.createdAt,
+                            ticket.lastModifiedAt,
+                            ticket.originalUrl
+                    ))
+                    .from(ticket)
                     .where(ticket.id.in(ids))
-                    .orderBy(getOrderSpecifiers(pageable)) // 순서 보장
+                    .orderBy(getOrderSpecifiers(pageable))
                     .fetch();
-
-            content = tickets.stream()
-                    .map(TicketDto.TicketElementResponse::new) // DTO 생성자에서 가공 로직 수행
-                    .toList();
         }
 
         // SEQ 3. Count Query

@@ -65,6 +65,7 @@ public class TicketDto {
                     .review(review)
                     .ticketBook(ticketBook)
                     .file(file)
+                    .originalUrl(file != null ? file.getFilePath() : null)
                     .build();
         }
     }
@@ -211,16 +212,20 @@ public class TicketDto {
         private LocalDateTime lastModifiedAt;
 
         @Builder
-        public TicketElementResponse(Ticket ticket) {
-            this.id = ticket.getId();
-            this.title = ticket.getTitle();
-            this.date = ticket.getDate();
-            this.seat = ticket.getSeat();
-            this.location = ticket.getLocation();
-            this.createdAt = ticket.getCreatedAt();
-            this.lastModifiedAt = ticket.getLastModifiedAt();
-            this.thumbnail = ThumbnailUtils.getMediumThumbnailUrl(ticket.getFile().getFilePath());
-            this.casting = truncateCasting(ticket.getCasting());
+        public TicketElementResponse(Long id, String title, LocalDateTime date,
+                                     String seat, String location, String casting,
+                                     LocalDateTime createdAt, LocalDateTime lastModifiedAt,
+                                     String originalUrl) {
+            this.id = id;
+            this.title = title;
+            this.date = date;
+            this.seat = seat;
+            this.location = location;
+            this.casting = truncateCasting(casting);
+            this.createdAt = createdAt;
+            this.lastModifiedAt = lastModifiedAt;
+
+            this.thumbnail = ThumbnailUtils.getMediumThumbnailUrl(originalUrl);
         }
 
         private String truncateCasting(String original) {
