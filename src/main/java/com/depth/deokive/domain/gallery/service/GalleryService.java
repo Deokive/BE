@@ -5,6 +5,8 @@ import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.entity.Gallery;
 import com.depth.deokive.domain.gallery.entity.GalleryBook;
@@ -33,17 +35,20 @@ public class GalleryService {
     private final ArchiveRepository archiveRepository;
     private final GalleryRepository galleryRepository;
     private final FileService fileService;
+    private final FriendMapRepository friendMapRepository;
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public GalleryDto.PageListResponse getGalleries(Long archiveId, Pageable pageable) {
+    public GalleryDto.PageListResponse getGalleries(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
 
-        String galleryBookTitle = galleryBookRepository.findTitleByArchiveId(archiveId)
+        GalleryBook galleryBook = galleryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+
+        validateReadPermission(galleryBook.getArchive(), userPrincipal);
 
         Page<GalleryDto.Response> page = galleryQueryRepository.searchGalleriesByArchive(archiveId, pageable);
 
-        return GalleryDto.PageListResponse.of(galleryBookTitle, page);
+        return GalleryDto.PageListResponse.of(galleryBook.getTitle(), page);
     }
 
     @Transactional
@@ -113,5 +118,32 @@ public class GalleryService {
         if (!ownerId.equals(userPrincipal.getUserId())) {
             throw new RestException(ErrorCode.AUTH_FORBIDDEN);
         }
+    }
+
+    private void validateReadPermission(Archive archive, UserPrincipal userPrincipal) {
+        Long ownerId = archive.getUser().getId();
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+
+        if (ownerId.equals(viewerId)) return; // 주인은 프리패스
+
+        switch (archive.getVisibility()) {
+            case PRIVATE -> throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+            case RESTRICTED -> {
+                if (!checkFriendRelationship(viewerId, ownerId)) {
+                    throw new RestException(ErrorCode.AUTH_FORBIDDEN);
+                }
+            }
+            case PUBLIC -> { /* Pass */ }
+        }
+    }
+
+    private boolean checkFriendRelationship(Long viewerId, Long ownerId) {
+        if (viewerId == null) return false;
+
+        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                viewerId,
+                ownerId,
+                FriendStatus.ACCEPTED
+        );
     }
 }
