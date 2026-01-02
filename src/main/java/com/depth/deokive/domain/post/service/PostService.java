@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
@@ -122,11 +123,12 @@ public class PostService {
     @ExecutionTime
     @Transactional(readOnly = true)
     public PostDto.PageListResponse getPosts(PostDto.PostPageRequest request) {
-        // TODO: Check -> QueryDSL을 사용한 No-Offset Optimization (Category Filter 적용)
         Page<PostDto.PostPageResponse> page = postQueryRepository.searchPostFeed(
                 request.getCategory(),
                 request.toPageable()
         );
+
+        PageUtils.validatePageRange(page);
 
         String title = (request.getCategory() != null)
                 ? request.getCategory().name() + " 게시판"
