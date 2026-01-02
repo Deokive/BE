@@ -31,10 +31,10 @@ public class GalleryController {
          schema = @Schema(implementation = GalleryDto.PageListResponse.class)))
     public ResponseEntity<GalleryDto.PageListResponse> getGalleries(
             @PathVariable Long archiveId,
-            // @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @ModelAttribute GalleryDto.GalleryPageRequest pageRequest
     ) {
-        GalleryDto.PageListResponse response = galleryService.getGalleries(archiveId, pageRequest.toPageable());
+        GalleryDto.PageListResponse response = galleryService.getGalleries(userPrincipal, archiveId, pageRequest.toPageable());
         return ResponseEntity.ok(response);
     }
 
