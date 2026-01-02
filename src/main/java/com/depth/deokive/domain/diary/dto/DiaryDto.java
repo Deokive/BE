@@ -1,6 +1,5 @@
 package com.depth.deokive.domain.diary.dto;
 
-import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.entity.Diary;
@@ -196,7 +195,7 @@ public class DiaryDto {
         public DiaryPageResponse(Long diaryId, String title, String thumbnailUrl, LocalDate recordedAt, Visibility visibility) {
             this.diaryId = diaryId;
             this.title = title;
-            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(thumbnailUrl);
+            this.thumbnailUrl = thumbnailUrl;
             this.recordedAt = recordedAt;
             this.visibility = visibility;
         }
