@@ -100,6 +100,8 @@ public class PostQueryRepository {
             orders.add(new OrderSpecifier<>(Order.DESC, post.id));
         }
 
+        orders.add(new OrderSpecifier<>(Order.DESC, post.id));
+
         return orders.toArray(new OrderSpecifier[0]);
     }
 }
