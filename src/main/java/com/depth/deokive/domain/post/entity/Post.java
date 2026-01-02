@@ -56,10 +56,8 @@ public class Post extends UserBaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // Denormalization Fields for Pagination Performance
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "thumbnail_file_id")
-    private File thumbnailFile; // 리스트 조회 시 조인 비용 제거를 위한 썸네일 직접 참조
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl; // Denormalization Fields for Pagination Performance
 
     @Builder.Default
     @Column(nullable = false)
@@ -81,7 +79,7 @@ public class Post extends UserBaseEntity {
         this.content = nonBlankOrDefault(request.getContent(), this.content);
     }
 
-    public void updateThumbnail(File file) { this.thumbnailFile = file; }
+    public void updateThumbnail(String thumbnailPath) { this.thumbnailUrl = thumbnailPath; }
     public void increaseViewCount() { this.viewCount++; }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {

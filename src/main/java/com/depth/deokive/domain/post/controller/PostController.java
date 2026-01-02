@@ -73,7 +73,7 @@ public class PostController {
             description = "조회 성공",
             content = @Content(schema = @Schema(implementation = PostDto.PageListResponse.class)))
     public ResponseEntity<PostDto.PageListResponse> getPosts(
-            @Valid @ModelAttribute PostDto.FeedRequest request
+            @Valid @ModelAttribute PostDto.PostPageRequest request
     ) {
         PostDto.PageListResponse response = postService.getPosts(request);
         return ResponseEntity.ok(response);

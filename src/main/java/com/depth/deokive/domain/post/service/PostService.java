@@ -120,9 +120,9 @@ public class PostService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public PostDto.PageListResponse getPosts(PostDto.FeedRequest request) {
+    public PostDto.PageListResponse getPosts(PostDto.PostPageRequest request) {
         // TODO: Check -> QueryDSL을 사용한 No-Offset Optimization (Category Filter 적용)
-        Page<PostDto.FeedResponse> page = postQueryRepository.searchPostFeed(
+        Page<PostDto.PostPageResponse> page = postQueryRepository.searchPostFeed(
                 request.getCategory(),
                 request.toPageable()
         );
@@ -184,16 +184,16 @@ public class PostService {
         // SEQ 8. 대표 썸네일 선정 로직
         // 1순위: MediaRole.PREVIEW
         // 2순위: Sequence (0번)
-        File thumbnailCandidate = savedMaps.stream()
+        String thumbnailPath = savedMaps.stream()
                 .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
                 .findFirst()
-                .map(PostFileMap::getFile)
+                .map(map -> map.getFile().getFilePath()) // 경로 추출
                 .orElseGet(() -> savedMaps.stream()
                         .min(Comparator.comparingInt(PostFileMap::getSequence))
-                        .map(PostFileMap::getFile)
+                        .map(map -> map.getFile().getFilePath()) // 경로 추출
                         .orElse(null));
 
-        post.updateThumbnail(thumbnailCandidate); // Post 엔티티에 역정규화 저장
+        post.updateThumbnail(thumbnailPath);
 
         return savedMaps;
     }

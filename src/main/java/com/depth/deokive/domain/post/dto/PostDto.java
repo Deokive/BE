@@ -192,7 +192,7 @@ public class PostDto {
     // DESCRIPTION: PAGINATION DTOS
     @Data @NoArgsConstructor
     @Schema(description = "게시글 피드 목록 조회 요청 DTO")
-    public static class FeedRequest {
+    public static class PostPageRequest {
         @Min(value = 0)
         @Schema(description = "페이지 번호 (0부터 시작)", example = "0")
         private int page = 0;
@@ -222,8 +222,8 @@ public class PostDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "게시글 피드 응답 DTO (Lightweight)")
-    public static class FeedResponse {
+    @Schema(description = "게시글 응답 DTO (Lightweight)")
+    public static class PostPageResponse {
         @Schema(description = "게시글 ID", example = "1")
         private Long postId;
 
@@ -256,7 +256,7 @@ public class PostDto {
         private LocalDateTime lastModifiedAt;
 
         @QueryProjection // Q-Class 생성용
-        public FeedResponse(Long postId, String title, Category category, String thumbnailUrl,
+        public PostPageResponse(Long postId, String title, Category category, String thumbnailUrl,
                             String writerNickname, Long likeCount, Long viewCount, Double hotScore,
                             LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
             this.postId = postId;
@@ -279,12 +279,12 @@ public class PostDto {
         private String pageTitle;
         
         @Schema(description = "게시글 목록")
-        private List<FeedResponse> content;
+        private List<PostPageResponse> content;
         
         @Schema(description = "페이징 정보")
         private PageInfo page;
 
-        public static PageListResponse of(String pageTitle, Page<FeedResponse> pageData) {
+        public static PageListResponse of(String pageTitle, Page<PostPageResponse> pageData) {
             return PageListResponse.builder()
                     .pageTitle(pageTitle)
                     .content(pageData.getContent())
