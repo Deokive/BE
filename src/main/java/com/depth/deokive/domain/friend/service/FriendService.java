@@ -196,4 +196,27 @@ public class FriendService {
         myMap.updateStatus(FriendStatus.CANCELED);
         friendMap.updateStatus(FriendStatus.CANCELED);
     }
+
+    /**
+     * 친구 끊기 취소(recover)
+     */
+    @Transactional
+    public void recoverFriendRequest(UserPrincipal userPrincipal, Long friendId) {
+        Long userId = userPrincipal.getUserId(); // 나
+
+        // SEQ 1. 관계 조회(나 -> 친구)
+        FriendMap myMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
+
+        // SEQ 2. 상태 검증(CANCELED일 떄만 가능)
+        if(myMap.getFriendStatus() != FriendStatus.CANCELED) {
+            throw new RestException(ErrorCode.FRIEND_NOT_CANCELED_BAD_REQUEST);
+        }
+
+        // SEQ 3. 상태 변경
+        myMap.updateStatus(FriendStatus.ACCEPTED);
+
+        User me = userRepository.getReferenceById(userId);
+        myMap.updateRequestedBy(me);
+    }
 }
