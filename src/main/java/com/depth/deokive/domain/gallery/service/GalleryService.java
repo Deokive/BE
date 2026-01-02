@@ -68,6 +68,7 @@ public class GalleryService {
                         .archiveId(archiveId)
                         .galleryBook(galleryBook)
                         .file(file)
+                        .originalUrl(file.getFilePath())
                         .build())
                 .collect(Collectors.toList());
 

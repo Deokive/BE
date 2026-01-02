@@ -36,13 +36,12 @@ public class GalleryDto {
         private LocalDateTime lastModifiedAt;
 
         @Builder
-        public Response(Long id, String filePath, LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
+        public Response(Long id, String originalUrl, LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
             this.id = id;
             this.createdAt = createdAt;
             this.lastModifiedAt = lastModifiedAt;
-
-            this.originalUrl = filePath;
-            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(filePath);
+            this.originalUrl = originalUrl;
+            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(originalUrl);
         }
     }
 
@@ -143,7 +142,6 @@ public class GalleryDto {
     @Schema(description = "갤러리북 제목 수정 요청 DTO")
     public static class UpdateTitleRequest {
         @NotBlank(message = "제목은 필수입니다.")
-        // @Size(max = 50, message = "제목은 50자를 초과할 수 없습니다.")
         @Schema(description = "변경할 갤러리북 제목", example = "2024 제주도 여행 (수정됨)")
         private String title;
     }

@@ -41,4 +41,6 @@ public class Gallery extends TimeBaseEntity {
     @JoinColumn(name = "file_id", nullable = false)
     private File file;
 
+    @Column(name = "original_url")
+    private String originalUrl; // originalUrl과 thumbnailUrl 둘 다 쓰일거라면, 이거 하나 두고 Utils로 동적 변환
 }

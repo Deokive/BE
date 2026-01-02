@@ -46,12 +46,11 @@ public class GalleryQueryRepository {
             content = queryFactory
                     .select(Projections.constructor(GalleryDto.Response.class,
                             gallery.id,
-                            file.filePath,
+                            gallery.originalUrl,
                             gallery.createdAt,
                             gallery.lastModifiedAt
                     ))
                     .from(gallery)
-                    .join(gallery.file, file) // N+1 방지
                     .where(gallery.id.in(ids))
                     .orderBy(getOrderSpecifiers(pageable)) // IN절 순서 보장을 위해 재정렬
                     .fetch();
