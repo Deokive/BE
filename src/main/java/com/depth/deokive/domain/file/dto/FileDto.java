@@ -13,29 +13,6 @@ import java.util.List;
 
 public class FileDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "파일 업로드 요청 DTO")
-    public static class UploadFileRequest {
-        @Schema(description = "원본 파일명", example = "image.jpg")
-        private String originalFileName;
-        
-        @Schema(description = "MIME 타입", example = "image/jpeg")
-        private String mimeType;
-        
-        @Schema(description = "파일 크기 (bytes)", example = "102400")
-        private Long fileSize;
-        
-        @Schema(description = "미디어 역할 (CONTENT: 본문, PREVIEW: 썸네일/대표)", example = "CONTENT")
-        private MediaRole mediaRole; // CONTENT or PREVIEW
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "다중 파일 업로드 요청 DTO")
-    public static class UploadFilesRequest {
-        @Schema(description = "업로드할 파일 리스트")
-        private List<UploadFileRequest> files;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "파일 업로드 응답 DTO")
     public static class UploadFileResponse {
         @Schema(description = "파일 아이디", example = "1")
@@ -75,14 +52,6 @@ public class FileDto {
         }
     }
 
-    // DESCRIPTION: 단일 업로드를 병렬 처리하는게 더 속도 있음 -> 불필요한 DTO일 지도 모름
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "다중 파일 업로드 응답 DTO")
-    public static class UploadFilesResponse {
-        @Schema(description = "업로드된 파일 리스트")
-        private List<UploadFileResponse> files;
-    }
-
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(description = "멀티파트 업로드 초기화 요청 DTO")
     public static class MultipartUploadInitiateRequest {
@@ -94,8 +63,8 @@ public class FileDto {
         
         @Schema(description = "파일 크기 (bytes)", example = "104857600")
         private Long fileSize;
-        
-        @Schema(description = "미디어 역할", example = "CONTENT")
+
+        @Schema(description = "미디어 역할 (CONTENT: 본문, PREVIEW: 썸네일/대표)", example = "CONTENT")
         private MediaRole mediaRole;
     }
 

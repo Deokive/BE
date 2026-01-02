@@ -38,20 +38,13 @@ public class FileService {
     private final S3Service s3Service;
     private final FileRepository fileRepository;
 
-    @Value("${cdn.base-url:#{null}}")
-    private String cdnBaseUrl;
+    @Value("${cdn.base-url:#{null}}") private String cdnBaseUrl;
 
-    @Value("${spring.cloud.aws.s3.bucket}")
-    private String bucketName;
-
-    /**
-     * 멀티파트 업로드 초기화 (모든 파일 타입: 이미지, 동영상 등)
-     * PresignedUrl 방식으로 통일
-     */
+    /** 멀티파트 업로드 초기화 (모든 파일 타입: 이미지, 동영상 등) */
     public FileDto.MultipartUploadInitiateResponse initiateMultipartUpload(
             FileDto.MultipartUploadInitiateRequest request
     ) {
-        log.info("🚀 [FileService] 멀티파트 업로드 초기화 시작 - filename: {}, size: {} bytes",
+        log.info("1️⃣[FileService] 멀티파트 업로드 초기화 시작 - filename: {}, size: {} bytes",
                 request.getOriginalFileName(), request.getFileSize());
 
         // S3 멀티파트 업로드 초기화
@@ -62,12 +55,12 @@ public class FileService {
                 .build();
 
         S3ServiceDto.UploadInitiateResponse s3Response = s3Service.initiateUpload(s3Request);
-        log.info("✅ [FileService] S3 멀티파트 업로드 초기화 완료 - key: {}, uploadId: {}",
+        log.info("2️⃣ [FileService] S3 멀티파트 업로드 초기화 완료 - key: {}, uploadId: {}",
                 s3Response.getKey(), s3Response.getUploadId());
 
         // Part 개수 계산
         Integer partCount = s3Service.calculatePartCount(request.getFileSize());
-        log.info("📊 [FileService] Part 개수 계산 완료 - partCount: {}", partCount);
+        log.info("3️⃣ [FileService] Part 개수 계산 완료 - partCount: {}", partCount);
 
         // 각 Part에 대한 Presigned URL 생성
         S3ServiceDto.PartPresignedUrlRequest partRequest = S3ServiceDto.PartPresignedUrlRequest.builder()
@@ -77,7 +70,7 @@ public class FileService {
                 .build();
 
         List<S3ServiceDto.PartPresignedUrlResponse> partPresignedUrls = s3Service.generatePartPresignedUrls(partRequest);
-        log.info("🔑 [FileService] Presigned URL 생성 완료 - 총 {}개", partPresignedUrls.size());
+        log.info("4️⃣ [FileService] Presigned URL 생성 완료 - 총 {}개", partPresignedUrls.size());
 
         // DTO 변환
         List<FileDto.PartPresignedUrl> partPresignedUrlList = partPresignedUrls.stream()
@@ -88,7 +81,7 @@ public class FileService {
                         .build())
                 .collect(Collectors.toList());
 
-        log.info("🎯 [FileService] 멀티파트 업로드 초기화 응답 준비 완료 - key: {}, uploadId: {}, partCount: {}",
+        log.info("🟢 [FileService] 멀티파트 업로드 초기화 응답 준비 완료 - key: {}, uploadId: {}, partCount: {}",
                 s3Response.getKey(), s3Response.getUploadId(), partCount);
 
         return FileDto.MultipartUploadInitiateResponse.builder()
@@ -132,7 +125,7 @@ public class FileService {
                 .build();
 
         CompleteMultipartUploadResponse s3Response = s3Service.completeUpload(s3Request);
-        log.info("✅ [FileService] S3 멀티파트 업로드 완료 - location: {}, etag: {}",
+        log.info("1️⃣ [FileService] S3 멀티파트 업로드 완료 - location: {}, etag: {}",
                 s3Response.location(), s3Response.eTag());
 
         // 업로드된 파일의 URL 가져오기
@@ -157,12 +150,12 @@ public class FileService {
                 .build();
 
         fileEntity = fileRepository.save(fileEntity);
-        log.info("💾 [FileService] File 엔티티 저장 완료 - fileId: {}, filename: {}",
+        log.info("2️⃣ [FileService] File 엔티티 저장 완료 - fileId: {}, filename: {}",
                 fileEntity.getId(), fileEntity.getFilename());
 
         // 참고: 썸네일은 DB에 저장하지 않고, 조회 시 getThumbnailUrl()로 동적 생성 (패턴 4)
 
-        log.info("🎉 [FileService] 멀티파트 업로드 완료 - fileId: {}", fileEntity.getId());
+        log.info("🟢 [FileService] 멀티파트 업로드 완료 - fileId: {}", fileEntity.getId());
 
         return fileEntity;
     }
@@ -175,7 +168,7 @@ public class FileService {
                 .uploadId(uploadId)
                 .build();
         s3Service.abortUpload(request);
-        log.info("✅ [FileService] 멀티파트 업로드 취소 완료 - key: {}, uploadId: {}", key, uploadId);
+        log.info("🟢 [FileService] 멀티파트 업로드 취소 완료 - key: {}, uploadId: {}", key, uploadId);
     }
 
     @Transactional(readOnly = true)
