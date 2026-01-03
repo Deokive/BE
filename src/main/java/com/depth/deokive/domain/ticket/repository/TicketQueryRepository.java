@@ -91,6 +91,8 @@ public class TicketQueryRepository {
             orders.add(new OrderSpecifier<>(Order.DESC, ticket.createdAt));
         }
 
+        orders.add(new OrderSpecifier<>(Order.DESC, ticket.id));
+
         return orders.toArray(new OrderSpecifier[0]);
     }
 }

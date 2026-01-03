@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.ticket.service;
 
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.file.entity.File;
@@ -75,10 +76,8 @@ public class TicketService {
         // SEQ 3. 페이지네이션 조회
         Page<TicketDto.TicketElementResponse> ticketPage = ticketQueryRepository.searchTicketsByBook(archiveId, pageable);
 
-        // SEQ 4. Index 범위 벗어나면 404에러
-        if(pageable.getPageNumber() > 0 && pageable.getPageNumber() >= ticketPage.getTotalPages()) {
-            throw new RestException(ErrorCode.DB_DATA_NOT_FOUND);
-        }
+        // SEQ 4. Page Range Validation
+        PageUtils.validatePageRange(ticketPage);
 
         return TicketDto.PageListResponse.of(ticketBook.getTitle(), ticketPage);
     }
