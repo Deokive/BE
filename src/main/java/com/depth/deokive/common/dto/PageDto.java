@@ -48,7 +48,7 @@ public class PageDto {
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     @Schema(description = "공통 페이징 응답 Wrapper")
-    public class PageListResponse<T> {
+    public static class PageListResponse<T> {
 
         @Schema(description = "페이지 타이틀")
         private String title;
