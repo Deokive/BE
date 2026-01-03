@@ -3,7 +3,7 @@ package com.depth.deokive.domain.friend.service;
 import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
-import com.depth.deokive.domain.notification.NotificationService;
+import com.depth.deokive.domain.notification.service.NotificationService;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;
@@ -80,7 +80,7 @@ public class FriendService {
             friendMapRepository.save(newMap);
         }
 
-        // SEQ 5. 비동기 알림
+        // SEQ 5. 알림
         notificationService.sendFriendRequestNotification(friendId, userId);
     }
 
@@ -91,40 +91,45 @@ public class FriendService {
     public void acceptFriendRequest(UserPrincipal userPrincipal, Long friendId) {
         Long userId = userPrincipal.getUserId();
 
-        // SEQ 1. 요청 데이터 확인
-        // 상대방이 나한테 보내는 요청 찾기
-        FriendMap requestMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
-                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_NOT_FOUND));
-
-        // SEQ 2. 상태 검증
-        if(requestMap.getFriendStatus() != FriendStatus.PENDING) {
-            throw new RestException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        // SEQ 1. 자기 자신에게 친구 요청을 수락한 경우
+        if (userId.equals(friendId)) {
+            throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
-        // SEQ 3. 상대방 관계 ACCEPTED로 최신화(상대방 -> 나(ACCEPTED))
+        boolean isAlreadyFriend = friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                userId, friendId, FriendStatus.ACCEPTED);
+
+        // SEQ 2. 이미 친구인 경우
+        if (isAlreadyFriend) {
+            throw new RestException(ErrorCode.FRIEND_ALREADY_EXISTS);
+        }
+
+        // SEQ 3. 요청 데이터 확인 -> 데이터가 없거나, PENDING이 아니면 -> 에러
+        FriendMap requestMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
+                .filter(map -> map.getFriendStatus() == FriendStatus.PENDING)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
+
+        // SEQ 4. 상대방 관계 ACCEPTED로 최신화(상대방 -> 나(ACCEPTED))
         requestMap.updateStatus(FriendStatus.ACCEPTED);
 
-        // SEQ 4. 내 관계 생성/업데이트(나 -> 상대방(ACCEPTED))
+        // SEQ 5. 내 관계 생성/업데이트(나 -> 상대방(ACCEPTED))
         User me = userRepository.getReferenceById(userId);
         User friend = userRepository.getReferenceById(friendId);
 
         Optional<FriendMap> myMapOptional = friendMapRepository.findByUserIdAndFriendId(userId, friendId);
 
-        if(myMapOptional.isPresent()) {
-            FriendMap myMap = myMapOptional.get();
-            myMap.updateStatus(FriendStatus.ACCEPTED);
-        } else {
-            FriendMap newMap = FriendMap.builder()
-                    .user(me)
-                    .friend(friend)
-                    .friendStatus(FriendStatus.ACCEPTED)
-                    .requestedBy(me)
-                    .build();
-            friendMapRepository.save(newMap);
-        }
+        FriendMap myMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
+                .orElse(FriendMap.builder()
+                        .user(me)
+                        .friend(friend)
+                        .requestedBy(me)
+                        .build());
 
-        // SEQ 5. 알림
-        notificationService.sendFriendRequestNotification(friendId, userId);
+        myMap.updateStatus(FriendStatus.ACCEPTED);
+        friendMapRepository.save(myMap);
+
+        // SEQ 6. 알림
+        notificationService.sendFriendAcceptNotification(friendId, userId);
     }
 
     /**
@@ -134,16 +139,25 @@ public class FriendService {
     public void rejectFriendRequest(UserPrincipal userPrincipal, Long friendId) {
         Long userId = userPrincipal.getUserId();
 
-        // SEQ 1. 거절할 요청 데이터 확인(상대방 -> 나)
-        FriendMap requestMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
-                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
-
-        // SEQ 2. 상태 검증
-        if(requestMap.getFriendStatus() != FriendStatus.PENDING) {
-            throw new RestException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        // SEQ 1. 자기 자신일 때
+        if (userId.equals(friendId)) {
+            throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
-        // SEQ 3. 상태 변경
+        // SEQ 2. 이미 친구일 때
+        boolean isAlreadyFriend = friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
+                userId, friendId, FriendStatus.ACCEPTED);
+
+        if (isAlreadyFriend) {
+            throw new RestException(ErrorCode.FRIEND_ALREADY_EXISTS);
+        }
+
+        // SEQ 3. 요청 데이터 확인 -> 데이터가 없거나, PENDING이 아니면 -> 에러
+        FriendMap requestMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
+                .filter(map -> map.getFriendStatus() == FriendStatus.PENDING)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
+
+        // SEQ 4. 상태 변경
         requestMap.updateStatus(FriendStatus.REJECTED);
     }
 
@@ -154,14 +168,14 @@ public class FriendService {
     public void friendRequest(UserPrincipal userPrincipal, Long friendId) {
         Long userId = userPrincipal.getUserId(); // 나
 
+        // 자기 자신일 때
+        if (userId.equals(friendId)) {
+            throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
+        }
+
         // SEQ 1. 내가 보낸 요청 데이터 확인 (나 -> 상대방)
         FriendMap sentMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
-                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
-
-        // SEQ 2. 내가 보낸 요청인지 재확인
-        if (!sentMap.getRequestedBy().getId().equals(userId)) {
-            throw new RestException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
-        }
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_SEND_REQUEST_NOT_FOUND));
 
         // SEQ 3. 상태 검증
         if (sentMap.getFriendStatus() != FriendStatus.PENDING) {
@@ -178,6 +192,11 @@ public class FriendService {
     @Transactional
     public void cancelFriendRequest(UserPrincipal userPrincipal, Long friendId) {
         Long userId = userPrincipal.getUserId(); // 나
+
+        // 자기 자신일 때
+        if (userId.equals(friendId)) {
+            throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
+        }
 
         // SEQ 1. 관계 조회(나 -> 친구)
         FriendMap myMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
@@ -204,13 +223,26 @@ public class FriendService {
     public void recoverFriendRequest(UserPrincipal userPrincipal, Long friendId) {
         Long userId = userPrincipal.getUserId(); // 나
 
+        // 자기 자신일 때
+        if (userId.equals(friendId)) {
+            throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
+        }
+
         // SEQ 1. 관계 조회(나 -> 친구)
         FriendMap myMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
-                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_CANCELED_NOT_FOUND));
+
+        FriendMap friendMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_CANCELED_NOT_FOUND));
 
         // SEQ 2. 상태 검증(CANCELED일 떄만 가능)
+        if (myMap.getFriendStatus() == FriendStatus.ACCEPTED) {
+            throw new RestException(ErrorCode.FRIEND_ALREADY_EXISTS);
+        }
+
+        // CANCELED 상태가 아닐 때
         if(myMap.getFriendStatus() != FriendStatus.CANCELED) {
-            throw new RestException(ErrorCode.FRIEND_NOT_CANCELED_BAD_REQUEST);
+            throw new RestException(ErrorCode.FRIEND_RECOVER_BAD_REQUEST);
         }
 
         // SEQ 3. 상태 변경
