@@ -130,9 +130,10 @@ public class PostService {
 
         PageUtils.validatePageRange(page);
 
-        String title = (request.getCategory() != null)
-                ? request.getCategory().name() + " 게시판"
-                : "전체 게시판";
+        String title;
+        if (request.getCategory() == null) { title = "전체 게시판"; }
+        else if ("hotScore".equals(request.getSort())) { title = "핫한 게시판"; }
+        else { title = request.getCategory().name() + " 게시판"; }
 
         return PostDto.PageListResponse.of(title, page);
     }
