@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.event.service;
 
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.event.dto.EventDto;
 import com.depth.deokive.domain.event.entity.*;
@@ -24,7 +24,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 

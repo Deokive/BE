@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.diary.entity;
 
 import com.depth.deokive.common.auditor.UserBaseEntity;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

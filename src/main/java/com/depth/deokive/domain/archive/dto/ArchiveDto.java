@@ -1,9 +1,8 @@
 package com.depth.deokive.domain.archive.dto;
 
-import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -16,13 +15,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 public class ArchiveDto {
 

@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.diary.service;
 
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;

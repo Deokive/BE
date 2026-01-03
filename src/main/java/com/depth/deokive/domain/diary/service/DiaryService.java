@@ -4,7 +4,7 @@ import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;

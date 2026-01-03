@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.gallery.repository;
 
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaType;

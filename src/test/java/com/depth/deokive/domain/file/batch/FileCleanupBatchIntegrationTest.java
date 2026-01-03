@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.file.batch;
 
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
@@ -194,7 +195,7 @@ class FileCleanupBatchIntegrationTest {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             User u = em.merge(testUser);
             File f = em.merge(banner);
-            Archive archive = Archive.builder().title("A").user(u).bannerFile(f).visibility(com.depth.deokive.domain.archive.entity.enums.Visibility.PUBLIC).build();
+            Archive archive = Archive.builder().title("A").user(u).bannerFile(f).visibility(Visibility.PUBLIC).build();
             em.persist(archive);
         });
     }
@@ -226,12 +227,12 @@ class FileCleanupBatchIntegrationTest {
             User u = em.merge(testUser);
             File f = em.merge(file);
             // DiaryBook(Archive) 필요
-            Archive archive = Archive.builder().title("DiaryBook").user(u).visibility(com.depth.deokive.domain.archive.entity.enums.Visibility.PUBLIC).build();
+            Archive archive = Archive.builder().title("DiaryBook").user(u).visibility(Visibility.PUBLIC).build();
             em.persist(archive);
             DiaryBook book = DiaryBook.builder().archive(archive).title("DB").build();
             em.persist(book);
 
-            Diary diary = Diary.builder().title("D").content("C").color("#000000").recordedAt(LocalDate.now()).visibility(com.depth.deokive.domain.archive.entity.enums.Visibility.PUBLIC).diaryBook(book).build();
+            Diary diary = Diary.builder().title("D").content("C").color("#000000").recordedAt(LocalDate.now()).visibility(Visibility.PUBLIC).diaryBook(book).build();
             em.persist(diary);
 
             DiaryFileMap map = DiaryFileMap.builder().diary(diary).file(f).mediaRole(MediaRole.CONTENT).sequence(0).build();
@@ -243,7 +244,7 @@ class FileCleanupBatchIntegrationTest {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             User u = em.merge(testUser);
             File f = em.merge(file);
-            Archive archive = Archive.builder().title("TicketBook").user(u).visibility(com.depth.deokive.domain.archive.entity.enums.Visibility.PUBLIC).build();
+            Archive archive = Archive.builder().title("TicketBook").user(u).visibility(Visibility.PUBLIC).build();
             em.persist(archive);
             TicketBook book = TicketBook.builder().archive(archive).title("TB").build();
             em.persist(book);
@@ -257,7 +258,7 @@ class FileCleanupBatchIntegrationTest {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             User u = em.merge(testUser);
             File f = em.merge(file);
-            Archive archive = Archive.builder().title("GalleryBook").user(u).visibility(com.depth.deokive.domain.archive.entity.enums.Visibility.PUBLIC).build();
+            Archive archive = Archive.builder().title("GalleryBook").user(u).visibility(Visibility.PUBLIC).build();
             em.persist(archive);
             GalleryBook book = GalleryBook.builder().archive(archive).title("GB").build();
             em.persist(book);

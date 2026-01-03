@@ -1,6 +1,6 @@
 package com.depth.deokive.domain.diary.repository;
 
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.dto.QDiaryDto_DiaryPageResponse;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -13,7 +13,6 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static com.depth.deokive.domain.diary.entity.QDiary.diary;

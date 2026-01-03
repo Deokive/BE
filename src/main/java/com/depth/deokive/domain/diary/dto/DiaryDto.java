@@ -1,8 +1,7 @@
 package com.depth.deokive.domain.diary.dto;
 
-import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
 import com.depth.deokive.domain.diary.entity.DiaryFileMap;
@@ -16,7 +15,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;

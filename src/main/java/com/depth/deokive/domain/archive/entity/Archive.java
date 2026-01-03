@@ -4,7 +4,7 @@ import com.depth.deokive.common.auditor.TimeBaseEntity;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.gallery.entity.GalleryBook;

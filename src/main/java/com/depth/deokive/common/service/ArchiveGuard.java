@@ -1,7 +1,7 @@
 package com.depth.deokive.common.service;
 
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;

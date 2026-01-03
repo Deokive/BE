@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.depth.deokive.domain.archive.entity.*;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.*;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
 import com.depth.deokive.domain.diary.repository.DiaryFileMapRepository;

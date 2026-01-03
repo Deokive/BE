@@ -4,7 +4,7 @@ import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.ArchiveLike;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.ArchiveLikeRepository;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.archive.scheduler.ArchiveBadgeScheduler;
