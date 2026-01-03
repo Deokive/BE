@@ -2,18 +2,17 @@ package com.depth.deokive.common.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Schema(description = "공통 페이지 메타데이터")
 public class PageDto {
 
+    @Data @NoArgsConstructor @AllArgsConstructor
     public static class PageInfo {
         @Schema(description = "페이지 크기", example = "10")
         private int size;
@@ -44,6 +43,28 @@ public class PageDto {
             this.hasPrev = page.hasPrevious();
             this.hasNext = page.hasNext();
             this.empty = page.isEmpty();
+        }
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    @Schema(description = "공통 페이징 응답 Wrapper")
+    public class PageListResponse<T> {
+
+        @Schema(description = "페이지 타이틀")
+        private String title;
+
+        @Schema(description = "데이터 목록")
+        private List<T> content;
+
+        @Schema(description = "페이징 메타데이터")
+        private PageDto.PageInfo page;
+
+        public static <T> PageListResponse<T> of(String title, Page<T> pageData) {
+            return PageListResponse.<T>builder()
+                    .title(title)
+                    .content(pageData.getContent())
+                    .page(new PageDto.PageInfo(pageData))
+                    .build();
         }
     }
 }
