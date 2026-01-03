@@ -23,7 +23,7 @@ public class FileDto {
         private String filename;
 
         @Schema(description = "CDN URL (파일 경로)", example = "https://cdn.example.com/files/uuid_filename.jpg")
-        private String cdnUrl; // filePath
+        private String cdnUrl;
 
         @Schema(description = "파일 크기 (bytes)", example = "102400")
         private Long fileSize;
