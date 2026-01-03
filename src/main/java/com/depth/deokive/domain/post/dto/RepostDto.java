@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.dto;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.post.entity.Repost;
 import com.depth.deokive.domain.post.entity.RepostTab;
@@ -174,7 +175,7 @@ public class RepostDto {
         private List<RepostElementResponse> content;
 
         @Schema(description = "페이지 메타데이터")
-        private PageInfo page;
+        private PageDto.PageInfo page;
 
         public static RepostListResponse of(
                 String title, Long currentTabId, List<TabResponse> tabs, Page<RepostElementResponse> pageData) {
@@ -183,29 +184,8 @@ public class RepostDto {
                     .tabId(currentTabId)
                     .tab(tabs)
                     .content(pageData.getContent())
-                    .page(new PageInfo(pageData))
+                    .page(new PageDto.PageInfo(pageData))
                     .build();
-        }
-    }
-
-    @Data @AllArgsConstructor
-    public static class PageInfo {
-        private int size;
-        private int pageNumber;
-        private long totalElements;
-        private int totalPages;
-        private boolean hasPrev;
-        private boolean hasNext;
-        private boolean empty;
-
-        public PageInfo(Page<?> page) {
-            this.size = page.getSize();
-            this.pageNumber = page.getNumber();
-            this.totalElements = page.getTotalElements();
-            this.totalPages = page.getTotalPages();
-            this.hasPrev = page.hasPrevious();
-            this.hasNext = page.hasNext();
-            this.empty = page.isEmpty();
         }
     }
 }

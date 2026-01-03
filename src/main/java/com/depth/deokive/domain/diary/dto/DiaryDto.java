@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.diary.dto;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
-import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.entity.Diary;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
@@ -22,7 +22,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -212,13 +211,13 @@ public class DiaryDto {
         private List<DiaryPageResponse> content;
 
         @Schema(description = "페이징 메타데이터")
-        private ArchiveDto.PageInfo page; // ArchiveDto 재사용을 일단 여기서 했는데, 리팩터링 때 아예 common 쪽으로 옮겨버릴 것
+        private PageDto.PageInfo page;
 
         public static PageListResponse of(String bookTitle, Page<DiaryPageResponse> pageData) {
             return PageListResponse.builder()
                     .bookTitle(bookTitle)
                     .content(pageData.getContent())
-                    .page(new ArchiveDto.PageInfo(pageData))
+                    .page(new PageDto.PageInfo(pageData))
                     .build();
         }
     }
