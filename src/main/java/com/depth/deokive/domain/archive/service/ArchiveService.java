@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.archive.service;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
@@ -228,7 +229,7 @@ public class ArchiveService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getGlobalFeed(ArchiveDto.ArchivePageRequest request) {
+    public PageDto.PageListResponse<ArchiveDto.ArchivePageResponse> getGlobalFeed(ArchiveDto.ArchivePageRequest request) {
         // 무조건 PUBLIC & 전체 유저 대상
         Page<ArchiveDto.ArchivePageResponse> page = archiveQueryRepository.searchArchiveFeed(
                 null, // filterUserId
@@ -240,12 +241,12 @@ public class ArchiveService {
 
         String title = "hotScore".equals(request.getSort()) ? "지금 핫한 피드" : "최신 아카이브 피드";
 
-        return ArchiveDto.PageListResponse.of(title, page);
+        return PageDto.PageListResponse.of(title, page);
     }
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getUserArchives(
+    public PageDto.PageListResponse<ArchiveDto.ArchivePageResponse> getUserArchives(
             UserPrincipal userPrincipal,
             Long targetUserId,
             ArchiveDto.ArchivePageRequest request
@@ -280,7 +281,7 @@ public class ArchiveService {
 
         PageUtils.validatePageRange(page);
 
-        return ArchiveDto.PageListResponse.of(pageTitle, page);
+        return PageDto.PageListResponse.of(pageTitle, page);
     }
 
     // -------- Helper Methods

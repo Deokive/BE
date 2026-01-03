@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.diary.service;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
@@ -136,7 +137,7 @@ public class DiaryService {
 
     // Pagination
     @Transactional(readOnly = true)
-    public DiaryDto.PageListResponse getDiaries(UserPrincipal userPrincipal, Long archiveId, DiaryDto.DiaryPageRequest request) {
+    public PageDto.PageListResponse<DiaryDto.DiaryPageResponse> getDiaries(UserPrincipal userPrincipal, Long archiveId, DiaryDto.DiaryPageRequest request) {
         // SEQ 1. 아카이브(Book) 존재 여부 확인
         DiaryBook diaryBook = diaryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
@@ -182,7 +183,7 @@ public class DiaryService {
         // SEQ 5. Page Validation
         PageUtils.validatePageRange(page);
 
-        return DiaryDto.PageListResponse.of(diaryBook.getTitle(), page);
+        return PageDto.PageListResponse.of(diaryBook.getTitle(), page);
     }
 
     // --- Helper Methods ---

@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.gallery.controller;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.service.GalleryService;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -26,16 +27,13 @@ public class GalleryController {
 
     @GetMapping("/{archiveId}")
     @Operation(summary = "갤러리 목록 조회", description = "특정 아카이브의 갤러리 이미지들을 페이징하여 조회합니다.")
-    @ApiResponse(responseCode = "200", description = "갤러리 목록 조회 성공", content = @Content(
-         mediaType = "application/json",
-         schema = @Schema(implementation = GalleryDto.PageListResponse.class)))
-    public ResponseEntity<GalleryDto.PageListResponse> getGalleries(
+    @ApiResponse(responseCode = "200", description = "갤러리 목록 조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<GalleryDto.Response>> getGalleries(
             @PathVariable Long archiveId,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @ModelAttribute GalleryDto.GalleryPageRequest pageRequest
     ) {
-        GalleryDto.PageListResponse response = galleryService.getGalleries(userPrincipal, archiveId, pageRequest.toPageable());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(galleryService.getGalleries(userPrincipal, archiveId, pageRequest.toPageable()));
     }
 
     @PostMapping("/{archiveId}")

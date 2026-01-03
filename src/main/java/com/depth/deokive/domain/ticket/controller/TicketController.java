@@ -1,10 +1,12 @@
 package com.depth.deokive.domain.ticket.controller;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.service.TicketService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -76,12 +78,12 @@ public class TicketController {
 
     @GetMapping("/book/{archiveId}")
     @Operation(summary = "티켓북 페이지네이션 조회")
-    public ResponseEntity<TicketDto.PageListResponse> getTicketBookPage(
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<TicketDto.TicketPageResponse>> getTicketBookPage(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
             @Valid @ModelAttribute TicketDto.TicketPageRequest pageRequest
     ) {
-        TicketDto.PageListResponse response = ticketService.getTickets(userPrincipal, archiveId, pageRequest.toPageable());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ticketService.getTickets(userPrincipal, archiveId, pageRequest.toPageable()));
     }
 }

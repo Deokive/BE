@@ -1,7 +1,6 @@
 package com.depth.deokive.domain.ticket.repository;
 
 import com.depth.deokive.domain.ticket.dto.TicketDto;
-import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
@@ -15,10 +14,8 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import static com.depth.deokive.domain.file.entity.QFile.file;
 import static com.depth.deokive.domain.ticket.entity.QTicket.ticket;
 
 @Repository
@@ -27,7 +24,7 @@ public class TicketQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<TicketDto.TicketElementResponse> searchTicketsByBook(Long ticketBookId, Pageable pageable) {
+    public Page<TicketDto.TicketPageResponse> searchTicketsByBook(Long ticketBookId, Pageable pageable) {
 
         // SEQ 1. 커버링 인덱스 활용
         List<Long> ids = queryFactory
@@ -40,11 +37,11 @@ public class TicketQueryRepository {
                 .fetch();
 
         // SEQ 2. 데이터 조회
-        List<TicketDto.TicketElementResponse> content = new ArrayList<>();
+        List<TicketDto.TicketPageResponse> content = new ArrayList<>();
 
         if (!ids.isEmpty()) {
             content = queryFactory
-                    .select(Projections.constructor(TicketDto.TicketElementResponse.class,
+                    .select(Projections.constructor(TicketDto.TicketPageResponse.class,
                             ticket.id,
                             ticket.title,
                             ticket.date,

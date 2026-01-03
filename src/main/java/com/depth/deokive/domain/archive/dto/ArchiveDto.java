@@ -183,25 +183,4 @@ public class ArchiveDto {
             this.ownerNickname = ownerNickname;
         }
     }
-
-    @Data @Builder @AllArgsConstructor
-    @Schema(description = "아카이브 피드 목록 페이징 응답 DTO")
-    public static class PageListResponse {
-        @Schema(description = "페이지 제목", example = "전체 피드")
-        private String pageTitle;
-
-        @Schema(description = "아카이브 피드 목록")
-        private List<ArchivePageResponse> content;
-        
-        @Schema(description = "페이지 메타데이터")
-        private PageDto.PageInfo page;
-
-        public static PageListResponse of(String pageTitle, Page<ArchivePageResponse> pageData) {
-            return PageListResponse.builder()
-                    .pageTitle(pageTitle)
-                    .content(pageData.getContent())
-                    .page(new PageDto.PageInfo(pageData))
-                    .build();
-        }
-    }
 }

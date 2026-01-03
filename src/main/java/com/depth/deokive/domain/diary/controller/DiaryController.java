@@ -1,10 +1,12 @@
 package com.depth.deokive.domain.diary.controller;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.service.DiaryService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -76,12 +78,12 @@ public class DiaryController {
 
     @GetMapping("/book/{archiveId}")
     @Operation(summary = "다이어리 목록 조회 (페이지네이션)", description = "아카이브 내의 다이어리 목록을 조회합니다.")
-    public ResponseEntity<DiaryDto.PageListResponse> getDiaryFeed(
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<DiaryDto.DiaryPageResponse>> getDiaryFeed(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
             @Valid @ModelAttribute DiaryDto.DiaryPageRequest pageRequest
     ) {
-        DiaryDto.PageListResponse response = diaryService.getDiaries(userPrincipal, archiveId, pageRequest);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(diaryService.getDiaries(userPrincipal, archiveId, pageRequest));
     }
 }

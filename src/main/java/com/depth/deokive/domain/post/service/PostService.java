@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
@@ -122,7 +123,7 @@ public class PostService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public PostDto.PageListResponse getPosts(PostDto.PostPageRequest request) {
+    public PageDto.PageListResponse<PostDto.PostPageResponse> getPosts(PostDto.PostPageRequest request) {
         Page<PostDto.PostPageResponse> page = postQueryRepository.searchPostFeed(
                 request.getCategory(),
                 request.toPageable()
@@ -135,7 +136,7 @@ public class PostService {
         else if ("hotScore".equals(request.getSort())) { title = "핫한 게시판"; }
         else { title = request.getCategory().name() + " 게시판"; }
 
-        return PostDto.PageListResponse.of(title, page);
+        return PageDto.PageListResponse.of(title, page);
     }
 
     // ------ Helper Methods -------

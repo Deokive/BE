@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.gallery.service;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
@@ -40,7 +41,7 @@ public class GalleryService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public GalleryDto.PageListResponse getGalleries(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
+    public PageDto.PageListResponse<GalleryDto.Response> getGalleries(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
 
         GalleryBook galleryBook = galleryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
@@ -51,7 +52,7 @@ public class GalleryService {
 
         PageUtils.validatePageRange(page);
 
-        return GalleryDto.PageListResponse.of(galleryBook.getTitle(), page);
+        return PageDto.PageListResponse.of(galleryBook.getTitle(), page);
     }
 
     @Transactional

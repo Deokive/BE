@@ -176,8 +176,8 @@ public class TicketDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "티켓 목록 요소 응답 DTO", name = "TicketElementResponse")
-    public static class TicketElementResponse {
+    @Schema(description = "티켓 목록 요소 응답 DTO", name = "TicketPageResponse")
+    public static class TicketPageResponse {
         @Schema(description = "티켓 아이디", example = "10")
         private Long id;
 
@@ -206,10 +206,10 @@ public class TicketDto {
         private LocalDateTime lastModifiedAt;
 
         @QueryProjection
-        public TicketElementResponse(Long id, String title, LocalDateTime date,
-                                     String seat, String location, String casting,
-                                     LocalDateTime createdAt, LocalDateTime lastModifiedAt,
-                                     String originalKey) {
+        public TicketPageResponse(Long id, String title, LocalDateTime date,
+                                  String seat, String location, String casting,
+                                  LocalDateTime createdAt, LocalDateTime lastModifiedAt,
+                                  String originalKey) {
             this.id = id;
             this.title = title;
             this.date = date;
@@ -225,27 +225,6 @@ public class TicketDto {
             if (original == null) return null;
             if (original.length() <= 10) return original;
             return original.substring(0, 10) + "...";
-        }
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 목록 페이징 응답 DTO", name = "TicketPageListResponse")
-    public static class PageListResponse {
-        @Schema(description = "티켓북 타이틀", example = "티켓북 타이틀입니다")
-        private String title;
-
-        @Schema(description = "티켓 목록", type = "array", implementation = TicketElementResponse.class)
-        private List<TicketElementResponse> content;
-
-        @Schema(description = "페이지 메타데이터")
-        private PageDto.PageInfo page;
-
-        public static PageListResponse of(String title, Page<TicketElementResponse> pageData) {
-            return PageListResponse.builder()
-                    .title(title)
-                    .content(pageData.getContent())
-                    .page(new PageDto.PageInfo(pageData))
-                    .build();
         }
     }
 

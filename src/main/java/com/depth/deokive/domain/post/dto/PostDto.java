@@ -272,25 +272,4 @@ public class PostDto {
             this.lastModifiedAt = lastModifiedAt;
         }
     }
-
-    @Data @Builder @AllArgsConstructor
-    @Schema(description = "게시글 피드 페이징 응답 Wrapper")
-    public static class PageListResponse {
-        @Schema(description = "페이지 제목", example = "아이돌 게시판")
-        private String pageTitle;
-        
-        @Schema(description = "게시글 목록")
-        private List<PostPageResponse> content;
-        
-        @Schema(description = "페이징 정보")
-        private PageDto.PageInfo page;
-
-        public static PageListResponse of(String pageTitle, Page<PostPageResponse> pageData) {
-            return PageListResponse.builder()
-                    .pageTitle(pageTitle)
-                    .content(pageData.getContent())
-                    .page(new PageDto.PageInfo(pageData))
-                    .build();
-        }
-    }
 }

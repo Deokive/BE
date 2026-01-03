@@ -1,10 +1,9 @@
 package com.depth.deokive.domain.ticket.service;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.file.entity.File;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
@@ -65,7 +64,7 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public TicketDto.PageListResponse getTickets(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
+    public PageDto.PageListResponse<TicketDto.TicketPageResponse> getTickets(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
         // SEQ 1. 아카이브 존재 여부 및 타이틀 조회
         TicketBook ticketBook = ticketBookRepository.findByIdWithArchiveAndUser(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
@@ -74,12 +73,12 @@ public class TicketService {
         validateReadPermission(ticketBook.getArchive(), userPrincipal);
 
         // SEQ 3. 페이지네이션 조회
-        Page<TicketDto.TicketElementResponse> ticketPage = ticketQueryRepository.searchTicketsByBook(archiveId, pageable);
+        Page<TicketDto.TicketPageResponse> ticketPage = ticketQueryRepository.searchTicketsByBook(archiveId, pageable);
 
         // SEQ 4. Page Range Validation
         PageUtils.validatePageRange(ticketPage);
 
-        return TicketDto.PageListResponse.of(ticketBook.getTitle(), ticketPage);
+        return PageDto.PageListResponse.of(ticketBook.getTitle(), ticketPage);
     }
 
     @Transactional

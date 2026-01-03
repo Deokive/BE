@@ -200,25 +200,4 @@ public class DiaryDto {
             this.visibility = visibility;
         }
     }
-
-    @Data @Builder @AllArgsConstructor
-    @Schema(description = "다이어리 목록 페이징 응답")
-    public static class PageListResponse {
-        @Schema(description = "아카이브(다이어리북) 제목", example = "2025년 나의 기록")
-        private String bookTitle;
-
-        @Schema(description = "다이어리 목록")
-        private List<DiaryPageResponse> content;
-
-        @Schema(description = "페이징 메타데이터")
-        private PageDto.PageInfo page;
-
-        public static PageListResponse of(String bookTitle, Page<DiaryPageResponse> pageData) {
-            return PageListResponse.builder()
-                    .bookTitle(bookTitle)
-                    .content(pageData.getContent())
-                    .page(new PageDto.PageInfo(pageData))
-                    .build();
-        }
-    }
 }

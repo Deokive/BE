@@ -48,27 +48,6 @@ public class GalleryDto {
         }
     }
 
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "갤러리 목록 페이징 응답 DTO", name = "GalleryPageListResponse")
-    public static class PageListResponse {
-        @Schema(description = "갤러리 제목", example = "2024년 1월 갤러리")
-        private String title;
-        
-        @Schema(description = "갤러리 이미지 목록", type = "array", implementation = Response.class)
-        private List<Response> content;
-        
-        @Schema(description = "페이지 메타데이터")
-        private PageDto.PageInfo page; // 커스텀 페이지 메타데이터
-
-        public static PageListResponse of(String title, Page<Response> pageData) {
-            return PageListResponse.builder()
-                    .title(title)
-                    .content(pageData.getContent())
-                    .page(new PageDto.PageInfo(pageData))
-                    .build();
-        }
-    }
-
     // DESCRIPTION: Pageable로 받을 수 있는데 Validation을 못함 -> 커스텀으로 Request를 만듦
     @Data
     @Schema(description = "갤러리 목록 조회 요청 DTO")
