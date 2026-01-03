@@ -187,16 +187,17 @@ public class PostService {
         // SEQ 8. 대표 썸네일 선정 로직
         // 1순위: MediaRole.PREVIEW
         // 2순위: Sequence (0번)
-        String thumbnailPath = savedMaps.stream()
+        String originalKey = savedMaps.stream()
                 .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
                 .findFirst()
-                .map(map -> map.getFile().getFilePath()) // 경로 추출
+                .map(map -> map.getFile().getS3ObjectKey())
                 .orElseGet(() -> savedMaps.stream()
                         .min(Comparator.comparingInt(PostFileMap::getSequence))
-                        .map(map -> map.getFile().getFilePath()) // 경로 추출
+                        .map(map -> map.getFile().getS3ObjectKey())
                         .orElse(null));
 
-        post.updateThumbnail(ThumbnailUtils.getMediumThumbnailUrl(thumbnailPath));
+        // 2. 썸네일 Key로 변환 후 저장
+        post.updateThumbnail(ThumbnailUtils.getMediumThumbnailKey(originalKey));
 
         return savedMaps;
     }

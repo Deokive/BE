@@ -26,9 +26,6 @@ public class File extends UserBaseEntity {
     @Column(nullable = false, length = 1024)
     private String filename; // 원본 파일명
 
-    @Column(nullable = false, length = 1024) // TODO: FILE_PATH DELETE
-    private String filePath; // CDN URL (bucketName 노출 방지)
-
     @Column(nullable = false)
     private Long fileSize; // 파일 크기 (바이트 단위)
 

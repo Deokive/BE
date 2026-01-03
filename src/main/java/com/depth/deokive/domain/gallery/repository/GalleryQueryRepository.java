@@ -47,7 +47,7 @@ public class GalleryQueryRepository {
             content = queryFactory
                     .select(Projections.constructor(GalleryDto.Response.class,
                             gallery.id,
-                            gallery.originalUrl,
+                            gallery.originalKey,
                             gallery.createdAt,
                             gallery.lastModifiedAt
                     ))

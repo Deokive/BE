@@ -25,7 +25,7 @@ public class RepostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<RepostDto.Response> findByTabId(Long tabId, Pageable pageable) {
+    public Page<RepostDto.RepostElementResponse> findByTabId(Long tabId, Pageable pageable) {
 
         // SEQ 1. ID로 조회
         List<Long> ids = queryFactory
@@ -37,17 +37,18 @@ public class RepostQueryRepository {
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        List<RepostDto.Response> content = new ArrayList<>();
+        List<RepostDto.RepostElementResponse> content = new ArrayList<>();
 
         // SEQ 2. 데이터 조회
         if (!ids.isEmpty()) {
             content = queryFactory
-                    .select(Projections.constructor(RepostDto.Response.class,
+                    .select(Projections.constructor(RepostDto.RepostElementResponse.class,
                             repost.id,
                             repost.postId,
                             repost.title,
-                            repost.thumbnailUrl,
-                            repost.repostTab.id
+                            repost.thumbnailKey,
+                            repost.repostTab.id,
+                            repost.createdAt
                     ))
                     .from(repost)
                     .where(repost.id.in(ids))

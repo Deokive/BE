@@ -50,8 +50,8 @@ public class Ticket extends TimeBaseEntity {
     @JoinColumn(name = "file_id")
     private File file;
 
-    @Column(name = "original_url")
-    private String originalUrl;
+    @Column(name = "original_key")
+    private String originalKey;
 
     public void update(TicketDto.UpdateRequest request, File resolvedFile) {
         if (request == null) return;
@@ -73,6 +73,6 @@ public class Ticket extends TimeBaseEntity {
 
     private void updateFile(File file) {
         this.file = file; // Service Layer에서 철저한 검증 거침
-        this.originalUrl = (file != null) ? file.getFilePath() : null;
+        this.originalKey = (file != null) ? file.getS3ObjectKey() : null;
     }
 }

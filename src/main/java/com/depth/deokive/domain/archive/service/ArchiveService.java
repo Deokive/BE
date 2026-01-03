@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.archive.service;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.file.service.FileService;
@@ -110,7 +111,7 @@ public class ArchiveService {
 
         // SEQ 6. Response
         String bannerUrl = (archive.getBannerFile() != null)
-                ? archive.getBannerFile().getFilePath()
+                ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
                 : null;
 
         // p: archive, bannerUrl, viewCount, likeCount, isLiked, isOwner
@@ -134,8 +135,10 @@ public class ArchiveService {
         archive.increaseViewCount();
 
         // SEQ 5. 데이터 조회 : 좋아요 수, 조회수, isLiked, isOwner, bannerUrl, archive
-        // ArchiveLikeCount likeCountEntity = likeCountRepository.findById(archiveId).orElse(null);
-        String bannerUrl = (archive.getBannerFile() != null) ? archive.getBannerFile().getFilePath() : null;
+        String bannerUrl = (archive.getBannerFile() != null)
+                ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
+                : null;
+
         boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
 
         return ArchiveDto.Response.of(
@@ -328,7 +331,9 @@ public class ArchiveService {
 
     private String updateBannerImage(Archive archive, Long newFileId, Long userId) {
         if (newFileId == null) {
-            return archive.getBannerFile() != null ? archive.getBannerFile().getFilePath() : null;
+            return archive.getBannerFile() != null
+                    ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
+                    : null;
         }
 
         if (newFileId == -1L) {
@@ -340,7 +345,7 @@ public class ArchiveService {
 
             File newBanner = fileService.validateFileOwner(newFileId, userId);
             archive.updateBanner(newBanner);
-            return newBanner.getFilePath();
+            return FileUrlUtils.buildCdnUrl(newBanner.getS3ObjectKey());
         }
     }
 }

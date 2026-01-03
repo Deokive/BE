@@ -83,8 +83,8 @@ public class Archive extends TimeBaseEntity {
     @OneToOne(mappedBy = "archive", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private TicketBook ticketBook;
 
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl;
+    @Column(name = "thumbnail_key")
+    private String thumbnailKey;
 
     public void update(ArchiveDto.UpdateRequest request) {
         if (request == null) return;
@@ -97,9 +97,9 @@ public class Archive extends TimeBaseEntity {
         this.bannerFile = file;
 
         if (file != null) {
-            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(file.getFilePath());
+            this.thumbnailKey = ThumbnailUtils.getMediumThumbnailKey(file.getS3ObjectKey());
         } else {
-            this.thumbnailUrl = null;
+            this.thumbnailKey = null;
         }
     }
 

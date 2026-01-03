@@ -52,7 +52,7 @@ public class ArchiveQueryRepository {
                     .select(new QArchiveDto_ArchivePageResponse(
                             archive.id,
                             archive.title,
-                            archive.thumbnailUrl,
+                            archive.thumbnailKey,
                             archive.viewCount,
                             archive.likeCount,
                             archive.hotScore,

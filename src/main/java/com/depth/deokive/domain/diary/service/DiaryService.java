@@ -281,16 +281,16 @@ public class DiaryService {
             return;
         }
 
-        String thumbnailUrl = maps.stream()
+        String originalKey = maps.stream()
                 .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
                 .findFirst()
-                .map(map -> map.getFile().getFilePath())
+                .map(map -> map.getFile().getS3ObjectKey())
                 .orElseGet(() -> maps.stream()
                         .min(Comparator.comparingInt(DiaryFileMap::getSequence))
-                        .map(map -> map.getFile().getFilePath())
+                        .map(map -> map.getFile().getS3ObjectKey())
                         .orElse(null)
                 );
 
-        diary.updateThumbnail(ThumbnailUtils.getMediumThumbnailUrl(thumbnailUrl));
+        diary.updateThumbnail(ThumbnailUtils.getMediumThumbnailKey(originalKey));
     }
 }

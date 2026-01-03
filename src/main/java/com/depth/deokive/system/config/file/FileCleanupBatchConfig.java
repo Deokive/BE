@@ -1,5 +1,6 @@
 package com.depth.deokive.system.config.file;
 
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaType;
 import com.depth.deokive.domain.file.repository.FileRepository;
@@ -19,11 +20,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.Delete;
+import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import javax.sql.DataSource;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Configuration
@@ -86,13 +91,12 @@ public class FileCleanupBatchConfig {
                         .id(rs.getLong("id"))
                         .s3ObjectKey(rs.getString("s3Object_key"))
                         .filename(rs.getString("filename"))
-                        .filePath(rs.getString("file_path"))
                         .fileSize(rs.getLong("file_size"))
                         .mediaType(MediaType.valueOf(rs.getString("media_type")))
                         .build()
                 )
                 .sql("""
-                    SELECT f.id, f.s3Object_key, f.filename, f.file_path, f.file_size, f.media_type
+                    SELECT f.id, f.s3Object_key, f.filename, f.file_size, f.media_type
                     FROM files f
                     -- 1. Archive Banner
                     LEFT JOIN archive a ON f.id = a.banner_file_id
@@ -102,16 +106,14 @@ public class FileCleanupBatchConfig {
                     LEFT JOIN diary_file_map dfm ON f.id = dfm.file_id
                     -- 4. Post Image (Content/Preview in Map)
                     LEFT JOIN post_file_map pfm ON f.id = pfm.file_id
-                    -- 5. [중요] Post Thumbnail (Denormalized Column) - FK 제약조건 방어
-                    LEFT JOIN post p ON f.id = p.thumbnail_file_id
-                    -- 6. Gallery Image
+                    -- 5. Gallery Image
                     LEFT JOIN gallery g ON f.id = g.file_id
+                    
                     WHERE f.created_at < ?
                       AND a.id IS NULL
                       AND t.id IS NULL
                       AND dfm.id IS NULL
                       AND pfm.id IS NULL
-                      AND p.id IS NULL -- 썸네일로도 쓰이지 않아야 함
                       AND g.id IS NULL
                 """)
                 .queryArguments(Timestamp.valueOf(threshold))
@@ -124,15 +126,27 @@ public class FileCleanupBatchConfig {
             int attempt = 0;
             Exception lastException = null;
 
+            List<ObjectIdentifier> objectsToDelete = new ArrayList<>();
+            objectsToDelete.add(ObjectIdentifier.builder().key(file.getS3ObjectKey()).build());
+
+            if (file.getMediaType() == MediaType.IMAGE) {
+                // S3에 실제로 존재하는지 체크하지 않고 delete 요청 보내도 에러 안 남 (S3 특성) -> 과감하게 삭제 요청 목록에 추가
+                String smallKey = ThumbnailUtils.getSmallThumbnailKey(file.getS3ObjectKey());
+                String mediumKey = ThumbnailUtils.getMediumThumbnailKey(file.getS3ObjectKey());
+
+                if (smallKey != null) objectsToDelete.add(ObjectIdentifier.builder().key(smallKey).build());
+                if (mediumKey != null) objectsToDelete.add(ObjectIdentifier.builder().key(mediumKey).build());
+            }
+
             while (attempt < maxRetryAttempts) {
                 try {
                     attempt++;
-                    log.info("🟢 [Batch] Deleting S3 Object: {} (Attempt {}/{})",
-                            file.getS3ObjectKey(), attempt, maxRetryAttempts);
+                    log.info("🟢 [Batch] Deleting S3 Objects for FileId {}: {} (Attempt {}/{})",
+                            file.getId(), file.getS3ObjectKey(), attempt, maxRetryAttempts);
 
-                    s3Client.deleteObject(builder -> builder
+                    s3Client.deleteObjects(builder -> builder
                             .bucket(bucketName)
-                            .key(file.getS3ObjectKey())
+                            .delete(Delete.builder().objects(objectsToDelete).build())
                     );
 
                     return file; // 성공 시 파일 객체 반환

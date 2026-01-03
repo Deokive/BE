@@ -1,10 +1,12 @@
 package com.depth.deokive.domain.ticket.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -65,7 +67,7 @@ public class TicketDto {
                     .review(review)
                     .ticketBook(ticketBook)
                     .file(file)
-                    .originalUrl(file != null ? file.getFilePath() : null)
+                    .originalKey(file != null ? file.getS3ObjectKey() : null)
                     .build();
         }
     }
@@ -149,16 +151,7 @@ public class TicketDto {
                     .score(ticket.getScore())
                     .review(ticket.getReview())
                     .ticketBookId(ticket.getTicketBook().getId())
-                    .file(ticket.getFile() != null ? toFileResponse(ticket.getFile()) : null)
-                    .build();
-        }
-
-        private static FileDto.UploadFileResponse toFileResponse(File file) {
-            return FileDto.UploadFileResponse.builder()
-                    .fileId(file.getId())
-                    .filename(file.getFilename())
-                    .cdnUrl(file.getFilePath())
-                    .mediaType(file.getMediaType().name())
+                    .file(ticket.getFile() != null ? FileDto.UploadFileResponse.of(ticket.getFile(), null) : null)
                     .build();
         }
     }
@@ -211,11 +204,11 @@ public class TicketDto {
         @Schema(description = "수정 시간")
         private LocalDateTime lastModifiedAt;
 
-        @Builder
+        @QueryProjection
         public TicketElementResponse(Long id, String title, LocalDateTime date,
                                      String seat, String location, String casting,
                                      LocalDateTime createdAt, LocalDateTime lastModifiedAt,
-                                     String originalUrl) {
+                                     String originalKey) {
             this.id = id;
             this.title = title;
             this.date = date;
@@ -224,8 +217,7 @@ public class TicketDto {
             this.casting = truncateCasting(casting);
             this.createdAt = createdAt;
             this.lastModifiedAt = lastModifiedAt;
-
-            this.thumbnail = ThumbnailUtils.getMediumThumbnailUrl(originalUrl);
+            this.thumbnail = FileUrlUtils.buildCdnUrl(ThumbnailUtils.getMediumThumbnailKey(originalKey));
         }
 
         private String truncateCasting(String original) {

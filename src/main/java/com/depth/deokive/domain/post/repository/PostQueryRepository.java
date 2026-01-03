@@ -48,7 +48,7 @@ public class PostQueryRepository {
                         post.id,
                         post.title,
                         post.category,
-                        post.thumbnailUrl,
+                        post.thumbnailKey,
                         post.user.nickname,
                         post.likeCount,
                         post.viewCount,

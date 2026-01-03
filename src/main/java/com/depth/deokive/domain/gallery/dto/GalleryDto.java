@@ -1,6 +1,8 @@
 package com.depth.deokive.domain.gallery.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -35,13 +37,13 @@ public class GalleryDto {
         @Schema(description = "수정 시간", example = "KST DateTime")
         private LocalDateTime lastModifiedAt;
 
-        @Builder
-        public Response(Long id, String originalUrl, LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
+        @QueryProjection
+        public Response(Long id, String originalKey, LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
             this.id = id;
             this.createdAt = createdAt;
             this.lastModifiedAt = lastModifiedAt;
-            this.originalUrl = originalUrl;
-            this.thumbnailUrl = ThumbnailUtils.getMediumThumbnailUrl(originalUrl);
+            this.originalUrl = FileUrlUtils.buildCdnUrl(originalKey);
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(ThumbnailUtils.getMediumThumbnailKey(originalKey));
         }
     }
 

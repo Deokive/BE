@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.diary.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.diary.entity.Diary;
@@ -124,7 +125,7 @@ public class DiaryDto {
                 return FileDto.UploadFileResponse.builder()
                         .fileId(file.getId())
                         .filename(file.getFilename())
-                        .cdnUrl(file.getFilePath())
+                        .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
                         .mediaRole(map.getMediaRole())
                         .sequence(map.getSequence())
                         .build();
@@ -192,10 +193,10 @@ public class DiaryDto {
         private Visibility visibility;
 
         @QueryProjection
-        public DiaryPageResponse(Long diaryId, String title, String thumbnailUrl, LocalDate recordedAt, Visibility visibility) {
+        public DiaryPageResponse(Long diaryId, String title, String thumbnailKey, LocalDate recordedAt, Visibility visibility) {
             this.diaryId = diaryId;
             this.title = title;
-            this.thumbnailUrl = thumbnailUrl;
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
             this.recordedAt = recordedAt;
             this.visibility = visibility;
         }

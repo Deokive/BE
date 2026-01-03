@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.file.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
@@ -43,7 +44,7 @@ public class FileDto {
             return FileDto.UploadFileResponse.builder()
                     .fileId(file.getId())
                     .filename(file.getFilename())
-                    .cdnUrl(file.getFilePath())
+                    .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
                     .fileSize(file.getFileSize())
                     .mediaType(file.getMediaType().name())
                     .mediaRole(request.getMediaRole())

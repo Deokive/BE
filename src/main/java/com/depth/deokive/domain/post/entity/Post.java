@@ -56,8 +56,8 @@ public class Post extends UserBaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl; // Denormalization Fields for Pagination Performance
+    @Column(name = "thumbnail_key")
+    private String thumbnailKey; // Denormalization Fields for Pagination Performance
 
     @Builder.Default
     @Column(nullable = false)
@@ -79,7 +79,7 @@ public class Post extends UserBaseEntity {
         this.content = nonBlankOrDefault(request.getContent(), this.content);
     }
 
-    public void updateThumbnail(String thumbnailPath) { this.thumbnailUrl = thumbnailPath; }
+    public void updateThumbnail(String thumbnailKey) { this.thumbnailKey = thumbnailKey; }
     public void increaseViewCount() { this.viewCount++; }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {

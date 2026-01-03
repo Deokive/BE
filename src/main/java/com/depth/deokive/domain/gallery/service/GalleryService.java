@@ -76,7 +76,7 @@ public class GalleryService {
                         .archiveId(archiveId)
                         .galleryBook(galleryBook)
                         .file(file)
-                        .originalUrl(file.getFilePath())
+                        .originalKey(file.getS3ObjectKey())
                         .build())
                 .collect(Collectors.toList());
 

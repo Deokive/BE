@@ -43,8 +43,8 @@ public class Diary extends UserBaseEntity {
     @JoinColumn(name = "diary_book_id", nullable = false)
     private DiaryBook diaryBook;
 
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl; // Denormalization Field for Pagination Performance
+    @Column(name = "thumbnail_key")
+    private String thumbnailKey; // Denormalization Field for Pagination Performance
 
     public void update(DiaryDto.UpdateRequest request) {
         if (request == null) return;
@@ -56,7 +56,7 @@ public class Diary extends UserBaseEntity {
         this.visibility = nonBlankOrDefault(request.getVisibility(), this.visibility);
     }
 
-    public void updateThumbnail(String url) { this.thumbnailUrl = url; }
+    public void updateThumbnail(String thumbnailKey) { this.thumbnailKey = thumbnailKey; }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;

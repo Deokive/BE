@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.archive.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.enums.Visibility;
@@ -167,12 +168,12 @@ public class ArchiveDto {
         private String ownerNickname;
 
         @QueryProjection // Q-Class 재생성 필요
-        public ArchivePageResponse(Long archiveId, String title, String thumbnailUrl,
+        public ArchivePageResponse(Long archiveId, String title, String thumbnailKey,
                                    Long viewCount, Long likeCount, Double hotScore, Visibility visibility,
                                    LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
             this.archiveId = archiveId;
             this.title = title;
-            this.thumbnailUrl = thumbnailUrl;
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
             this.viewCount = viewCount;
             this.likeCount = likeCount;
             this.hotScore = hotScore;

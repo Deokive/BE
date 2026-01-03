@@ -1,7 +1,9 @@
 package com.depth.deokive.domain.post.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.post.entity.Repost;
 import com.depth.deokive.domain.post.entity.RepostTab;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class RepostDto {
@@ -56,7 +59,7 @@ public class RepostDto {
                     .id(repost.getId())
                     .postId(repost.getPostId())
                     .title(repost.getTitle())
-                    .thumbnailUrl(repost.getThumbnailUrl())
+                    .thumbnailUrl(FileUrlUtils.buildCdnUrl(repost.getThumbnailKey()))
                     .repostTabId(repost.getRepostTab().getId())
                     .build();
         }
@@ -121,6 +124,40 @@ public class RepostDto {
         }
     }
 
+    @Data @NoArgsConstructor
+    @Schema(description = "리포스트 목록 요소 응답 DTO")
+    public static class RepostElementResponse {
+        @Schema(description = "리포스트 아이디", example = "1")
+        private Long id;
+
+        @Schema(description = "원본 게시글 ID", example = "5")
+        private Long postId;
+
+        @Schema(description = "리포스트 제목", example = "제목")
+        private String title;
+
+        @Schema(description = "썸네일 이미지 URL")
+        private String thumbnailUrl;
+
+        @Schema(description = "소속 탭 ID")
+        private Long repostTabId;
+
+        @Schema(description = "생성 시간")
+        private LocalDateTime createdAt;
+
+        @QueryProjection
+        public RepostElementResponse(
+                Long id, Long postId, String title,
+                String thumbnailKey, Long repostTabId, LocalDateTime createdAt) {
+            this.id = id;
+            this.postId = postId;
+            this.title = title;
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
+            this.repostTabId = repostTabId;
+            this.createdAt = createdAt;
+        }
+    }
+
     @Data @Builder @AllArgsConstructor
     @Schema(description = "리포스트 응답 DTO")
     public static class RepostListResponse {
@@ -134,12 +171,13 @@ public class RepostDto {
         private List<TabResponse> tab;
 
         @Schema(description = "리포스트 데이터 목록")
-        private List<Response> content;
+        private List<RepostElementResponse> content;
 
         @Schema(description = "페이지 메타데이터")
         private PageInfo page;
 
-        public static RepostListResponse of(String title, Long currentTabId, List<TabResponse> tabs, Page<Response> pageData) {
+        public static RepostListResponse of(
+                String title, Long currentTabId, List<TabResponse> tabs, Page<RepostElementResponse> pageData) {
             return RepostListResponse.builder()
                     .title(title)
                     .tabId(currentTabId)

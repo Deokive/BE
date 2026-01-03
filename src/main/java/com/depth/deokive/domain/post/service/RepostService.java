@@ -56,14 +56,14 @@ public class RepostService {
 
         // SEQ 5. 스냅샷 데이터 추출 (제목 & 썸네일)
         String titleSnapshot = post.getTitle(); // 생성 시점에선 자동으로 원본 게시글의 제목을 저장
-        String thumbnailSnapshot = post.getThumbnailUrl();
+        String thumbnailKeySnapshot = post.getThumbnailKey();
 
         // SEQ 6. 저장
         Repost repost = Repost.builder()
                 .repostTab(tab)
                 .postId(post.getId())
                 .title(titleSnapshot)
-                .thumbnailUrl(thumbnailSnapshot)
+                .thumbnailKey(thumbnailKeySnapshot)
                 .build();
         repostRepository.save(repost);
 
@@ -184,7 +184,7 @@ public class RepostService {
         }
 
         // SEQ 5. 페이지네이션 쿼리
-        Page<RepostDto.Response> page = repostQueryRepository.findByTabId(targetTabId, pageable);
+        Page<RepostDto.RepostElementResponse> page = repostQueryRepository.findByTabId(targetTabId, pageable);
 
         PageUtils.validatePageRange(page);
 

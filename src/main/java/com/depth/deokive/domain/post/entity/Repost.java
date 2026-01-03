@@ -32,8 +32,8 @@ public class Repost extends TimeBaseEntity {
     @Column(nullable = false)
     private String title; // Default: 게시글 제목 -> Snapshot (삭제되면 못가져오니까. 그리고 이름 수정도 가능하라고)
 
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl; // 원본 썸네일 URL (조회용) -> Snapshot
+    @Column(name = "thumbnail_key")
+    private String thumbnailKey; // 원본 썸네일 URL (조회용) -> Snapshot
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repost_tab_id", nullable = false)

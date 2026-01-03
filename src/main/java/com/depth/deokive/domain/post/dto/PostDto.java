@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.dto;
 
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
@@ -164,7 +165,7 @@ public class PostDto {
                     return FileDto.UploadFileResponse.builder()
                         .fileId(file.getId())
                         .filename(file.getFilename())
-                        .cdnUrl(file.getFilePath())
+                        .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
                         .fileSize(file.getFileSize())
                         .mediaType(file.getMediaType().name())
                         .mediaRole(map.getMediaRole())
@@ -255,13 +256,13 @@ public class PostDto {
         private LocalDateTime lastModifiedAt;
 
         @QueryProjection // Q-Class 생성용
-        public PostPageResponse(Long postId, String title, Category category, String thumbnailUrl,
+        public PostPageResponse(Long postId, String title, Category category, String thumbnailKey,
                             String writerNickname, Long likeCount, Long viewCount, Double hotScore,
                             LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
             this.postId = postId;
             this.title = title;
             this.category = category;
-            this.thumbnailUrl = thumbnailUrl;
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
             this.writerNickname = writerNickname;
             this.likeCount = likeCount;
             this.viewCount = viewCount;

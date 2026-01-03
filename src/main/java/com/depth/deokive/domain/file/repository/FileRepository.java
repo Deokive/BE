@@ -7,6 +7,4 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FileRepository extends JpaRepository<File, Long> {
-    List<File> findByIdIn(List<Long> ids);
-    Optional<File> findByS3ObjectKey(String s3ObjectKey);
 }

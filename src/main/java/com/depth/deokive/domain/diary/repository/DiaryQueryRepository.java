@@ -50,7 +50,7 @@ public class DiaryQueryRepository {
                     .select(new QDiaryDto_DiaryPageResponse(
                             diary.id,
                             diary.title,
-                            diary.thumbnailUrl, // 역정규화 컬럼 사용 (Zero-Join)
+                            diary.thumbnailKey,
                             diary.recordedAt,
                             diary.visibility
                     ))
