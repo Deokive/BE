@@ -1,13 +1,11 @@
 package com.depth.deokive.domain.event.service;
 
+import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.event.dto.EventDto;
 import com.depth.deokive.domain.event.entity.*;
 import com.depth.deokive.domain.event.repository.*;
-import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
-import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -27,12 +25,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EventService {
 
+    private final ArchiveGuard archiveGuard;
     private final EventRepository eventRepository;
     private final SportRecordRepository sportRecordRepository;
     private final HashtagRepository hashtagRepository;
     private final EventHashtagMapRepository eventHashtagMapRepository;
     private final ArchiveRepository archiveRepository;
-    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public EventDto.Response createEvent(UserPrincipal user, Long archiveId, EventDto.CreateRequest request) {
@@ -41,7 +39,7 @@ public class EventService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateOwner(archive, user);
+        archiveGuard.checkOwner(archive.getUser().getId(), user);
 
         // SEQ 3. 날짜/시간 병합 로직
         LocalDateTime recordAt = getRecordAt(request);
@@ -70,7 +68,7 @@ public class EventService {
                 .orElseThrow(() -> new RestException(ErrorCode.EVENT_NOT_FOUND));
 
         // SEQ 2. Archive 접근 권한에 따른 읽기 범위 설정
-        validateReadPermission(event, user);
+        archiveGuard.checkArchiveReadPermission(event.getArchive(), user);
 
         // SEQ 3. 스포츠 타입 On 이면 스포츠 정보 로드
         SportRecord sportRecord = null;
@@ -91,7 +89,7 @@ public class EventService {
                 .orElseThrow(() -> new RestException(ErrorCode.EVENT_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateOwner(event.getArchive(), user);
+        archiveGuard.checkOwner(event.getArchive().getUser().getId(), user);
 
         // SEQ 3. 업데이트
         event.update(request, getRecordAt(request, event)); // Dirty Checking
@@ -120,7 +118,7 @@ public class EventService {
                 .orElseThrow(() -> new RestException(ErrorCode.EVENT_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateOwner(event.getArchive(), user);
+        archiveGuard.checkOwner(event.getArchive().getUser().getId(), user);
 
         // SEQ 3. Event 삭제
         eventHashtagMapRepository.deleteByEventId(eventId); // 1:N에 대해서 명시적으로 연관 데이터 삭제 패턴 권장하는 중
@@ -138,7 +136,7 @@ public class EventService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 아카이브 자체의 접근 권한 확인 (주인인지, 공개인지 등)
-        validateArchiveReadPermission(archive, user);
+        archiveGuard.checkArchiveReadPermission(archive, user);
 
         // SEQ 3. 날짜 범위 계산 (해당 월의 1일 00:00 ~ 말일 23:59)
         LocalDateTime startDateTime = LocalDateTime.of(year, month, 1, 0, 0);
@@ -238,54 +236,6 @@ public class EventService {
                     .build();
             eventHashtagMapRepository.save(map);
         }
-    }
-
-    private void validateOwner(Archive archive, UserPrincipal user) {
-        if (!archive.getUser().getId().equals(user.getUserId())) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-    }
-
-    private void validateReadPermission(Event event, UserPrincipal userPrincipal) {
-        Long ownerId = event.getArchive().getUser().getId();
-        Long viewerId = userPrincipal != null ? userPrincipal.getUserId() : null;
-
-        if (ownerId.equals(viewerId)) return;
-
-        validateReadPermissionCommon(ownerId, viewerId, event.getArchive().getVisibility());
-    }
-
-    // validateReadPermission은 단건 조회용(Event 기준)이라, 아카이브 기준 검증 메서드 분리
-    private void validateArchiveReadPermission(Archive archive, UserPrincipal userPrincipal) {
-        Long ownerId = archive.getUser().getId();
-        Long viewerId = userPrincipal != null ? userPrincipal.getUserId() : null;
-
-        if (ownerId.equals(viewerId)) return;
-
-        validateReadPermissionCommon(ownerId, viewerId, archive.getVisibility());
-    }
-
-    private void validateReadPermissionCommon(Long ownerId, Long viewerId, Visibility visibility) {
-        switch (visibility) {
-            case PRIVATE ->
-                    throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 주인 외 접근 불가
-            case RESTRICTED -> {
-                if (!checkFriendRelationship(viewerId, ownerId)) {
-                    throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-                }
-            }
-            case PUBLIC -> { /* 모두 허용 */ }
-        }
-    }
-
-    private boolean checkFriendRelationship(Long viewerId, Long ownerId) {
-        if (viewerId == null) return false;
-
-        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
-                viewerId,
-                ownerId,
-                FriendStatus.ACCEPTED
-        );
     }
 
     private Map<Long, List<String>> getHashtagMap(List<Long> eventIds) {

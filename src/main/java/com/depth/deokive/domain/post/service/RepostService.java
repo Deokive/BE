@@ -1,12 +1,7 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.util.PageUtils;
-import com.depth.deokive.common.util.ThumbnailUtils;
-import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
-import com.depth.deokive.domain.file.entity.enums.MediaRole;
-import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
-import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.depth.deokive.domain.post.entity.*;
 import com.depth.deokive.domain.post.repository.*;
@@ -21,20 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static com.depth.deokive.domain.user.entity.QUser.user;
-
 @Service
 @RequiredArgsConstructor
 public class RepostService {
 
+    private final ArchiveGuard archiveGuard;
     private final RepostRepository repostRepository;
     private final RepostTabRepository repostTabRepository;
     private final RepostBookRepository repostBookRepository;
 
     private final PostRepository postRepository; // Post 정보 조회를 위한 Repository (검증 및 스냅샷 용도)
-    private final PostFileMapRepository postFileMapRepository;
     private final RepostQueryRepository repostQueryRepository;
-    private final FriendMapRepository friendMapRepository;
 
     @Transactional
     public RepostDto.Response createRepost(UserPrincipal userPrincipal, Long tabId, RepostDto.CreateRequest request) {
@@ -43,7 +35,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND)); // ErrorCode.TAB_NOT_FOUND 권장
 
         // SEQ 2. 소유권 확인
-        validateTabOwner(tab, userPrincipal);
+        archiveGuard.checkOwner(tab.getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 원본 게시글 확인
         Post post = postRepository.findById(request.getPostId())
@@ -77,7 +69,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.REPOST_NOT_FOUND));
 
         // SEQ 2. 소유권 점검
-        validateTabOwner(repost.getRepostTab(), userPrincipal);
+        archiveGuard.checkOwner(repost.getRepostTab().getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 타이틀 수정 (Repost 자체는 편집의 대상이 아님)
         repost.updateTitle(request.getTitle()); // Dirty Checking
@@ -91,7 +83,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.REPOST_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateTabOwner(repost.getRepostTab(), userPrincipal);
+        archiveGuard.checkOwner(repost.getRepostTab().getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. Repost 삭제
         repostRepository.delete(repost);
@@ -104,7 +96,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateBookOwner(book, userPrincipal);
+        archiveGuard.checkOwner(book.getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 10개 제한 체크
         long count = repostTabRepository.countByRepostBookId(archiveId);
@@ -130,7 +122,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.REPOST_TAB_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateTabOwner(tab, userPrincipal);
+        archiveGuard.checkOwner(tab.getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 리포스트 탭 타이틀 수정
         tab.updateTitle(request.getTitle());
@@ -145,7 +137,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.REPOST_TAB_NOT_FOUND));
 
         // SEQ 2. 소유권 검증
-        validateTabOwner(tab, userPrincipal);
+        archiveGuard.checkOwner(tab.getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 리포스트 탭 제거
         repostRepository.deleteAllByRepostTabId(tabId); // Bulk로 Repost 명시적 삭제 (성능을 위해)
@@ -159,7 +151,7 @@ public class RepostService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 공개 범위 검증
-        validateArchiveAccess(userPrincipal, book.getArchive());
+        archiveGuard.checkArchiveReadPermission(book.getArchive(), userPrincipal);
 
         // SEQ 3. 전체 탭 목록 조회
         List<RepostTab> tabs = repostTabRepository.findAllByRepostBookIdOrderByIdAsc(archiveId);
@@ -194,54 +186,5 @@ public class RepostService {
 
         // SEQ 6. 리턴
         return RepostDto.RepostListResponse.of(book.getTitle(), targetTabId, tabDtos, page);
-    }
-
-    // --- Helpers ---
-    private void validateTabOwner(RepostTab tab, UserPrincipal user) {
-        if (!tab.getRepostBook().getArchive().getUser().getId().equals(user.getUserId())) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-    }
-
-    private void validateBookOwner(RepostBook book, UserPrincipal user) {
-        if (!book.getArchive().getUser().getId().equals(user.getUserId())) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-    }
-
-    private void validateArchiveAccess(UserPrincipal viewer, Archive archive) {
-        Long ownerId = archive.getUser().getId();
-        Long viewerId = (viewer != null) ? viewer.getUserId() : null;
-
-        // 1. 주인은 무조건 통과
-        if (ownerId.equals(viewerId)) {
-            return;
-        }
-
-        Visibility visibility = archive.getVisibility();
-
-        // 2. 비공개(PRIVATE) -> 주인이 아니면 차단
-        if (visibility == Visibility.PRIVATE) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-
-        // 3. 친구공개(RESTRICTED) -> 친구가 아니면 차단
-        if (visibility == Visibility.RESTRICTED) {
-            if (!isFriend(viewerId, ownerId)) {
-                throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-            }
-        }
-
-        // 4. 전체공개(PUBLIC) -> 통과 (아무것도 안 함)
-    }
-
-    private boolean isFriend(Long viewerId, Long ownerId) {
-        if (viewerId == null) return false; // 비로그인 유저는 친구일 수 없음
-
-        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
-                viewerId,
-                ownerId,
-                FriendStatus.ACCEPTED
-        );
     }
 }

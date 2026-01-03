@@ -1,11 +1,10 @@
 package com.depth.deokive.domain.ticket.service;
 
 import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.util.PageUtils;
-import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.service.FileService;
-import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.entity.Ticket;
@@ -27,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TicketService {
 
     private final FileService fileService;
-
+    private final ArchiveGuard archiveGuard;
     private final TicketRepository ticketRepository;
     private final TicketBookRepository ticketBookRepository;
     private final FriendMapRepository friendMapRepository;
@@ -39,7 +38,7 @@ public class TicketService {
         TicketBook ticketBook = ticketBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        validateOwner(ticketBook.getArchive().getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(ticketBook.getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 2. 파일 조회 (있으면 찾고, 없으면 null)
         File file = (request.getFileId() != null)
@@ -58,7 +57,7 @@ public class TicketService {
         Ticket ticket = ticketRepository.findByIdWithFile(ticketId)
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
 
-        validateReadPermission(ticket.getTicketBook().getArchive(), userPrincipal);
+        archiveGuard.checkArchiveReadPermission(ticket.getTicketBook().getArchive(), userPrincipal);
 
         return TicketDto.Response.of(ticket);
     }
@@ -70,7 +69,7 @@ public class TicketService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 공개 범위 검사 -> 만약에 통과되지 않으면 다음 실행 X
-        validateReadPermission(ticketBook.getArchive(), userPrincipal);
+        archiveGuard.checkArchiveReadPermission(ticketBook.getArchive(), userPrincipal);
 
         // SEQ 3. 페이지네이션 조회
         Page<TicketDto.TicketPageResponse> ticketPage = ticketQueryRepository.searchTicketsByBook(archiveId, pageable);
@@ -88,7 +87,7 @@ public class TicketService {
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
 
         // SEQ 2. 소유자 검증
-        validateOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
         // SEQ 3. 파일 조회 및 결정
         File finalFile = resolveUpdatedFile(ticket.getFile(), request, userPrincipal.getUserId());
@@ -104,7 +103,7 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RestException(ErrorCode.TICKET_NOT_FOUND));
 
-        validateOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
         ticketRepository.delete(ticket);
     }
@@ -114,7 +113,7 @@ public class TicketService {
         TicketBook ticketBook = ticketBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        validateOwner(ticketBook.getArchive().getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(ticketBook.getArchive().getUser().getId(), userPrincipal);
 
         ticketBook.updateTitle(request.getTitle());
 
@@ -122,41 +121,6 @@ public class TicketService {
     }
 
     // --- Helpers ---
-    private void validateOwner(Long ownerId, UserPrincipal userPrincipal) {
-        if (!ownerId.equals(userPrincipal.getUserId())) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-    }
-
-    private void validateReadPermission(Archive archive, UserPrincipal userPrincipal) {
-        Long ownerId = archive.getUser().getId();
-        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-        //Visibility visibility = ticket.getTicketBook().getArchive().getVisibility();
-
-        if (ownerId.equals(viewerId)) return;
-
-        switch (archive.getVisibility()) {
-            case PRIVATE ->
-                    throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 주인 외 접근 불가
-            case RESTRICTED -> {
-                if (!checkFriendRelationship(viewerId, ownerId)) {
-                    throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-                }
-            }
-            case PUBLIC -> { /* 모두 허용 */ }
-        }
-    }
-
-    private boolean checkFriendRelationship(Long viewerId, Long ownerId) {
-        if (viewerId == null) return false;
-
-        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
-                viewerId,
-                ownerId,
-                FriendStatus.ACCEPTED
-        );
-    }
-
     private File resolveUpdatedFile(File currentFile, TicketDto.UpdateRequest request, Long userId) {
         // 1. 삭제 요청인 경우 -> null 리턴 (DB에서 관계 끊김)
         if (Boolean.TRUE.equals(request.getDeleteFile())) {
