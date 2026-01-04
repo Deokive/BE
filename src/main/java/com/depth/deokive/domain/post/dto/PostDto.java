@@ -9,6 +9,7 @@ import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -104,6 +105,10 @@ public class PostDto {
         @Schema(description = "좋아요 수", example = "25")
         private Long likeCount;
 
+        @JsonProperty("isLiked")
+        @Schema(description = "내가 좋아요 눌렀는지 여부", example = "true")
+        private boolean isLiked;
+
         @Schema(description = "핫 스코어", example = "50.5")
         private Double hotScore;
 
@@ -140,7 +145,7 @@ public class PostDto {
         """)
         private List<FileDto.UploadFileResponse> files;
 
-        public static Response of(Post post, List<PostFileMap> maps) {
+        public static Response of(Post post, List<PostFileMap> maps, boolean isLiked) {
             return Response.builder()
                     .id(post.getId())
                     .title(post.getTitle())
@@ -152,6 +157,7 @@ public class PostDto {
                     .lastModifiedBy(post.getLastModifiedBy())
                     .viewCount(post.getViewCount())
                     .likeCount(post.getLikeCount())
+                    .isLiked(isLiked)
                     .hotScore(post.getHotScore())
                     .files(toFileResponses(maps))
                     .build();

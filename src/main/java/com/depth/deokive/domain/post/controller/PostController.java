@@ -38,9 +38,10 @@ public class PostController {
     @GetMapping("/{postId}")
     @Operation(summary = "게시글 상세 조회", description = "게시글 ID로 상세 정보를 조회합니다.")
     public ResponseEntity<PostDto.Response> getPost(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId
     ) {
-        PostDto.Response response = postService.getPost(postId);
+        PostDto.Response response = postService.getPost(userPrincipal, postId);
         return ResponseEntity.ok(response);
     }
 

@@ -10,6 +10,7 @@ import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
+import com.depth.deokive.domain.post.repository.PostLikeRepository;
 import com.depth.deokive.domain.post.repository.PostQueryRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
@@ -38,6 +39,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final PostFileMapRepository postFileMapRepository;
+    private final PostLikeRepository postLikeRepository;
     private final FileService fileService;
     private final PostQueryRepository postQueryRepository;
 
@@ -54,12 +56,12 @@ public class PostService {
         // SEQ 3. 파일 연결
         List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 4. Response
-        return PostDto.Response.of(post, maps);
+        // SEQ 4. Response (생성 시점에는 좋아요 없음)
+        return PostDto.Response.of(post, maps, false);
     }
 
     @Transactional
-    public PostDto.Response getPost(Long postId) {
+    public PostDto.Response getPost(UserPrincipal userPrincipal, Long postId) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
@@ -67,11 +69,15 @@ public class PostService {
         // SEQ 2. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
 
-        // SEQ 4. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
+        // SEQ 3. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
         post.increaseViewCount();
 
+        // SEQ 4. 좋아요 여부 조회
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        boolean isLiked = (viewerId != null) && postLikeRepository.existsByPostIdAndUserId(postId, viewerId);
+
         // SEQ 5. Return
-        return PostDto.Response.of(post, maps);
+        return PostDto.Response.of(post, maps, isLiked);
     }
 
     @Transactional
@@ -99,8 +105,11 @@ public class PostService {
             maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
         }
 
+        // SEQ 5. 좋아요 여부 조회
+        boolean isLiked = postLikeRepository.existsByPostIdAndUserId(postId, userPrincipal.getUserId());
+
         // SEQ 6. Return
-        return PostDto.Response.of(post, maps);
+        return PostDto.Response.of(post, maps, isLiked);
     }
 
     @Transactional
@@ -116,7 +125,10 @@ public class PostService {
         // SEQ 3. 파일 매핑 해제: Cascade.REMOVE 의 N+1 문제 및 성능 이슈 -> 명시적 삭제: Bulk 처리 (Using JPQL)
         postFileMapRepository.deleteAllByPostId(postId);
 
-        // SEQ 4. 게시글 삭제
+        // SEQ 4. 좋아요 삭제
+        postLikeRepository.deleteByPostId(postId);
+
+        // SEQ 5. 게시글 삭제
         postRepository.delete(post);
     }
 
