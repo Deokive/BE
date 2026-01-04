@@ -65,7 +65,7 @@ public class DiaryController {
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/{archiveId}")
+    @PatchMapping("/book/{archiveId}")
     @Operation(summary = "다이어리북 제목 수정", description = "다이어리북(폴더)의 제목을 수정합니다.")
     public ResponseEntity<DiaryDto.UpdateBookTitleResponse> updateDiaryBookTitle(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
