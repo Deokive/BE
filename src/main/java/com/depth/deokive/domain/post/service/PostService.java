@@ -131,8 +131,8 @@ public class PostService {
         PageUtils.validatePageRange(page);
 
         String title;
-        if (request.getCategory() == null) { title = "전체 게시판"; }
-        else if ("hotScore".equals(request.getSort())) { title = "핫한 게시판"; }
+        if ("hotScore".equals(request.getSort())) { title = "핫한 게시판"; }
+        else if (request.getCategory() == null) { title = "전체 게시판"; }
         else { title = request.getCategory().name() + " 게시판"; }
 
         return PageDto.PageListResponse.of(title, page);
@@ -156,6 +156,11 @@ public class PostService {
         List<Long> fileIds = fileRequests.stream()
                 .map(PostDto.AttachedFileRequest::getFileId)
                 .collect(Collectors.toList());
+
+        long uniqueCount = fileIds.stream().distinct().count();
+        if (fileIds.size() != uniqueCount) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
 
         // SEQ 3. File Entity Bulk Fetch
         List<File> files = fileService.validateFileOwners(fileIds, userId);
