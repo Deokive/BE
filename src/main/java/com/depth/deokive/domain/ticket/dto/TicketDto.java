@@ -152,7 +152,19 @@ public class TicketDto {
                     .score(ticket.getScore())
                     .review(ticket.getReview())
                     .ticketBookId(ticket.getTicketBook().getId())
-                    .file(ticket.getFile() != null ? FileDto.UploadFileResponse.of(ticket.getFile(), null) : null)
+                    .file(ticket.getFile() != null ? toFileResponse(ticket.getFile()) : null)
+                    .build();
+        }
+
+        private static FileDto.UploadFileResponse toFileResponse(File file) {
+            return FileDto.UploadFileResponse.builder()
+                    .fileId(file.getId())
+                    .filename(file.getFilename())
+                    .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
+                    .fileSize(file.getFileSize())
+                    .mediaType(file.getMediaType().name())
+                    .mediaRole(com.depth.deokive.domain.file.entity.enums.MediaRole.PREVIEW)
+                    .sequence(0)
                     .build();
         }
     }
