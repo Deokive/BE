@@ -38,6 +38,10 @@ public class ArchiveGuard {
 
     // 3. 소유자(수정/삭제 권한) 체크
     public void checkOwner(Long ownerId, UserPrincipal user) {
+        if (user == null) {
+            throw new RestException(ErrorCode.USER_UNAUTHORIZED);
+        }
+
         if (!ownerId.equals(user.getUserId())) {
             throw new RestException(ErrorCode.AUTH_FORBIDDEN);
         }
