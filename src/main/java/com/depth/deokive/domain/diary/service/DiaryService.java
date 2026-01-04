@@ -194,6 +194,11 @@ public class DiaryService {
         List<Long> fileIds = fileRequests.stream()
                 .map(DiaryDto.AttachedFileRequest::getFileId).toList();
 
+        long uniqueCount = fileIds.stream().distinct().count();
+        if (fileIds.size() != uniqueCount) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
+
         // SEQ 3. File Entity Bulk Fetch
         List<File> files = fileService.validateFileOwners(fileIds, userId);
 
