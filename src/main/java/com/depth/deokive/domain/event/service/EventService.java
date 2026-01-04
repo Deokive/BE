@@ -140,7 +140,7 @@ public class EventService {
 
         // SEQ 3. 날짜 범위 계산 (해당 월의 1일 00:00 ~ 말일 23:59)
         LocalDateTime startDateTime = LocalDateTime.of(year, month, 1, 0, 0);
-        LocalDateTime endDateTime = startDateTime.plusMonths(1).minusNanos(1);
+        LocalDateTime endDateTime = startDateTime.plusMonths(1);
 
         // SEQ 4. 이벤트 조회
         List<Event> events = eventRepository.findAllByArchiveAndDateRange(archiveId, startDateTime, endDateTime);
