@@ -58,7 +58,7 @@ public class PostService {
         return PostDto.Response.of(post, maps);
     }
 
-    @Transactional(readOnly=true)
+    @Transactional
     public PostDto.Response getPost(Long postId) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
