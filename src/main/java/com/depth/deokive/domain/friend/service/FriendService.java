@@ -3,6 +3,8 @@ package com.depth.deokive.domain.friend.service;
 import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
+import com.depth.deokive.domain.notification.dto.event.NotificationEvent;
+import com.depth.deokive.domain.notification.entity.enums.NotificationType;
 import com.depth.deokive.domain.notification.service.NotificationService;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -10,6 +12,7 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +24,7 @@ public class FriendService {
 
     private final FriendMapRepository friendMapRepository;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 친구 요청
@@ -81,7 +84,16 @@ public class FriendService {
         }
 
         // SEQ 5. 알림
-        notificationService.sendFriendRequestNotification(friendId, userId);
+        String message = me.getNickname() + "님이 친구 요청을 보냈습니다.";
+        String relatedUrl = "/users/" + userId;
+
+        eventPublisher.publishEvent(NotificationEvent.of(
+                friendId,
+                userId,
+                NotificationType.FRIEND_REQUEST,
+                message,
+                relatedUrl
+        ));
     }
 
     /**
@@ -92,7 +104,7 @@ public class FriendService {
         Long userId = userPrincipal.getUserId();
 
         // SEQ 1. 자기 자신에게 친구 요청을 수락한 경우
-        if (userId.equals(friendId)) {
+        if(userId.equals(friendId)) {
             throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
@@ -100,7 +112,7 @@ public class FriendService {
                 userId, friendId, FriendStatus.ACCEPTED);
 
         // SEQ 2. 이미 친구인 경우
-        if (isAlreadyFriend) {
+        if(isAlreadyFriend) {
             throw new RestException(ErrorCode.FRIEND_ALREADY_EXISTS);
         }
 
@@ -116,8 +128,6 @@ public class FriendService {
         User me = userRepository.getReferenceById(userId);
         User friend = userRepository.getReferenceById(friendId);
 
-        Optional<FriendMap> myMapOptional = friendMapRepository.findByUserIdAndFriendId(userId, friendId);
-
         FriendMap myMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
                 .orElse(FriendMap.builder()
                         .user(me)
@@ -129,7 +139,16 @@ public class FriendService {
         friendMapRepository.save(myMap);
 
         // SEQ 6. 알림
-        notificationService.sendFriendAcceptNotification(friendId, userId);
+        String message = me.getNickname() + "님이 친구 요청을 수락했습니다.";
+        String relatedUrl = "/users/" + userId;
+
+        eventPublisher.publishEvent(NotificationEvent.of(
+                friendId,
+                userId,
+                NotificationType.FRIEND_ACCEPT,
+                message,
+                relatedUrl
+        ));
     }
 
     /**
@@ -140,7 +159,7 @@ public class FriendService {
         Long userId = userPrincipal.getUserId();
 
         // SEQ 1. 자기 자신일 때
-        if (userId.equals(friendId)) {
+        if(userId.equals(friendId)) {
             throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
@@ -148,7 +167,7 @@ public class FriendService {
         boolean isAlreadyFriend = friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
                 userId, friendId, FriendStatus.ACCEPTED);
 
-        if (isAlreadyFriend) {
+        if(isAlreadyFriend) {
             throw new RestException(ErrorCode.FRIEND_ALREADY_EXISTS);
         }
 
@@ -169,7 +188,7 @@ public class FriendService {
         Long userId = userPrincipal.getUserId(); // 나
 
         // 자기 자신일 때
-        if (userId.equals(friendId)) {
+        if(userId.equals(friendId)) {
             throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
@@ -178,7 +197,7 @@ public class FriendService {
                 .orElseThrow(() -> new RestException(ErrorCode.FRIEND_SEND_REQUEST_NOT_FOUND));
 
         // SEQ 3. 상태 검증
-        if (sentMap.getFriendStatus() != FriendStatus.PENDING) {
+        if(sentMap.getFriendStatus() != FriendStatus.PENDING) {
             throw new RestException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
         }
 
@@ -194,7 +213,7 @@ public class FriendService {
         Long userId = userPrincipal.getUserId(); // 나
 
         // 자기 자신일 때
-        if (userId.equals(friendId)) {
+        if(userId.equals(friendId)) {
             throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
@@ -236,19 +255,12 @@ public class FriendService {
                 .orElseThrow(() -> new RestException(ErrorCode.FRIEND_CANCELED_NOT_FOUND));
 
         // SEQ 2. 상태 검증(CANCELED일 떄만 가능)
-        if (myMap.getFriendStatus() == FriendStatus.ACCEPTED) {
-            throw new RestException(ErrorCode.FRIEND_ALREADY_EXISTS);
-        }
-
-        // CANCELED 상태가 아닐 때
-        if(myMap.getFriendStatus() != FriendStatus.CANCELED) {
+        if(myMap.getFriendStatus() != FriendStatus.CANCELED || friendMap.getFriendStatus() != FriendStatus.CANCELED) {
             throw new RestException(ErrorCode.FRIEND_RECOVER_BAD_REQUEST);
         }
 
         // SEQ 3. 상태 변경
         myMap.updateStatus(FriendStatus.ACCEPTED);
-
-        User me = userRepository.getReferenceById(userId);
-        myMap.updateRequestedBy(me);
+        friendMap.updateStatus(FriendStatus.ACCEPTED);
     }
 }
