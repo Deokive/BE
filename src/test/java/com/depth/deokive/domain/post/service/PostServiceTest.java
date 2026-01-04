@@ -1,329 +1,780 @@
 package com.depth.deokive.domain.post.service;
 
-/** PostService CRUD 테스트 */
-class PostServiceTest {
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.test.IntegrationTestSupport;
+import com.depth.deokive.common.util.ThumbnailUtils;
+import com.depth.deokive.domain.file.entity.File;
+import com.depth.deokive.domain.file.entity.enums.MediaRole;
+import com.depth.deokive.domain.file.entity.enums.MediaType;
+import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.post.dto.PostDto;
+import com.depth.deokive.domain.post.entity.Post;
+import com.depth.deokive.domain.post.entity.PostFileMap;
+import com.depth.deokive.domain.post.entity.enums.Category;
+import com.depth.deokive.domain.post.repository.PostFileMapRepository;
+import com.depth.deokive.domain.post.repository.PostRepository;
+import com.depth.deokive.domain.user.entity.User;
+import com.depth.deokive.domain.user.entity.enums.Role;
+import com.depth.deokive.domain.user.entity.enums.UserType;
+import com.depth.deokive.system.exception.model.ErrorCode;
+import com.depth.deokive.system.exception.model.RestException;
+import com.depth.deokive.system.security.model.UserPrincipal;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 
-    /** Setup */
-    // Users : UserA, UserB, UserC, UserD (N명 설정)
-    // Posts : User 당 10개의 Posts 생성 (다양한 카테고리 분배)
-    // Files : Post 당 10개의 더미 Files, 테스트를 위한 여분의 더미 파일 넉넉히 세팅
-    // PostFileMap : 각 Post의 파일들은 sequence 순서대로, MediaRole(PREVIEW/CONTENT) 분배
-    // like, view : hotScore 처리를 위해 적정 비율로 분배 (일부 Post는 높은 like/view, 일부는 낮은 like/view)
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 
-    // [Category 1]. Create ----------------------------------------------------------
-    
-    // === [ 정상 케이스 ] ===
-    /** SCENE 1. createPost - 정상 케이스 (파일 포함, PREVIEW 파일 있음) */
-    // Given: UserA UserPrincipal, 제목, 내용, 카테고리, 파일 목록 (PREVIEW 파일 포함)
-    // When: createPost 호출
-    // Then: Post 엔티티가 저장되었는지 확인
-    // Then: PostFileMap이 생성되었는지 확인
-    // Then: 파일 순서(sequence)가 올바르게 저장되었는지 확인
-    // Then: 썸네일이 PREVIEW 파일 기반인지 확인
-    // Then: 썸네일 Key가 Medium 크기로 변환되었는지 확인
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-    /** SCENE 2. createPost - 정상 케이스 (파일 포함, PREVIEW 파일 없음) */
-    // Given: UserA UserPrincipal, 제목, 내용, 카테고리, 파일 목록 (PREVIEW 없음, CONTENT만)
-    // When: createPost 호출
-    // Then: Post 엔티티가 저장되었는지 확인
-    // Then: PostFileMap이 생성되었는지 확인
-    // Then: 썸네일이 첫 번째 파일(sequence 0) 기반인지 확인
+@DisplayName("PostService 통합 테스트")
+class PostServiceTest extends IntegrationTestSupport {
 
-    /** SCENE 3. createPost - 정상 케이스 (다양한 카테고리) */
-    // Given: UserA UserPrincipal, 제목, 내용, 각 카테고리별로, 파일 목록
-    // When: createPost 호출 (각 카테고리별로)
-    // Then: Post 엔티티가 저장되었는지 확인
-    // Then: Post의 카테고리가 올바르게 설정되었는지 확인
+    @Autowired PostService postService;
+    @Autowired PostRepository postRepository;
+    @Autowired PostFileMapRepository postFileMapRepository;
+    @Autowired FileRepository fileRepository;
 
-    /** SCENE 4. createPost - 파일 없이 생성 */
-    // Given: UserA UserPrincipal, 제목, 내용, 카테고리, 파일 목록 = null
-    // When: createPost 호출
-    // Then: Post 엔티티가 저장되었는지 확인
-    // Then: PostFileMap이 생성되지 않았는지 확인
-    // Then: 썸네일이 null인지 확인
+    // Test Data
+    private User userA;
+    private User userB;
 
-    /** SCENE 5. createPost - 파일 없이 생성 (빈 리스트) */
-    // Given: UserA UserPrincipal, 제목, 내용, 카테고리, 파일 목록 = []
-    // When: createPost 호출
-    // Then: Post 엔티티가 저장되었는지 확인
-    // Then: PostFileMap이 생성되지 않았는지 확인
-    // Then: 썸네일이 null인지 확인
+    private List<File> userAFiles;
+    private List<File> userBFiles;
 
-    // === [ 예외 케이스 ] ===
-    /** SCENE 6. createPost - 존재하지 않는 사용자 */
-    // Given: 존재하지 않는 userId를 가진 UserPrincipal
-    // When: createPost 호출
-    // Then: USER_NOT_FOUND 예외 발생 확인
+    @BeforeEach
+    void setUp() {
+        // Users Setup
+        userA = createTestUser("usera@test.com", "UserA");
+        userB = createTestUser("userb@test.com", "UserB");
 
-    /** SCENE 7. createPost - 다른 사용자의 파일 사용 시도 */
-    // Given: UserA UserPrincipal, UserB가 소유한 파일 ID
-    // When: createPost 호출
-    // Then: FILE_NOT_FOUND 또는 권한 예외 발생 확인
+        // Files Setup (UserA: 20 files, UserB: 5 files)
+        setupMockUser(userA);
+        userAFiles = createFiles(userA, 20);
 
-    /** SCENE 8. createPost - 중복된 파일 ID */
-    // Given: UserA UserPrincipal, 중복된 파일 ID 목록
-    // When: createPost 호출
-    // Then: FILE_NOT_FOUND 예외 발생 확인 (파일 개수 불일치)
+        setupMockUser(userB);
+        userBFiles = createFiles(userB, 5);
 
-    /** SCENE 9. createPost - 존재하지 않는 파일 ID */
-    // Given: UserA UserPrincipal, 존재하지 않는 파일 ID 목록
-    // When: createPost 호출
-    // Then: FILE_NOT_FOUND 예외 발생 확인
+        SecurityContextHolder.clearContext();
+    }
 
-    // [Category 2]. Read ----------------------------------------------------------
-    
-    // === [ 정상 케이스 ] ===
-    /** SCENE 10. getPost - 정상 케이스 (파일 포함, 본인 조회) */
-    // Given: UserA의 Post, PostFileMap들 (10개), UserA UserPrincipal
-    // When: getPost 호출
-    // Then: Post 정보가 정확히 반환되는지 확인
-    // Then: PostFileMap이 올바른 순서(sequence)로 반환되는지 확인
-    // Then: 조회수가 증가했는지 확인
-    // Then: 각 파일의 이미지 URL이 정확히 반환되는지 확인
+    private User createTestUser(String email, String nickname) {
+        User user = User.builder()
+                .email(email)
+                .username("user_" + UUID.randomUUID())
+                .nickname(nickname)
+                .password("password")
+                .role(Role.USER)
+                .userType(UserType.COMMON)
+                .isEmailVerified(true)
+                .build();
+        return userRepository.save(user);
+    }
 
-    /** SCENE 11. getPost - 정상 케이스 (파일 포함, 타인 조회) */
-    // Given: UserA의 Post, PostFileMap들, UserB UserPrincipal
-    // When: getPost 호출
-    // Then: Post 정보가 정확히 반환되는지 확인
-    // Then: PostFileMap이 올바른 순서로 반환되는지 확인
-    // Then: 조회수가 증가했는지 확인
+    private List<File> createFiles(User owner, int count) {
+        List<File> files = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            String uuid = UUID.randomUUID().toString();
+            File file = fileRepository.save(File.builder()
+                    .filename("file_" + uuid + ".jpg")
+                    .s3ObjectKey("posts/" + owner.getNickname() + "/" + uuid + ".jpg")
+                    .fileSize(100L)
+                    .mediaType(MediaType.IMAGE)
+                    .createdBy(owner.getId())
+                    .lastModifiedBy(owner.getId())
+                    .build());
+            files.add(file);
+        }
+        return files;
+    }
 
-    /** SCENE 12. getPost - 정상 케이스 (파일 없음) */
-    // Given: UserA의 Post, PostFileMap 없음
-    // When: getPost 호출
-    // Then: Post 정보가 정확히 반환되는지 확인
-    // Then: 파일 목록이 빈 리스트인지 확인
-    // Then: 조회수가 증가했는지 확인
+    // ========================================================================================
+    // [Category 1]: Create
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 1] Create Post")
+    class Create {
 
-    /** SCENE 13. getPost - 정상 케이스 (PREVIEW 파일 포함) */
-    // Given: UserA의 Post, PostFileMap들 (PREVIEW 파일 포함)
-    // When: getPost 호출
-    // Then: Post 정보가 정확히 반환되는지 확인
-    // Then: PREVIEW 파일이 올바른 순서로 포함되었는지 확인
+        @Test
+        @DisplayName("SCENE 1: 정상 케이스 (파일 포함, PREVIEW 파일 있음)")
+        void createPost_WithPreview() {
+            // Given
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            // Sequence 0: CONTENT
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0));
+            // Sequence 1: PREVIEW (Thumbnail target)
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(1).getId(), MediaRole.PREVIEW, 1));
 
-    /** SCENE 14. getPost - 정상 케이스 (CONTENT 파일만) */
-    // Given: UserA의 Post, PostFileMap들 (CONTENT만, PREVIEW 없음)
-    // When: getPost 호출
-    // Then: Post 정보가 정확히 반환되는지 확인
-    // Then: 모든 파일이 CONTENT로 반환되는지 확인
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Title")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
 
-    /** SCENE 15. getPost - 조회수 증가 확인 (동시성 고려) */
-    // Given: UserA의 Post (초기 viewCount = 0), 여러 번 조회
-    // When: getPost 호출 (3번)
-    // Then: 조회수가 3으로 증가했는지 확인
+            // When
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
 
-    // === [ 예외 케이스 ] ===
-    /** SCENE 16. getPost - 존재하지 않는 Post */
-    // Given: 존재하지 않는 postId
-    // When: getPost 호출
-    // Then: POST_NOT_FOUND 예외 발생 확인
+            // Then
+            Post post = postRepository.findById(response.getId()).orElseThrow();
+            assertThat(post.getTitle()).isEqualTo("Title");
 
-    // [Category 3]. Update ----------------------------------------------------------
-    
-    // === [ 정상 케이스 ] ===
-    /** SCENE 17. updatePost - 정상 케이스 (제목, 내용, 카테고리 수정) */
-    // Given: UserA의 Post, UserA UserPrincipal, 새로운 제목, 내용, 카테고리
-    // When: updatePost 호출
-    // Then: Post의 제목이 업데이트되었는지 확인
-    // Then: Post의 내용이 업데이트되었는지 확인
-    // Then: Post의 카테고리가 업데이트되었는지 확인
-    // Then: 기존 PostFileMap이 유지되었는지 확인
+            // File Map check
+            List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(maps).hasSize(2);
+            assertThat(maps.get(1).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
 
-    /** SCENE 18. updatePost - 제목만 수정 */
-    // Given: UserA의 Post, UserA UserPrincipal, 새로운 제목, 내용 = null, 카테고리 = null
-    // When: updatePost 호출
-    // Then: Post의 제목만 업데이트되었는지 확인
-    // Then: 기존 내용과 카테고리가 유지되었는지 확인
+            // Thumbnail check
+            String expectedThumb = ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(1).getS3ObjectKey());
+            assertThat(post.getThumbnailKey()).isEqualTo(expectedThumb);
+        }
 
-    /** SCENE 19. updatePost - 내용만 수정 */
-    // Given: UserA의 Post, UserA UserPrincipal, 제목 = null, 새로운 내용, 카테고리 = null
-    // When: updatePost 호출
-    // Then: Post의 내용만 업데이트되었는지 확인
-    // Then: 기존 제목과 카테고리가 유지되었는지 확인
+        @Test
+        @DisplayName("SCENE 2: 정상 케이스 (파일 포함, PREVIEW 파일 없음)")
+        void createPost_NoPreview() {
+            // Given
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0));
 
-    /** SCENE 20. updatePost - 카테고리만 수정 */
-    // Given: UserA의 Post, UserA UserPrincipal, 제목 = null, 내용 = null, 새로운 카테고리
-    // When: updatePost 호출
-    // Then: Post의 카테고리만 업데이트되었는지 확인
-    // Then: 기존 제목과 내용이 유지되었는지 확인
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Title")
+                    .content("Content")
+                    .category(Category.ACTOR)
+                    .files(files)
+                    .build();
 
-    /** SCENE 21. updatePost - 파일 전체 교체 (PREVIEW 파일 포함) */
-    // Given: UserA의 Post, 기존 파일들, UserA UserPrincipal, 새로운 파일 목록 (PREVIEW 포함)
-    // When: updatePost 호출
-    // Then: 기존 PostFileMap이 삭제되었는지 확인
-    // Then: 새로운 PostFileMap이 생성되었는지 확인
-    // Then: 썸네일이 PREVIEW 파일 기반으로 업데이트되었는지 확인
+            // When
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
 
-    /** SCENE 22. updatePost - 파일 전체 교체 (PREVIEW 파일 없음) */
-    // Given: UserA의 Post, 기존 파일들, UserA UserPrincipal, 새로운 파일 목록 (PREVIEW 없음)
-    // When: updatePost 호출
-    // Then: 기존 PostFileMap이 삭제되었는지 확인
-    // Then: 새로운 PostFileMap이 생성되었는지 확인
-    // Then: 썸네일이 첫 번째 파일 기반으로 업데이트되었는지 확인
+            // Then
+            Post post = postRepository.findById(response.getId()).orElseThrow();
+            String expectedThumb = ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(0).getS3ObjectKey());
+            assertThat(post.getThumbnailKey()).isEqualTo(expectedThumb);
+        }
 
-    /** SCENE 23. updatePost - 파일 삭제 (빈 리스트) */
-    // Given: UserA의 Post, 기존 파일들, UserA UserPrincipal, 파일 목록 = []
-    // When: updatePost 호출
-    // Then: 모든 PostFileMap이 삭제되었는지 확인
-    // Then: 썸네일이 null인지 확인
+        @Test
+        @DisplayName("SCENE 3: 정상 케이스 (다양한 카테고리)")
+        void createPost_Categories() {
+            setupMockUser(userA);
 
-    /** SCENE 24. updatePost - 파일 유지 (파일 목록 = null) */
-    // Given: UserA의 Post, 기존 파일들, UserA UserPrincipal, 파일 목록 = null
-    // When: updatePost 호출
-    // Then: 기존 PostFileMap이 유지되었는지 확인
-    // Then: 썸네일이 기존과 동일한지 확인
+            for (Category category : Category.values()) {
+                PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                        .title("Post " + category)
+                        .content("Content")
+                        .category(category)
+                        .files(null)
+                        .build();
 
-    /** SCENE 25. updatePost - 파일 추가 (기존 파일 유지 후 새 파일 추가) */
-    // Given: UserA의 Post, 기존 파일들 (5개), UserA UserPrincipal, 새로운 파일 목록 (기존 5개 + 새 3개)
-    // When: updatePost 호출
-    // Then: 기존 PostFileMap이 삭제되었는지 확인
-    // Then: 새로운 PostFileMap이 8개 생성되었는지 확인
-    // Then: 파일 순서가 올바르게 설정되었는지 확인
+                PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
+                Post post = postRepository.findById(response.getId()).orElseThrow();
+                assertThat(post.getCategory()).isEqualTo(category);
+            }
+        }
 
-    // === [ 예외 케이스 ] ===
-    /** SCENE 26. updatePost - 타인 수정 시도 */
-    // Given: UserA의 Post, UserB UserPrincipal
-    // When: updatePost 호출
-    // Then: AUTH_FORBIDDEN 예외 발생 확인
+        @Test
+        @DisplayName("SCENE 4: 파일 없이 생성 (files = null)")
+        void createPost_NullFiles() {
+            setupMockUser(userA);
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("No File")
+                    .content("Content")
+                    .category(Category.MUSICIAN)
+                    .files(null)
+                    .build();
 
-    /** SCENE 27. updatePost - 존재하지 않는 Post */
-    // Given: 존재하지 않는 postId, UserA UserPrincipal
-    // When: updatePost 호출
-    // Then: POST_NOT_FOUND 예외 발생 확인
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
+            Post post = postRepository.findById(response.getId()).orElseThrow();
 
-    /** SCENE 28. updatePost - 다른 사용자의 파일 사용 시도 */
-    // Given: UserA의 Post, UserA UserPrincipal, UserB가 소유한 파일 ID
-    // When: updatePost 호출
-    // Then: FILE_NOT_FOUND 또는 권한 예외 발생 확인
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).isEmpty();
+            assertThat(post.getThumbnailKey()).isNull();
+        }
 
-    // [Category 4]. Delete ----------------------------------------------------------
-    
-    // === [ 정상 케이스 ] ===
-    /** SCENE 29. deletePost - 정상 케이스 (파일 포함) */
-    // Given: UserA의 Post, 관련된 PostFileMap들 (10개), UserA UserPrincipal
-    // When: deletePost 호출
-    // Then: PostFileMap이 삭제되었는지 확인 (Bulk 삭제)
-    // Then: Post가 삭제되었는지 확인
-    // Then: File 엔티티는 유지되었는지 확인 (다른 Post에서 사용 가능)
+        @Test
+        @DisplayName("SCENE 5: 파일 없이 생성 (files = empty)")
+        void createPost_EmptyFiles() {
+            setupMockUser(userA);
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Empty File")
+                    .content("Content")
+                    .category(Category.SPORT)
+                    .files(Collections.emptyList())
+                    .build();
 
-    /** SCENE 30. deletePost - 정상 케이스 (파일 없음) */
-    // Given: UserA의 Post, PostFileMap 없음, UserA UserPrincipal
-    // When: deletePost 호출
-    // Then: Post가 삭제되었는지 확인
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
 
-    // === [ 예외 케이스 ] ===
-    /** SCENE 31. deletePost - 타인 삭제 시도 */
-    // Given: UserA의 Post, UserB UserPrincipal
-    // When: deletePost 호출
-    // Then: AUTH_FORBIDDEN 예외 발생 확인
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(response.getId())).isEmpty();
+        }
 
-    /** SCENE 32. deletePost - 존재하지 않는 Post */
-    // Given: 존재하지 않는 postId, UserA UserPrincipal
-    // When: deletePost 호출
-    // Then: POST_NOT_FOUND 예외 발생 확인
+        @Test
+        @DisplayName("SCENE 6: 존재하지 않는 사용자 (UserPrincipal ID가 DB에 없음)")
+        void createPost_UserNotFound() {
+            // Given: ID가 DB에 없는 Principal 생성
+            UserPrincipal invalidPrincipal = UserPrincipal.builder().userId(99999L).role(Role.USER).build();
 
-    // [Category 5]. Read-Pagination ----------------------------------------------------------
-    
-    // === [ 전체 카테고리 ] ===
-    /** SCENE 33. getPosts - 정상 케이스 (전체 카테고리, 기본 정렬) */
-    // Given: 여러 카테고리의 Post들, 카테고리 = null, sort = null, 페이지 정보
-    // When: getPosts 호출
-    // Then: 모든 카테고리의 Post가 반환되는지 확인
-    // Then: 페이지 제목이 "전체 게시판"인지 확인
-    // Then: 페이지네이션이 정상 동작하는지 확인
-    // Then: 정렬이 최신순(기본)인지 확인
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Fail").content("C").category(Category.ARTIST).build();
 
-    /** SCENE 34. getPosts - 정상 케이스 (전체 카테고리, hotScore 정렬) */
-    // Given: 여러 카테고리의 Post들, 카테고리 = null, sort = "hotScore", 페이지 정보
-    // When: getPosts 호출
-    // Then: 모든 카테고리의 Post가 반환되는지 확인
-    // Then: hotScore 기준으로 정렬되었는지 확인 (높은 순서)
-    // Then: 페이지 제목이 "핫한 게시판"인지 확인
+            // When & Then (Service: userRepository.findById().orElseThrow(USER_NOT_FOUND))
+            assertThatThrownBy(() -> postService.createPost(invalidPrincipal, request))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+        }
 
-    // === [ 특정 카테고리 ] ===
-    /** SCENE 35. getPosts - 정상 케이스 (특정 카테고리, 기본 정렬) */
-    // Given: 특정 카테고리의 Post들, 카테고리 지정, sort = null, 페이지 정보
-    // When: getPosts 호출
-    // Then: 해당 카테고리의 Post만 반환되는지 확인
-    // Then: 다른 카테고리의 Post는 반환되지 않는지 확인
-    // Then: 페이지 제목이 카테고리명을 포함하는지 확인
-    // Then: 정렬이 최신순(기본)인지 확인
+        @Test
+        @DisplayName("SCENE 7: 다른 사용자의 파일 사용 시도")
+        void createPost_IDOR() {
+            setupMockUser(userA);
+            // UserA가 UserB의 파일(userBFiles)을 사용 시도 -> validateFileOwners에서 걸러짐
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userBFiles.get(0).getId(), MediaRole.CONTENT, 0)
+            );
 
-    /** SCENE 36. getPosts - 정상 케이스 (특정 카테고리, hotScore 정렬) */
-    // Given: 특정 카테고리의 Post들, 카테고리 지정, sort = "hotScore", 페이지 정보
-    // When: getPosts 호출
-    // Then: 해당 카테고리의 Post만 반환되는지 확인
-    // Then: hotScore 기준으로 정렬되었는지 확인
-    // Then: 페이지 제목이 카테고리명을 포함하는지 확인
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("IDOR")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
 
-    /** SCENE 37. getPosts - 정상 케이스 (각 카테고리별 조회) */
-    // Given: 각 카테고리별 Post들, 각 카테고리별로 조회
-    // When: getPosts 호출 (각 카테고리별로)
-    // Then: 해당 카테고리의 Post만 반환되는지 확인
-    // Then: 페이지 제목이 각 카테고리명을 포함하는지 확인
+            // Service: if (files.size() != fileIds.size()) throw FILE_NOT_FOUND
+            assertThatThrownBy(() -> postService.createPost(UserPrincipal.from(userA), request))
+                    .isInstanceOf(RestException.class)
+                    .extracting("errorCode")
+                    .satisfies(code -> assertThat(code).isIn(ErrorCode.FILE_NOT_FOUND, ErrorCode.AUTH_FORBIDDEN));
+        }
 
-    // === [ hotScore 정렬 상세 테스트 ] ===
-    /** SCENE 38. getPosts - hotScore 정렬 (높은 like/view 우선) */
-    // Given: 여러 Post들 (다양한 like/view 수), sort = "hotScore"
-    // When: getPosts 호출
-    // Then: hotScore가 높은 Post가 먼저 반환되는지 확인
-    // Then: hotScore 계산이 정확한지 확인 (like, view 비율)
+        @Test
+        @DisplayName("SCENE 8: 중복된 파일 ID")
+        void createPost_DuplicateFileId() {
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0),
+                    new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 1) // 중복
+            );
 
-    /** SCENE 39. getPosts - hotScore 정렬 (동일한 hotScore 처리) */
-    // Given: 여러 Post들 (동일한 hotScore), sort = "hotScore"
-    // When: getPosts 호출
-    // Then: 동일한 hotScore의 Post들이 올바르게 정렬되는지 확인
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Dup")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
 
-    /** SCENE 40. getPosts - hotScore 정렬 (카테고리별) */
-    // Given: 특정 카테고리의 Post들 (다양한 hotScore), 카테고리 지정, sort = "hotScore"
-    // When: getPosts 호출
-    // Then: 해당 카테고리 내에서 hotScore 기준으로 정렬되는지 확인
+            assertThatThrownBy(() -> postService.createPost(UserPrincipal.from(userA), request))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FILE_NOT_FOUND);
+        }
 
-    // === [ 페이지네이션 테스트 ] ===
-    /** SCENE 41. getPosts - 페이지네이션 (첫 페이지) */
-    // Given: 여러 Post들, 페이지 정보 (page = 0)
-    // When: getPosts 호출
-    // Then: 첫 페이지의 Post들이 반환되는지 확인
-    // Then: 페이지 정보가 정확한지 확인
+        @Test
+        @DisplayName("SCENE 9: 존재하지 않는 파일 ID")
+        void createPost_FileNotFound() {
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(99999L, MediaRole.CONTENT, 0)
+            );
 
-    /** SCENE 42. getPosts - 페이지네이션 (중간 페이지) */
-    // Given: 여러 Post들, 페이지 정보 (page = 1)
-    // When: getPosts 호출
-    // Then: 두 번째 페이지의 Post들이 반환되는지 확인
-    // Then: 페이지 정보가 정확한지 확인
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("No File")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
 
-    /** SCENE 43. getPosts - 페이지네이션 (마지막 페이지) */
-    // Given: 여러 Post들, 페이지 정보 (마지막 페이지)
-    // When: getPosts 호출
-    // Then: 마지막 페이지의 Post들이 반환되는지 확인
-    // Then: 다음 페이지가 없는지 확인
+            assertThatThrownBy(() -> postService.createPost(UserPrincipal.from(userA), request))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FILE_NOT_FOUND);
+        }
+    }
 
-    /** SCENE 44. getPosts - 페이지네이션 (페이지 크기 변경) */
-    // Given: 여러 Post들, 다양한 페이지 크기 (size = 10, 20, 50)
-    // When: getPosts 호출 (각 크기별로)
-    // Then: 각 페이지 크기에 맞게 Post가 반환되는지 확인
+    // ========================================================================================
+    // [Category 2]: Read
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 2] Read Post")
+    class Read {
+        private Post postWithFiles;
+        private Post postNoFiles;
 
-    // === [ Edge Cases ] ===
-    /** SCENE 45. getPosts - 빈 결과 (전체 카테고리) */
-    // Given: Post가 없음, 카테고리 = null
-    // When: getPosts 호출
-    // Then: 빈 페이지가 반환되는지 확인
-    // Then: 페이지 제목이 "전체 게시판"인지 확인
+        @BeforeEach
+        void initPosts() {
+            setupMockUser(userA);
+            // Setup Post with 3 files
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            for(int i=0; i<3; i++) {
+                files.add(new PostDto.AttachedFileRequest(userAFiles.get(i).getId(), i==0 ? MediaRole.PREVIEW : MediaRole.CONTENT, i));
+            }
+            PostDto.CreateRequest req1 = PostDto.CreateRequest.builder()
+                    .title("With Files").content("Content").category(Category.IDOL).files(files).build();
+            PostDto.Response res1 = postService.createPost(UserPrincipal.from(userA), req1);
+            postWithFiles = postRepository.findById(res1.getId()).orElseThrow();
 
-    /** SCENE 46. getPosts - 빈 결과 (특정 카테고리) */
-    // Given: 특정 카테고리에 Post 없음, 카테고리 지정
-    // When: getPosts 호출
-    // Then: 빈 페이지가 반환되는지 확인
-    // Then: 페이지 제목이 카테고리명을 포함하는지 확인
+            // Setup Post with no files
+            PostDto.CreateRequest req2 = PostDto.CreateRequest.builder()
+                    .title("No Files").content("Content").category(Category.ACTOR).files(null).build();
+            PostDto.Response res2 = postService.createPost(UserPrincipal.from(userA), req2);
+            postNoFiles = postRepository.findById(res2.getId()).orElseThrow();
 
-    /** SCENE 47. getPosts - 페이지 범위 초과 */
-    // Given: 여러 Post들, 존재하지 않는 페이지 번호
-    // When: getPosts 호출
-    // Then: 페이지 범위 예외 발생 확인
+            flushAndClear();
+        }
 
-    /** SCENE 48. getPosts - 잘못된 카테고리 */
-    // Given: 존재하지 않는 카테고리, 카테고리 지정
-    // When: getPosts 호출
-    // Then: 빈 결과 또는 예외 발생 확인
+        @Test
+        @DisplayName("SCENE 10: 정상 케이스 (파일 포함, 본인 조회)")
+        void getPost_Owner() {
+            PostDto.Response response = postService.getPost(postWithFiles.getId());
+            assertThat(response.getId()).isEqualTo(postWithFiles.getId());
+            assertThat(response.getFiles()).hasSize(3);
+            assertThat(response.getFiles().get(0).getSequence()).isEqualTo(0);
+            assertThat(response.getViewCount()).isEqualTo(1); // Service increments viewCount
+        }
+
+        @Test
+        @DisplayName("SCENE 11: 정상 케이스 (파일 포함, 타인 조회)")
+        void getPost_Stranger() {
+            PostDto.Response response = postService.getPost(postWithFiles.getId());
+            assertThat(response.getId()).isEqualTo(postWithFiles.getId());
+            assertThat(response.getFiles()).hasSize(3);
+            assertThat(response.getViewCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("SCENE 12: 정상 케이스 (파일 없음)")
+        void getPost_NoFiles() {
+            PostDto.Response response = postService.getPost(postNoFiles.getId());
+            assertThat(response.getId()).isEqualTo(postNoFiles.getId());
+            assertThat(response.getFiles()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("SCENE 13: 정상 케이스 (PREVIEW 파일 포함 확인)")
+        void getPost_Preview() {
+            PostDto.Response response = postService.getPost(postWithFiles.getId());
+            assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
+        }
+
+        @Test
+        @DisplayName("SCENE 14: 정상 케이스 (CONTENT 파일만)")
+        void getPost_OnlyContent() {
+            // Given: Create post with content only
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(3).getId(), MediaRole.CONTENT, 0)
+            );
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder()
+                    .title("C").content("C").category(Category.SPORT).files(files).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            flushAndClear();
+
+            // When
+            PostDto.Response response = postService.getPost(res.getId());
+
+            // Then
+            assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.CONTENT);
+        }
+
+        @Test
+        @DisplayName("SCENE 15: 조회수 증가 확인 (DB 반영 확인)")
+        void getPost_ViewCount() {
+            Long id = postNoFiles.getId();
+
+            // 1st
+            postService.getPost(id);
+            flushAndClear();
+
+            // 2nd
+            postService.getPost(id);
+            flushAndClear();
+
+            // 3rd
+            postService.getPost(id);
+            flushAndClear();
+
+            Post post = postRepository.findById(id).orElseThrow();
+            assertThat(post.getViewCount()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("SCENE 16: 존재하지 않는 Post")
+        void getPost_NotFound() {
+            assertThatThrownBy(() -> postService.getPost(99999L))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+        }
+    }
+
+    // ========================================================================================
+    // [Category 3]: Update
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 3] Update Post")
+    class Update {
+        private Post post;
+
+        @BeforeEach
+        void init() {
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.PREVIEW, 0),
+                    new PostDto.AttachedFileRequest(userAFiles.get(1).getId(), MediaRole.CONTENT, 1)
+            );
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder()
+                    .title("Old Title").content("Old Content").category(Category.IDOL).files(files).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            post = postRepository.findById(res.getId()).orElseThrow();
+            flushAndClear();
+        }
+
+        @Test
+        @DisplayName("SCENE 17: 정상 케이스 (제목, 내용, 카테고리 수정)")
+        void updatePost_Full() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder()
+                    .title("New Title").content("New Content").category(Category.MUSICIAN).build();
+
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear(); // Dirty checking sync
+
+            Post updated = postRepository.findById(post.getId()).orElseThrow();
+            assertThat(updated.getTitle()).isEqualTo("New Title");
+            assertThat(updated.getContent()).isEqualTo("New Content");
+            assertThat(updated.getCategory()).isEqualTo(Category.MUSICIAN);
+
+            // Files preserved (files=null in request)
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("SCENE 18~20: 부분 수정 (제목만/내용만/카테고리만)")
+        void updatePost_Partial() {
+            // 18: Title only
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().title("T").build());
+            flushAndClear();
+            assertThat(postRepository.findById(post.getId()).get().getTitle()).isEqualTo("T");
+
+            // 19: Content only
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().content("C").build());
+            flushAndClear();
+            assertThat(postRepository.findById(post.getId()).get().getContent()).isEqualTo("C");
+
+            // 20: Category only
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().category(Category.ANIMATION).build());
+            flushAndClear();
+            assertThat(postRepository.findById(post.getId()).get().getCategory()).isEqualTo(Category.ANIMATION);
+        }
+
+        @Test
+        @DisplayName("SCENE 21: 파일 전체 교체 (PREVIEW 포함)")
+        void updatePost_ReplaceFiles_Preview() {
+            List<PostDto.AttachedFileRequest> newFiles = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(5).getId(), MediaRole.PREVIEW, 0)
+            );
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(newFiles).build();
+
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear(); // [중요] Bulk delete & insert sync
+
+            List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(maps).hasSize(1);
+            assertThat(maps.get(0).getFile().getId()).isEqualTo(userAFiles.get(5).getId());
+
+            // Thumbnail check
+            assertThat(postRepository.findById(post.getId()).get().getThumbnailKey())
+                    .isEqualTo(ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(5).getS3ObjectKey()));
+        }
+
+        @Test
+        @DisplayName("SCENE 22: 파일 전체 교체 (PREVIEW 없음)")
+        void updatePost_ReplaceFiles_NoPreview() {
+            List<PostDto.AttachedFileRequest> newFiles = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(5).getId(), MediaRole.CONTENT, 0)
+            );
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(newFiles).build();
+
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear();
+
+            assertThat(postRepository.findById(post.getId()).get().getThumbnailKey())
+                    .isEqualTo(ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(5).getS3ObjectKey())); // First file used
+        }
+
+        @Test
+        @DisplayName("SCENE 23: 파일 삭제 (빈 리스트)")
+        void updatePost_DeleteFiles() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(Collections.emptyList()).build();
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear();
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).isEmpty();
+            assertThat(postRepository.findById(post.getId()).get().getThumbnailKey()).isNull();
+        }
+
+        @Test
+        @DisplayName("SCENE 24: 파일 유지 (null)")
+        void updatePost_KeepFiles() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().title("U").files(null).build();
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("SCENE 25: 파일 추가 (기존+신규 -> 클라이언트가 전체 리스트를 보내야 함)")
+        void updatePost_AddFiles() {
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            // Re-send existing
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.PREVIEW, 0));
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(1).getId(), MediaRole.CONTENT, 1));
+            // Add new
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(2).getId(), MediaRole.CONTENT, 2));
+
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(files).build();
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear();
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).hasSize(3);
+        }
+
+        @Test
+        @DisplayName("SCENE 26~28: 예외 케이스")
+        void updatePost_Exceptions() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().title("Hacked").build();
+
+            // 26: Forbidden
+            assertThatThrownBy(() -> postService.updatePost(UserPrincipal.from(userB), post.getId(), req))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 27: Not Found
+            assertThatThrownBy(() -> postService.updatePost(UserPrincipal.from(userA), 99999L, req))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+
+            // 28: IDOR
+            List<PostDto.AttachedFileRequest> idorFiles = List.of(new PostDto.AttachedFileRequest(userBFiles.get(0).getId(), MediaRole.CONTENT, 0));
+            PostDto.UpdateRequest idorReq = PostDto.UpdateRequest.builder().files(idorFiles).build();
+            assertThatThrownBy(() -> postService.updatePost(UserPrincipal.from(userA), post.getId(), idorReq))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+        }
+    }
+
+    // ========================================================================================
+    // [Category 4]: Delete
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 4] Delete Post")
+    class Delete {
+        @Test
+        @DisplayName("SCENE 29: 정상 케이스 (파일 포함)")
+        void deletePost_WithFiles() {
+            // Setup
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0));
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Del").content("C").category(Category.SPORT).files(files).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            Long postId = res.getId();
+            flushAndClear();
+
+            // When
+            postService.deletePost(UserPrincipal.from(userA), postId);
+            flushAndClear(); // Bulk delete sync
+
+            // Then
+            assertThat(postRepository.existsById(postId)).isFalse();
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId)).isEmpty();
+            assertThat(fileRepository.existsById(userAFiles.get(0).getId())).isTrue(); // File itself remains
+        }
+
+        @Test
+        @DisplayName("SCENE 30: 정상 케이스 (파일 없음)")
+        void deletePost_NoFiles() {
+            setupMockUser(userA);
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Del").content("C").category(Category.SPORT).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            Long postId = res.getId();
+            flushAndClear();
+
+            postService.deletePost(UserPrincipal.from(userA), postId);
+            flushAndClear();
+
+            assertThat(postRepository.existsById(postId)).isFalse();
+        }
+
+        @Test
+        @DisplayName("SCENE 31~32: 예외 케이스")
+        void deletePost_Exceptions() {
+            setupMockUser(userA);
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Del").content("C").category(Category.SPORT).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            Long postId = res.getId();
+
+            // 31: Forbidden
+            assertThatThrownBy(() -> postService.deletePost(UserPrincipal.from(userB), postId))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 32: Not Found
+            assertThatThrownBy(() -> postService.deletePost(UserPrincipal.from(userA), 99999L))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+        }
+    }
+
+    // ========================================================================================
+    // [Category 5]: Read-Pagination
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 5] Pagination")
+    class Pagination {
+        @BeforeEach
+        void setUpPosts() {
+            // Create 30 posts mixed categories and scores for testing sorting
+            setupMockUser(userA);
+            for (int i = 1; i <= 30; i++) {
+                Category cat = (i % 2 == 0) ? Category.SPORT : Category.IDOL;
+                Post post = Post.builder()
+                        .user(userA)
+                        .title("Post " + i)
+                        .content("Content")
+                        .category(cat)
+                        .viewCount((long) i) // ID 비례
+                        .likeCount((long) i)
+                        .hotScore(i * 10.0) // Explicit hotScore for sorting test
+                        .build();
+                postRepository.save(post);
+            }
+            flushAndClear();
+        }
+
+        @Test
+        @DisplayName("SCENE 33: 전체 카테고리, 기본 정렬 (최신순)")
+        void getPosts_All_Default() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setPage(0); req.setSize(10); req.setSort("createdAt"); req.setDirection("DESC");
+
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+
+            assertThat(res.getContent()).hasSize(10);
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30"); // Latest
+            assertThat(res.getTitle()).contains("전체");
+        }
+
+        @Test
+        @DisplayName("SCENE 34: 전체 카테고리, hotScore 정렬")
+        void getPosts_All_Hot() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSort("hotScore"); req.setDirection("DESC");
+
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+
+            // Post 30 has highest hotScore (300.0)
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30");
+            assertThat(res.getContent().get(9).getTitle()).isEqualTo("Post 21");
+            assertThat(res.getTitle()).contains("핫한");
+        }
+
+        @Test
+        @DisplayName("SCENE 35: 특정 카테고리 (SPORT), 기본 정렬")
+        void getPosts_Category_Default() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setCategory(Category.SPORT);
+
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+
+            assertThat(res.getContent()).allMatch(p -> p.getCategory() == Category.SPORT);
+            assertThat(res.getContent()).hasSize(10);
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30"); // Even numbers are SPORT
+        }
+
+        @Test
+        @DisplayName("SCENE 36: 특정 카테고리 (IDOL), hotScore 정렬")
+        void getPosts_Category_Hot() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setCategory(Category.IDOL);
+            req.setSort("hotScore");
+
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+
+            assertThat(res.getContent()).allMatch(p -> p.getCategory() == Category.IDOL);
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 29"); // Odd numbers are IDOL (Highest odd is 29)
+        }
+
+        @Test
+        @DisplayName("SCENE 37: 각 카테고리별 조회")
+        void getPosts_EachCategory() {
+            for (Category cat : List.of(Category.SPORT, Category.IDOL)) {
+                PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+                req.setCategory(cat);
+
+                PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+                assertThat(res.getContent()).isNotEmpty();
+                assertThat(res.getContent()).allMatch(p -> p.getCategory() == cat);
+            }
+        }
+
+        @Test
+        @DisplayName("SCENE 38~40: HotScore 정렬 상세")
+        void getPosts_HotScore_Detail() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSort("hotScore");
+            req.setDirection("DESC");
+
+            List<PostDto.PostPageResponse> content = postService.getPosts(req).getContent();
+
+            // Check order: 30, 29, 28...
+            assertThat(content.get(0).getTitle()).isEqualTo("Post 30");
+            assertThat(content.get(1).getTitle()).isEqualTo("Post 29");
+        }
+
+        @Test
+        @DisplayName("SCENE 41~43: 페이지네이션 (첫/중간/끝)")
+        void getPosts_Pagination() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSize(10);
+
+            // 41: First Page
+            req.setPage(0);
+            assertThat(postService.getPosts(req).getContent()).hasSize(10);
+
+            // 42: Middle Page
+            req.setPage(1);
+            assertThat(postService.getPosts(req).getContent()).hasSize(10);
+
+            // 43: Last Page (Total 30 -> 3 pages. Page 2 is last)
+            req.setPage(2);
+            assertThat(postService.getPosts(req).getContent()).hasSize(10);
+
+            req.setPage(3);
+            assertThatThrownBy(() -> postService.getPosts(req))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PAGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 44: 페이지 크기 변경")
+        void getPosts_PageSize() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSize(20);
+            assertThat(postService.getPosts(req).getContent()).hasSize(20);
+        }
+
+        @Test
+        @DisplayName("SCENE 45~48: Edge Cases")
+        void getPosts_Edge() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+
+            // 45: Empty (Delete all first)
+            postRepository.deleteAll();
+            assertThat(postService.getPosts(req).getContent()).isEmpty();
+
+            // 46: Specific category empty
+            req.setCategory(Category.ARTIST);
+            assertThat(postService.getPosts(req).getContent()).isEmpty();
+
+            // 47: Page Out Range
+            req.setCategory(null);
+            req.setPage(100);
+            assertThatThrownBy(() -> postService.getPosts(req)).isInstanceOf(RestException.class);
+        }
+    }
 }
-
