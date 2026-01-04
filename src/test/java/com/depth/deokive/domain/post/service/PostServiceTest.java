@@ -10,8 +10,10 @@ import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
+import com.depth.deokive.domain.post.entity.PostLike;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
+import com.depth.deokive.domain.post.repository.PostLikeRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
@@ -40,6 +42,7 @@ class PostServiceTest extends IntegrationTestSupport {
     @Autowired PostService postService;
     @Autowired PostRepository postRepository;
     @Autowired PostFileMapRepository postFileMapRepository;
+    @Autowired PostLikeRepository postLikeRepository;
     @Autowired FileRepository fileRepository;
 
     // Test Data
@@ -327,39 +330,58 @@ class PostServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 10: 정상 케이스 (파일 포함, 본인 조회)")
         void getPost_Owner() {
-            PostDto.Response response = postService.getPost(postWithFiles.getId());
+            setupMockUser(userA);
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userA), postWithFiles.getId());
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getFiles()).hasSize(3);
             assertThat(response.getFiles().get(0).getSequence()).isEqualTo(0);
             assertThat(response.getViewCount()).isEqualTo(1); // Service increments viewCount
+            assertThat(response.isLiked()).isFalse(); // 좋아요 없음
         }
 
         @Test
         @DisplayName("SCENE 11: 정상 케이스 (파일 포함, 타인 조회)")
         void getPost_Stranger() {
-            PostDto.Response response = postService.getPost(postWithFiles.getId());
+            setupMockUser(userB);
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getFiles()).hasSize(3);
             assertThat(response.getViewCount()).isEqualTo(1);
+            assertThat(response.isLiked()).isFalse(); // 좋아요 없음
         }
 
         @Test
-        @DisplayName("SCENE 12: 정상 케이스 (파일 없음)")
+        @DisplayName("SCENE 12: 정상 케이스 (비회원 조회)")
+        void getPost_Anonymous() {
+            // When: 비회원이 조회
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+
+            // Then: 정상 조회 가능
+            assertThat(response.getId()).isEqualTo(postWithFiles.getId());
+            assertThat(response.getTitle()).isEqualTo("With Files");
+            assertThat(response.getFiles()).hasSize(3);
+            assertThat(response.getViewCount()).isEqualTo(1);
+            assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
+        }
+
+        @Test
+        @DisplayName("SCENE 13: 정상 케이스 (파일 없음)")
         void getPost_NoFiles() {
-            PostDto.Response response = postService.getPost(postNoFiles.getId());
+            PostDto.Response response = postService.getPost(null, postNoFiles.getId());
             assertThat(response.getId()).isEqualTo(postNoFiles.getId());
             assertThat(response.getFiles()).isEmpty();
+            assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
         }
 
         @Test
-        @DisplayName("SCENE 13: 정상 케이스 (PREVIEW 파일 포함 확인)")
+        @DisplayName("SCENE 14: 정상 케이스 (PREVIEW 파일 포함 확인)")
         void getPost_Preview() {
-            PostDto.Response response = postService.getPost(postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
             assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
         }
 
         @Test
-        @DisplayName("SCENE 14: 정상 케이스 (CONTENT 파일만)")
+        @DisplayName("SCENE 15: 정상 케이스 (CONTENT 파일만)")
         void getPost_OnlyContent() {
             // Given: Create post with content only
             List<PostDto.AttachedFileRequest> files = List.of(
@@ -371,27 +393,27 @@ class PostServiceTest extends IntegrationTestSupport {
             flushAndClear();
 
             // When
-            PostDto.Response response = postService.getPost(res.getId());
+            PostDto.Response response = postService.getPost(null, res.getId());
 
             // Then
             assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.CONTENT);
         }
 
         @Test
-        @DisplayName("SCENE 15: 조회수 증가 확인 (DB 반영 확인)")
+        @DisplayName("SCENE 16: 조회수 증가 확인 (DB 반영 확인)")
         void getPost_ViewCount() {
             Long id = postNoFiles.getId();
 
             // 1st
-            postService.getPost(id);
+            postService.getPost(null, id);
             flushAndClear();
 
             // 2nd
-            postService.getPost(id);
+            postService.getPost(null, id);
             flushAndClear();
 
             // 3rd
-            postService.getPost(id);
+            postService.getPost(null, id);
             flushAndClear();
 
             Post post = postRepository.findById(id).orElseThrow();
@@ -399,11 +421,52 @@ class PostServiceTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("SCENE 16: 존재하지 않는 Post")
+        @DisplayName("SCENE 17: 존재하지 않는 Post")
         void getPost_NotFound() {
-            assertThatThrownBy(() -> postService.getPost(99999L))
+            assertThatThrownBy(() -> postService.getPost(null, 99999L))
                     .isInstanceOf(RestException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 18: isLiked 필드 검증 (좋아요 있음)")
+        void getPost_IsLiked_True() {
+            // Given: UserB가 UserA의 게시글에 좋아요
+            setupMockUser(userB);
+            postLikeRepository.save(PostLike.builder()
+                    .post(postWithFiles)
+                    .user(userB)
+                    .build());
+            flushAndClear();
+
+            // When: UserB가 조회
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+
+            // Then: isLiked가 true
+            assertThat(response.isLiked()).isTrue();
+        }
+
+        @Test
+        @DisplayName("SCENE 19: isLiked 필드 검증 (좋아요 없음)")
+        void getPost_IsLiked_False() {
+            // Given: 좋아요 없음
+            setupMockUser(userB);
+
+            // When: UserB가 조회
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+
+            // Then: isLiked가 false
+            assertThat(response.isLiked()).isFalse();
+        }
+
+        @Test
+        @DisplayName("SCENE 20: isLiked 필드 검증 (비회원)")
+        void getPost_IsLiked_Anonymous() {
+            // When: 비회원이 조회
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+
+            // Then: isLiked가 false
+            assertThat(response.isLiked()).isFalse();
         }
     }
 
