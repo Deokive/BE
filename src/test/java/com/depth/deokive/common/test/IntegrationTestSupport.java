@@ -51,6 +51,9 @@ public abstract class IntegrationTestSupport {
         registry.add("spring.datasource.password", MYSQL_CONTAINER::getPassword);
         registry.add("spring.datasource.driver-class-name", MYSQL_CONTAINER::getDriverClassName);
 
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQLDialect");
+
         // Redis
         registry.add("spring.data.redis.host", REDIS_CONTAINER::getHost);
         registry.add("spring.data.redis.port", () -> REDIS_CONTAINER.getMappedPort(6379).toString());
