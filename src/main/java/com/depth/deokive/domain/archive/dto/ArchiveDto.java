@@ -3,6 +3,7 @@ package com.depth.deokive.domain.archive.dto;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.common.enums.Visibility;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -81,9 +82,11 @@ public class ArchiveDto {
         @Schema(description = "생성 시간", example = "KST Datetime")
         private LocalDateTime createdAt; // 이게 day-N 데이터가 될거임
 
+        @JsonProperty("isLiked")
         @Schema(description = "내가 좋아요 눌렀는지 여부", example = "true")
         private boolean isLiked;
 
+        @JsonProperty("isOwner")
         @Schema(description = "내가 주인인지 여부", example = "true")
         private boolean isOwner;
 

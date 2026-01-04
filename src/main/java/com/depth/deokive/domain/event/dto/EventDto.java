@@ -4,6 +4,7 @@ import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.event.entity.Event;
 import com.depth.deokive.domain.event.entity.SportRecord;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -44,6 +45,7 @@ public class EventDto {
         private String color;
 
         @Builder.Default
+        @JsonProperty("isSportType")
         @Schema(description = "스포츠 타입 여부", example = "false")
         private Boolean isSportType = false;
 
@@ -84,6 +86,7 @@ public class EventDto {
         @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "올바른 HEX 컬러 코드가 아닙니다.")
         private String color;
 
+        @JsonProperty("isSportType")
         @Schema(description = "스포츠 타입 변경", example = "스포츠 타입 변경")
         private Boolean isSportType;
 
@@ -143,6 +146,7 @@ public class EventDto {
         @Schema(description = "이벤트 색상 코드", example = "#FF5733")
         private String color;
         
+        @JsonProperty("isSportType")
         @Schema(description = "스포츠 타입 여부", example = "false")
         private boolean isSportType;
 
