@@ -1,15 +1,10 @@
 package com.depth.deokive.domain.notification.service;
 
 import com.depth.deokive.domain.notification.repository.NotificationRepository;
-import com.depth.deokive.domain.user.entity.User;
-import com.depth.deokive.domain.user.repository.UserRepository;
-import com.depth.deokive.system.exception.model.ErrorCode;
-import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -19,7 +14,6 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class NotificationService {
 
-    private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
 
     // SSE 연결 시간(1시간)
@@ -32,41 +26,25 @@ public class NotificationService {
         // Emitter 생성
         SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT);
 
+        notificationRepository.save(userId, emitter);
+
         // SEQ 1. 연결 -> 만료시 삭제
         emitter.onCompletion(() -> notificationRepository.deleteById(userId));
         emitter.onTimeout(() -> notificationRepository.deleteById(userId));
+        emitter.onError((e) -> notificationRepository.deleteById(userId));
 
-        // SEQ 2. 저장
-        notificationRepository.save(userId, emitter);
 
-        // SEQ 3. 연결 직후 더미 데이터 전송
-        sendToClient(userId, "System", "connected");
+        // SEQ 2. 연결 직후 더미 데이터 전송
+        sendToClient(userId, "connect", "connected! [userId=" + userId + "]");
 
         return emitter;
     }
 
     /**
-     * 친구 요청 알림
+     * 알림 전송
      */
-    public void sendFriendRequestNotification(Long receiverId, Long senderId) {
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
-
-        String message = sender.getNickname() + "님이 친구 요청을 보냈습니다.";
-
-        // 실제 전송
-        sendToClient(receiverId, "FriendRequest", message);
-    }
-
-    /**
-     * 친구 수락 알림
-     */
-    public void sendFriendAcceptNotification(Long receiverId, Long senderId) {
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
-
-        String message = sender.getNickname() + "님이 친구 요청을 수락했습니다.";
-        sendToClient(receiverId, "FriendAccept", message);
+    public void send(Long receiverId, String eventName, Object data) {
+        sendToClient(receiverId, eventName, data);
     }
 
     /**
@@ -79,6 +57,7 @@ public class NotificationService {
         if(emitter != null) {
             try {
                 emitter.send(SseEmitter.event()
+                        .id(String.valueOf(System.currentTimeMillis()))
                         .name(eventName)
                         .data(data));
             } catch (IOException e) {
@@ -86,5 +65,19 @@ public class NotificationService {
                 log.error("SSE 연결 오류 발생: userId={}", receiverId);
             }
         }
+    }
+
+    /**
+     * heartbeat -> 30초마다 ping 전송
+     */
+    @Scheduled(fixedRate = 30000)
+    public void sendHeartbeat() {
+        notificationRepository.findAll().forEach((userId, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event().name("ping").data(""));
+            } catch (IOException e){
+                notificationRepository.deleteById(userId);
+            }
+        });
     }
 }
