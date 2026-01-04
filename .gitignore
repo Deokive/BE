@@ -60,3 +60,4 @@ DataInitializer.java
 
 ### Test resources  ###
 src/test/resources/application.yml
+mysql-data/
