@@ -601,23 +601,38 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             // 59: 본인(A) -> 본인(A) : Public(1) + Private(1) = 2
             var myPage = archiveService.getUserArchives(UserPrincipal.from(userA), userA.getId(), req);
             assertThat(myPage.getPage().getTotalElements()).isEqualTo(2);
+            // 본인은 모든 Visibility 조회 가능
+            assertThat(myPage.getContent()).anyMatch(a -> a.getVisibility() == Visibility.PUBLIC);
+            assertThat(myPage.getContent()).anyMatch(a -> a.getVisibility() == Visibility.PRIVATE);
 
             // 61: 친구(B) -> 친구(A) : Public(1) + (Restricted 없음) = 1 (Private 숨김)
             var friendViewA = archiveService.getUserArchives(UserPrincipal.from(userB), userA.getId(), req);
             assertThat(friendViewA.getPage().getTotalElements()).isEqualTo(1);
+            // 친구는 PUBLIC만 조회 가능 (A의 Archive에는 Restricted가 없음)
+            assertThat(friendViewA.getContent()).allMatch(a -> a.getVisibility() == Visibility.PUBLIC);
+            assertThat(friendViewA.getContent()).noneMatch(a -> a.getVisibility() == Visibility.PRIVATE);
 
             // 61-2: 친구(A) -> 친구(B) : Public(1) + Restricted(1) = 2
             var friendViewB = archiveService.getUserArchives(UserPrincipal.from(userA), userB.getId(), req);
             assertThat(friendViewB.getPage().getTotalElements()).isEqualTo(2);
+            // 친구는 PUBLIC + RESTRICTED 조회 가능
+            assertThat(friendViewB.getContent()).anyMatch(a -> a.getVisibility() == Visibility.PUBLIC);
+            assertThat(friendViewB.getContent()).anyMatch(a -> a.getVisibility() == Visibility.RESTRICTED);
+            assertThat(friendViewB.getContent()).noneMatch(a -> a.getVisibility() == Visibility.PRIVATE);
 
             // 63: 타인(C) -> 타인(B) : Public(1) only. (Restricted 숨김)
             var strangerView = archiveService.getUserArchives(UserPrincipal.from(userC), userB.getId(), req);
             assertThat(strangerView.getPage().getTotalElements()).isEqualTo(1);
             assertThat(strangerView.getContent().get(0).getVisibility()).isEqualTo(Visibility.PUBLIC);
+            // 타인은 PUBLIC만 조회 가능
+            assertThat(strangerView.getContent()).allMatch(a -> a.getVisibility() == Visibility.PUBLIC);
+            assertThat(strangerView.getContent()).noneMatch(a -> 
+                    a.getVisibility() == Visibility.RESTRICTED || a.getVisibility() == Visibility.PRIVATE);
 
             // 65: 비회원 -> 타인(B) : Public(1) only
             var anonView = archiveService.getUserArchives(null, userB.getId(), req);
             assertThat(anonView.getPage().getTotalElements()).isEqualTo(1);
+            assertThat(anonView.getContent()).allMatch(a -> a.getVisibility() == Visibility.PUBLIC);
         }
 
         @Test
@@ -667,17 +682,14 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 70: getUserArchives - 페이지네이션 정렬 확인 (조회수 정렬)")
         void getUserArchives_SortCheck() {
             // Given: UserA가 Public Archive 2개를 가짐 (조회수 다르게 설정)
-            // 1. 기존 Public Archive (ViewCount = 0)
-            Archive archive1 = archiveRepository.findAll().stream()
-                    .filter(a -> a.getUser().getId().equals(userA.getId()) && a.getVisibility() == Visibility.PUBLIC)
-                    .findFirst().orElseThrow();
-
-            // 2. 새 Public Archive 생성 (ViewCount = 100)
+            // 1. 기존 Public Archive는 ViewCount = 0으로 유지
+            // 2. 새 Public Archive 생성 (ViewCount = 10)
             Archive archive2 = createArchiveByService(userA, Visibility.PUBLIC, null);
             // 조회수 강제 주입 (Setter가 없으므로 increaseViewCount 반복 혹은 리플렉션/Repo 쿼리 사용)
             // 여기선 increaseViewCount 10번 호출로 시뮬레이션
             for(int i=0; i<10; i++) archive2.increaseViewCount();
             archiveRepository.save(archive2);
+            flushAndClear();
 
             // When: 조회수 내림차순(DESC) 조회
             ArchiveDto.ArchivePageRequest req = new ArchiveDto.ArchivePageRequest();
@@ -696,11 +708,23 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             assertThat(content.get(0).getArchiveId()).isEqualTo(archive2.getId());
             assertThat(content.get(0).getViewCount()).isEqualTo(10);
 
-            // 2. 조회수 동률(0) 처리 검증: ID 내림차순(최신순) 정렬 확인
-            // Private(ID 2)가 Public(ID 1)보다 최신이므로 먼저 나와야 함
-            assertThat(content.get(1).getArchiveId()).isGreaterThan(content.get(2).getArchiveId());
+            // 2. 정렬 검증: 조회수 내림차순
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getViewCount())
+                        .isGreaterThanOrEqualTo(content.get(i + 1).getViewCount());
+            }
 
-            assertThat(content.get(2).getArchiveId()).isEqualTo(archive1.getId());
+            // 3. 조회수 동률(0) 처리 검증: ID 내림차순(최신순) 정렬 확인
+            // 조회수가 0인 항목들 간에는 ID 내림차순으로 정렬됨
+            List<ArchiveDto.ArchivePageResponse> zeroViewCount = content.stream()
+                    .filter(a -> a.getViewCount() == 0)
+                    .toList();
+            if (zeroViewCount.size() > 1) {
+                for (int i = 0; i < zeroViewCount.size() - 1; i++) {
+                    assertThat(zeroViewCount.get(i).getArchiveId())
+                            .isGreaterThanOrEqualTo(zeroViewCount.get(i + 1).getArchiveId());
+                }
+            }
         }
     }
 

@@ -407,6 +407,13 @@ class TicketServiceTest extends IntegrationTestSupport {
             assertThat(resOwner.getContent()).hasSize(10);
             assertThat(resOwner.getContent().get(0).getThumbnail()).isNotNull();
 
+            // 정렬 검증: 기본 정렬은 createdAt DESC (최신순)
+            List<TicketDto.TicketPageResponse> content = resOwner.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getCreatedAt())
+                        .isAfterOrEqualTo(content.get(i + 1).getCreatedAt());
+            }
+
             // 28, 29, 30: Others
             assertThat(ticketService.getTickets(UserPrincipal.from(userC), archiveAPublic.getId(), req.toPageable()).getContent()).hasSize(10);
             assertThat(ticketService.getTickets(UserPrincipal.from(userB), archiveAPublic.getId(), req.toPageable()).getContent()).hasSize(10);
@@ -463,7 +470,20 @@ class TicketServiceTest extends IntegrationTestSupport {
 
             // 42: Pagination Check
             req.setPage(0); req.setSize(5);
-            assertThat(ticketService.getTickets(UserPrincipal.from(userA), archiveAPublic.getId(), req.toPageable()).getContent()).hasSize(5);
+            PageDto.PageListResponse<TicketDto.TicketPageResponse> page1 = ticketService.getTickets(UserPrincipal.from(userA), archiveAPublic.getId(), req.toPageable());
+            assertThat(page1.getContent()).hasSize(5);
+            assertThat(page1.getPage().getTotalElements()).isEqualTo(10);
+            assertThat(page1.getPage().getTotalPages()).isEqualTo(2);
+
+            // 두 번째 페이지 검증
+            req.setPage(1);
+            PageDto.PageListResponse<TicketDto.TicketPageResponse> page2 = ticketService.getTickets(UserPrincipal.from(userA), archiveAPublic.getId(), req.toPageable());
+            assertThat(page2.getContent()).hasSize(5);
+            
+            // 페이지 간 중복 없음 검증
+            List<Long> page1Ids = page1.getContent().stream().map(TicketDto.TicketPageResponse::getId).toList();
+            List<Long> page2Ids = page2.getContent().stream().map(TicketDto.TicketPageResponse::getId).toList();
+            assertThat(page1Ids).doesNotContainAnyElementsOf(page2Ids);
         }
     }
 
@@ -488,17 +508,62 @@ class TicketServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 43~46: 정상 수정 (필드별)")
         void updateTicket_Fields() {
+            // Given: 초기 상태 저장
+            Ticket original = ticketRepository.findById(ticket.getId()).get();
+            Long originalFileId = original.getFile().getId();
+
             // 43: Full Update
-            TicketDto.UpdateRequest req = TicketDto.UpdateRequest.builder().title("New").review("Great").date(LocalDateTime.now()).build();
+            LocalDateTime newDate = LocalDateTime.of(2025, 12, 25, 14, 30);
+            TicketDto.UpdateRequest req = TicketDto.UpdateRequest.builder()
+                    .title("New")
+                    .review("Great")
+                    .date(newDate)
+                    .location("Seoul")
+                    .seat("A-10")
+                    .build();
             ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), req);
+            flushAndClear();
+
             Ticket updated = ticketRepository.findById(ticket.getId()).get();
             assertThat(updated.getTitle()).isEqualTo("New");
             assertThat(updated.getReview()).isEqualTo("Great");
-            assertThat(updated.getFile().getId()).isEqualTo(userAFiles.get(0).getId()); // File Kept
+            assertThat(updated.getDate()).isEqualTo(newDate);
+            assertThat(updated.getLocation()).isEqualTo("Seoul");
+            assertThat(updated.getSeat()).isEqualTo("A-10");
+            assertThat(updated.getFile().getId()).isEqualTo(originalFileId); // File Kept
 
-            // 44, 45, 46: Partial Updates (Tested implicitly by above or separate calls)
-            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), TicketDto.UpdateRequest.builder().title("T").build());
-            assertThat(ticketRepository.findById(ticket.getId()).get().getTitle()).isEqualTo("T");
+            // 44: Title Only - 다른 필드 보존 검증
+            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), 
+                    TicketDto.UpdateRequest.builder().title("T").build());
+            flushAndClear();
+
+            Ticket afterTitleUpdate = ticketRepository.findById(ticket.getId()).get();
+            assertThat(afterTitleUpdate.getTitle()).isEqualTo("T");
+            assertThat(afterTitleUpdate.getReview()).isEqualTo("Great"); // 보존 확인
+            assertThat(afterTitleUpdate.getDate()).isEqualTo(newDate); // 보존 확인
+            assertThat(afterTitleUpdate.getLocation()).isEqualTo("Seoul"); // 보존 확인
+            assertThat(afterTitleUpdate.getFile().getId()).isEqualTo(originalFileId); // 보존 확인
+
+            // 45: Review Only - 다른 필드 보존 검증
+            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), 
+                    TicketDto.UpdateRequest.builder().review("Updated Review").build());
+            flushAndClear();
+
+            Ticket afterReviewUpdate = ticketRepository.findById(ticket.getId()).get();
+            assertThat(afterReviewUpdate.getTitle()).isEqualTo("T"); // 보존 확인
+            assertThat(afterReviewUpdate.getReview()).isEqualTo("Updated Review");
+            assertThat(afterReviewUpdate.getDate()).isEqualTo(newDate); // 보존 확인
+
+            // 46: Date Only - 다른 필드 보존 검증
+            LocalDateTime anotherDate = LocalDateTime.of(2026, 1, 1, 10, 0);
+            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), 
+                    TicketDto.UpdateRequest.builder().date(anotherDate).build());
+            flushAndClear();
+
+            Ticket afterDateUpdate = ticketRepository.findById(ticket.getId()).get();
+            assertThat(afterDateUpdate.getTitle()).isEqualTo("T"); // 보존 확인
+            assertThat(afterDateUpdate.getReview()).isEqualTo("Updated Review"); // 보존 확인
+            assertThat(afterDateUpdate.getDate()).isEqualTo(anotherDate);
         }
 
         @Test
@@ -539,10 +604,33 @@ class TicketServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 50~51: 파일 유지")
         void updateTicket_KeepFile() {
-            TicketDto.UpdateRequest req = TicketDto.UpdateRequest.builder().title("U").build(); // fileId=null, deleteFile=null
-            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), req);
+            // Given: 초기 파일 상태 저장
+            Ticket original = ticketRepository.findById(ticket.getId()).get();
+            Long originalFileId = original.getFile().getId();
+            String originalOriginalKey = original.getOriginalKey();
 
-            assertThat(ticketRepository.findById(ticket.getId()).get().getFile()).isNotNull();
+            // 50: fileId=null, deleteFile=null -> 파일 유지
+            TicketDto.UpdateRequest req1 = TicketDto.UpdateRequest.builder().title("U").build();
+            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), req1);
+            flushAndClear();
+
+            Ticket afterUpdate1 = ticketRepository.findById(ticket.getId()).get();
+            assertThat(afterUpdate1.getFile()).isNotNull();
+            assertThat(afterUpdate1.getFile().getId()).isEqualTo(originalFileId); // 동일한 파일 유지
+            assertThat(afterUpdate1.getOriginalKey()).isEqualTo(originalOriginalKey); // OriginalKey도 유지
+            assertThat(afterUpdate1.getTitle()).isEqualTo("U"); // 제목은 업데이트됨
+
+            // 51: deleteFile=false (명시적 유지) -> 파일 유지
+            TicketDto.UpdateRequest req2 = TicketDto.UpdateRequest.builder()
+                    .title("U2")
+                    .deleteFile(false)
+                    .build();
+            ticketService.updateTicket(UserPrincipal.from(userA), ticket.getId(), req2);
+            flushAndClear();
+
+            Ticket afterUpdate2 = ticketRepository.findById(ticket.getId()).get();
+            assertThat(afterUpdate2.getFile()).isNotNull();
+            assertThat(afterUpdate2.getFile().getId()).isEqualTo(originalFileId); // 여전히 유지
         }
 
         @Test

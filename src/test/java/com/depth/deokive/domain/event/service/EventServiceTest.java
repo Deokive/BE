@@ -31,7 +31,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -396,24 +395,39 @@ class EventServiceTest extends IntegrationTestSupport {
         void updateEvent_Normal() {
             UserPrincipal principal = UserPrincipal.from(userA);
 
+            // Given: 초기 상태 확인 (hasTime=true, time=12:00)
+            Event original = eventRepository.findById(event.getId()).get();
+            assertThat(original.isHasTime()).isTrue();
+
             // 35: Full Update
+            LocalDate newDate = LocalDate.of(2025, 12, 25);
+            LocalTime newTime = LocalTime.of(10, 0);
             EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder()
                     .title("New Title")
-                    .date(LocalDate.of(2025, 12, 25))
-                    .time(LocalTime.of(10, 0))
+                    .date(newDate)
+                    .time(newTime)
                     .hasTime(true)
                     .build();
             eventService.updateEvent(principal, event.getId(), req1);
+            flushAndClear();
+            
             Event updated = eventRepository.findById(event.getId()).get();
             assertThat(updated.getTitle()).isEqualTo("New Title");
-            assertThat(updated.getDate().toLocalDate()).isEqualTo(LocalDate.of(2025, 12, 25));
+            assertThat(updated.getDate().toLocalDate()).isEqualTo(newDate);
+            assertThat(updated.isHasTime()).isTrue();
+            assertThat(updated.getDate().toLocalTime()).isEqualTo(newTime);
 
-            // 36: Date Only (Time Keep)
-            EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder().date(LocalDate.of(2026, 1, 1)).build();
+            // 36: Date Only (Time Keep) - hasTime이 true일 때 시간 유지
+            EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder()
+                    .date(LocalDate.of(2026, 1, 1))
+                    .build();
             eventService.updateEvent(principal, event.getId(), req2);
+            flushAndClear();
+            
             updated = eventRepository.findById(event.getId()).get();
             assertThat(updated.getDate().toLocalDate()).isEqualTo(LocalDate.of(2026, 1, 1));
-            assertThat(updated.getDate().toLocalTime()).isEqualTo(LocalTime.of(10, 0)); // Kept
+            assertThat(updated.isHasTime()).isTrue(); // hasTime 상태 유지
+            assertThat(updated.getDate().toLocalTime()).isEqualTo(newTime); // 시간 유지
         }
 
         @Test
@@ -466,17 +480,42 @@ class EventServiceTest extends IntegrationTestSupport {
         void updateEvent_HasTime() {
             UserPrincipal principal = UserPrincipal.from(userA);
 
-            // 43: True -> False
+            // Given: 초기 상태 (hasTime=true, time=12:00)
+            Event original = eventRepository.findById(event.getId()).get();
+            assertThat(original.isHasTime()).isTrue();
+
+            // 43: True -> False (시간이 MIDNIGHT로 설정됨)
             EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder().hasTime(false).build();
             eventService.updateEvent(principal, event.getId(), req2);
+            flushAndClear();
+            
             Event updated = eventRepository.findById(event.getId()).get();
             assertThat(updated.isHasTime()).isFalse();
             assertThat(updated.getDate().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
 
-            // 42: False -> True
-            EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder().hasTime(true).time(LocalTime.of(9,0)).build();
+            // 42: False -> True (시간을 명시적으로 설정해야 함)
+            LocalTime newTime = LocalTime.of(9, 0);
+            EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder()
+                    .hasTime(true)
+                    .time(newTime)
+                    .build();
             eventService.updateEvent(principal, event.getId(), req1);
-            assertThat(eventRepository.findById(event.getId()).get().isHasTime()).isTrue();
+            flushAndClear();
+            
+            Event updated2 = eventRepository.findById(event.getId()).get();
+            assertThat(updated2.isHasTime()).isTrue();
+            assertThat(updated2.getDate().toLocalTime()).isEqualTo(newTime);
+            
+            // hasTime=false일 때 time을 설정하지 않으면 MIDNIGHT 유지
+            EventDto.UpdateRequest req3 = EventDto.UpdateRequest.builder()
+                    .hasTime(false)
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req3);
+            flushAndClear();
+            
+            Event updated3 = eventRepository.findById(event.getId()).get();
+            assertThat(updated3.isHasTime()).isFalse();
+            assertThat(updated3.getDate().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
         }
 
         @Test
@@ -663,15 +702,32 @@ class EventServiceTest extends IntegrationTestSupport {
 
             flushAndClear(); // [중요] DB 반영
 
-            // When
+            // When: 5월 조회
             List<EventDto.Response> results = eventService.getMonthlyEvents(principal, archiveAPublic.getId(), YEAR, 5);
 
             // Then
             // 5월 1일 ~ 5월 10일(setupData: 10개) + 5월 1일(boundary: 1개) + 5월 31일(boundary: 1개)
             // 총 12개여야 함
             assertThat(results).hasSize(12);
+            
+            // 모든 결과가 5월인지 검증
             assertThat(results).extracting(EventDto.Response::getDate)
                     .allMatch(d -> d.getMonthValue() == 5);
+            
+            // 4월 30일은 제외되는지 검증
+            assertThat(results).extracting(EventDto.Response::getDate)
+                    .noneMatch(d -> d.getMonthValue() == 4);
+            
+            // 6월 1일은 제외되는지 검증
+            assertThat(results).extracting(EventDto.Response::getDate)
+                    .noneMatch(d -> d.getMonthValue() == 6);
+            
+            // 5월 1일과 5월 31일이 포함되는지 검증
+            List<LocalDate> resultDates = results.stream()
+                    .map(EventDto.Response::getDate)
+                    .toList();
+            assertThat(resultDates).contains(LocalDate.of(YEAR, 5, 1));
+            assertThat(resultDates).contains(LocalDate.of(YEAR, 5, 31));
         }
 
         @Test

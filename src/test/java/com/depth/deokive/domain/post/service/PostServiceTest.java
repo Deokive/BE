@@ -469,6 +469,16 @@ class PostServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 21: 파일 전체 교체 (PREVIEW 포함)")
         void updatePost_ReplaceFiles_Preview() {
+            // Given: 기존 파일 매핑 확인
+            List<PostFileMap> originalMaps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(originalMaps).hasSize(2);
+            List<Long> originalFileIds = originalMaps.stream()
+                    .map(map -> map.getFile().getId())
+                    .toList();
+            assertThat(originalFileIds).containsExactlyInAnyOrder(
+                    userAFiles.get(0).getId(), userAFiles.get(1).getId());
+
+            // When: 파일 전체 교체
             List<PostDto.AttachedFileRequest> newFiles = List.of(
                     new PostDto.AttachedFileRequest(userAFiles.get(5).getId(), MediaRole.PREVIEW, 0)
             );
@@ -477,9 +487,16 @@ class PostServiceTest extends IntegrationTestSupport {
             postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
             flushAndClear(); // [중요] Bulk delete & insert sync
 
+            // Then: 기존 매핑이 삭제되고 새로운 매핑만 존재
             List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
             assertThat(maps).hasSize(1);
             assertThat(maps.get(0).getFile().getId()).isEqualTo(userAFiles.get(5).getId());
+            
+            // 기존 파일 ID가 더 이상 매핑에 없는지 확인
+            List<Long> newFileIds = maps.stream()
+                    .map(map -> map.getFile().getId())
+                    .toList();
+            assertThat(newFileIds).doesNotContainAnyElementsOf(originalFileIds);
 
             // Thumbnail check
             assertThat(postRepository.findById(post.getId()).get().getThumbnailKey())
@@ -524,10 +541,17 @@ class PostServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 25: 파일 추가 (기존+신규 -> 클라이언트가 전체 리스트를 보내야 함)")
         void updatePost_AddFiles() {
+            // Given: 기존 파일 매핑 확인
+            List<PostFileMap> originalMaps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(originalMaps).hasSize(2);
+            Long originalFile0Id = userAFiles.get(0).getId();
+            Long originalFile1Id = userAFiles.get(1).getId();
+
+            // When: 기존 파일 + 신규 파일
             List<PostDto.AttachedFileRequest> files = new ArrayList<>();
             // Re-send existing
-            files.add(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.PREVIEW, 0));
-            files.add(new PostDto.AttachedFileRequest(userAFiles.get(1).getId(), MediaRole.CONTENT, 1));
+            files.add(new PostDto.AttachedFileRequest(originalFile0Id, MediaRole.PREVIEW, 0));
+            files.add(new PostDto.AttachedFileRequest(originalFile1Id, MediaRole.CONTENT, 1));
             // Add new
             files.add(new PostDto.AttachedFileRequest(userAFiles.get(2).getId(), MediaRole.CONTENT, 2));
 
@@ -535,7 +559,21 @@ class PostServiceTest extends IntegrationTestSupport {
             postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
             flushAndClear();
 
-            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).hasSize(3);
+            // Then: 기존 파일 ID가 유지되고 신규 파일이 추가됨
+            List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(maps).hasSize(3);
+            
+            List<Long> fileIds = maps.stream()
+                    .map(map -> map.getFile().getId())
+                    .toList();
+            assertThat(fileIds).contains(originalFile0Id); // 기존 파일 유지
+            assertThat(fileIds).contains(originalFile1Id); // 기존 파일 유지
+            assertThat(fileIds).contains(userAFiles.get(2).getId()); // 신규 파일 추가
+            
+            // Sequence 검증
+            assertThat(maps.get(0).getSequence()).isEqualTo(0);
+            assertThat(maps.get(1).getSequence()).isEqualTo(1);
+            assertThat(maps.get(2).getSequence()).isEqualTo(2);
         }
 
         @Test
@@ -657,6 +695,13 @@ class PostServiceTest extends IntegrationTestSupport {
             assertThat(res.getContent()).hasSize(10);
             assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30"); // Latest
             assertThat(res.getTitle()).contains("전체");
+            
+            // 정렬 검증: createdAt DESC (최신순)
+            List<PostDto.PostPageResponse> content = res.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getCreatedAt())
+                        .isAfterOrEqualTo(content.get(i + 1).getCreatedAt());
+            }
         }
 
         @Test
@@ -671,6 +716,13 @@ class PostServiceTest extends IntegrationTestSupport {
             assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30");
             assertThat(res.getContent().get(9).getTitle()).isEqualTo("Post 21");
             assertThat(res.getTitle()).contains("핫한");
+            
+            // 정렬 검증: hotScore DESC
+            List<PostDto.PostPageResponse> content = res.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getHotScore())
+                        .isGreaterThanOrEqualTo(content.get(i + 1).getHotScore());
+            }
         }
 
         @Test
@@ -692,11 +744,19 @@ class PostServiceTest extends IntegrationTestSupport {
             PostDto.PostPageRequest req = new PostDto.PostPageRequest();
             req.setCategory(Category.IDOL);
             req.setSort("hotScore");
+            req.setDirection("DESC");
 
             PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
 
             assertThat(res.getContent()).allMatch(p -> p.getCategory() == Category.IDOL);
             assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 29"); // Odd numbers are IDOL (Highest odd is 29)
+            
+            // 정렬 검증: hotScore DESC
+            List<PostDto.PostPageResponse> content = res.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getHotScore())
+                        .isGreaterThanOrEqualTo(content.get(i + 1).getHotScore());
+            }
         }
 
         @Test

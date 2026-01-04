@@ -398,18 +398,22 @@ class DiaryServiceTest extends IntegrationTestSupport {
             DiaryDto.Response resOwner = diaryService.retrieveDiary(UserPrincipal.from(userA), diaryPublicArchive_PublicDiary.getId());
             assertThat(resOwner.getId()).isEqualTo(diaryPublicArchive_PublicDiary.getId());
             assertThat(resOwner.getFiles()).hasSize(3);
+            assertThat(resOwner.getVisibility()).isEqualTo(Visibility.PUBLIC);
 
-            // Scene 9: 타인 조회
+            // Scene 9: 타인 조회 (PUBLIC Archive + PUBLIC Diary -> 통과)
             DiaryDto.Response resStranger = diaryService.retrieveDiary(UserPrincipal.from(userC), diaryPublicArchive_PublicDiary.getId());
             assertThat(resStranger.getId()).isEqualTo(diaryPublicArchive_PublicDiary.getId());
+            assertThat(resStranger.getVisibility()).isEqualTo(Visibility.PUBLIC);
 
-            // Scene 10: 친구 조회
+            // Scene 10: 친구 조회 (PUBLIC Archive + PUBLIC Diary -> 통과)
             DiaryDto.Response resFriend = diaryService.retrieveDiary(UserPrincipal.from(userB), diaryPublicArchive_PublicDiary.getId());
             assertThat(resFriend.getId()).isEqualTo(diaryPublicArchive_PublicDiary.getId());
+            assertThat(resFriend.getVisibility()).isEqualTo(Visibility.PUBLIC);
 
-            // Scene 11: 비회원 조회
+            // Scene 11: 비회원 조회 (PUBLIC Archive + PUBLIC Diary -> 통과)
             DiaryDto.Response resAnon = diaryService.retrieveDiary(null, diaryPublicArchive_PublicDiary.getId());
             assertThat(resAnon.getId()).isEqualTo(diaryPublicArchive_PublicDiary.getId());
+            assertThat(resAnon.getVisibility()).isEqualTo(Visibility.PUBLIC);
         }
 
         @Test
@@ -435,13 +439,16 @@ class DiaryServiceTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("SCENE 16~19: PUBLIC Archive + PRIVATE Diary")
+        @DisplayName("SCENE 16~19: PUBLIC Archive + PRIVATE Diary (이중 Visibility 검증)")
         void retrieveDiary_PublicArchive_PrivateDiary() {
-            // Scene 16: 본인 조회
+            // Scene 16: 본인 조회 (Archive 통과 + Diary 통과)
             DiaryDto.Response resOwner = diaryService.retrieveDiary(UserPrincipal.from(userA), diaryPublicArchive_PrivateDiary.getId());
             assertThat(resOwner.getId()).isEqualTo(diaryPublicArchive_PrivateDiary.getId());
+            assertThat(resOwner.getVisibility()).isEqualTo(Visibility.PRIVATE);
 
-            // Scene 17~19: 타인/친구/비회원 조회 -> 모두 Fail
+            // Scene 17~19: 타인/친구/비회원 조회 -> Archive는 통과하지만 Diary 레벨에서 차단
+            // 이는 ArchiveGuard.checkArchiveReadPermission은 통과하지만
+            // ArchiveGuard.checkVisibility에서 Diary의 PRIVATE 때문에 차단됨
             assertThatThrownBy(() -> diaryService.retrieveDiary(UserPrincipal.from(userC), diaryPublicArchive_PrivateDiary.getId()))
                     .isInstanceOf(RestException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
@@ -879,6 +886,20 @@ class DiaryServiceTest extends IntegrationTestSupport {
             // Then
             assertThat(response.getPage().getTotalElements()).isEqualTo(30); // 10 + 10 + 10
             assertThat(response.getTitle()).contains("다이어리");
+            
+            // Visibility 필터링 검증: 본인은 모든 Visibility 조회 가능
+            long publicCount = response.getContent().stream()
+                    .filter(d -> d.getVisibility() == Visibility.PUBLIC)
+                    .count();
+            long restrictedCount = response.getContent().stream()
+                    .filter(d -> d.getVisibility() == Visibility.RESTRICTED)
+                    .count();
+            long privateCount = response.getContent().stream()
+                    .filter(d -> d.getVisibility() == Visibility.PRIVATE)
+                    .count();
+            assertThat(publicCount).isGreaterThan(0);
+            assertThat(restrictedCount).isGreaterThan(0);
+            assertThat(privateCount).isGreaterThan(0);
         }
 
         @Test
@@ -897,6 +918,19 @@ class DiaryServiceTest extends IntegrationTestSupport {
             assertThat(response.getPage().getTotalElements()).isEqualTo(20); // PUBLIC 10 + RESTRICTED 10
             assertThat(response.getContent()).allMatch(d -> 
                     d.getVisibility() == Visibility.PUBLIC || d.getVisibility() == Visibility.RESTRICTED);
+            
+            // Visibility 필터링 검증: PRIVATE Diary는 포함되지 않음
+            assertThat(response.getContent()).noneMatch(d -> d.getVisibility() == Visibility.PRIVATE);
+            
+            // PUBLIC과 RESTRICTED가 모두 포함되는지 검증
+            long publicCount = response.getContent().stream()
+                    .filter(d -> d.getVisibility() == Visibility.PUBLIC)
+                    .count();
+            long restrictedCount = response.getContent().stream()
+                    .filter(d -> d.getVisibility() == Visibility.RESTRICTED)
+                    .count();
+            assertThat(publicCount).isGreaterThan(0);
+            assertThat(restrictedCount).isGreaterThan(0);
         }
 
         @Test
