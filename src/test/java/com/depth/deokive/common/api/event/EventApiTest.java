@@ -42,30 +42,63 @@ class EventApiTest {
 
         /** SCENE 1. 정상 생성 - 일반 이벤트 (시간 포함, 해시태그 포함) */
         // Given: UserA 토큰, Public Archive ID
-        // Given: hasTime=true, time=14:30, hashtags=["concert", "live"]
+        // Given: Request Body (title="콘서트", date=2024-01-01, hasTime=true, time=14:30, color="#FF5733", hashtags=["concert", "live"])
         // When: POST /api/v1/events/{archiveId}
         // Then: 201 Created
-        // Then: 응답 데이터에 time=14:30, hashtags 포함 확인
+        // Then: **응답 Body 검증** - response.id가 null이 아니고 유효한 Long 값인지 확인
+        // Then: **응답 Body 검증** - response.title == "콘서트" 확인
+        // Then: **응답 Body 검증** - response.date == 2024-01-01 확인
+        // Then: **응답 Body 검증** - response.hasTime == true 확인
+        // Then: **응답 Body 검증** - response.time == 14:30 확인
+        // Then: **응답 Body 검증** - response.color == "#FF5733" 확인
+        // Then: **응답 Body 검증** - response.isSportType == false 확인
+        // Then: **응답 Body 검증** - response.sportInfo == null 확인
+        // Then: **응답 Body 검증** - response.hashtags 리스트가 2개인지 확인
+        // Then: **응답 Body 검증** - response.hashtags.contains("concert") 확인
+        // Then: **응답 Body 검증** - response.hashtags.contains("live") 확인
+        // Then: **DB 검증** - eventRepository.findById(response.getId())로 조회 시 엔티티가 존재하는지 확인
+        // Then: **DB 검증** - DB의 Event 엔티티의 title == "콘서트" 확인
+        // Then: **DB 검증** - DB의 Event 엔티티의 hasTime == true 확인
+        // Then: **DB 검증** - DB의 Event 엔티티의 date.toLocalTime() == 14:30 확인
+        // Then: **DB 검증** - eventHashtagMapRepository.findAllByEventId(response.getId())가 2개인지 확인
+        // Then: **DB 검증** - hashtagRepository.findByName("concert").isPresent() == true 확인
+        // Then: **DB 검증** - hashtagRepository.findByName("live").isPresent() == true 확인
 
         /** SCENE 2. 정상 생성 - 시간 없는 이벤트 (All Day) */
         // Given: UserA 토큰, Public Archive ID
         // Given: hasTime=false, time=null (혹은 값 있어도 무시되어야 함)
         // When: POST /api/v1/events/{archiveId}
         // Then: 201 Created
-        // Then: 응답 데이터에 time이 null(또는 00:00)인지 확인, hasTime=false 확인
+        // Then: 응답 데이터에 hasTime=false 확인
+        // Then: 응답의 date 필드의 시간 부분이 00:00:00인지 확인 (또는 무시됨)
+        // Then: DB에서 Event 엔티티의 hasTime=false, date의 시간 부분이 00:00:00인지 확인
 
         /** SCENE 3. 정상 생성 - 스포츠 이벤트 (SportRecord 포함) */
         // Given: UserA 토큰, Public Archive ID
-        // Given: isSportType=true, sportInfo={team1: "A", team2: "B", score1: 1, score2: 0}
+        // Given: Request Body (title="야구 경기", isSportType=true, sportInfo={team1: "A", team2: "B", score1: 1, score2: 0})
         // When: POST /api/v1/events/{archiveId}
         // Then: 201 Created
-        // Then: 응답 내 sportInfo 객체 존재 및 데이터 일치 확인
+        // Then: **응답 Body 검증** - response.isSportType == true 확인
+        // Then: **응답 Body 검증** - response.sportInfo != null 확인
+        // Then: **응답 Body 검증** - response.sportInfo.team1 == "A" 확인
+        // Then: **응답 Body 검증** - response.sportInfo.team2 == "B" 확인
+        // Then: **응답 Body 검증** - response.sportInfo.score1 == 1 확인
+        // Then: **응답 Body 검증** - response.sportInfo.score2 == 0 확인
+        // Then: **DB 검증** - eventRepository.findById(response.getId())로 조회 시 엔티티가 존재하는지 확인
+        // Then: **DB 검증** - DB의 Event 엔티티의 isSportType == true 확인
+        // Then: **DB 검증** - sportRecordRepository.existsById(response.getId()) == true 확인
+        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().team1 == "A" 확인
+        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().team2 == "B" 확인
+        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().score1 == 1 확인
+        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().score2 == 0 확인
 
         /** SCENE 4. 정상 생성 - 중복 해시태그 처리 */
         // Given: UserA 토큰, hashtags=["tag1", "tag1", "tag2"]
         // When: POST /api/v1/events/{archiveId}
         // Then: 201 Created
         // Then: 응답 내 hashtags가 ["tag1", "tag2"]로 중복 제거되었는지 확인
+        // Then: DB에서 Hashtag 엔티티가 2개만 생성되었는지 확인 (중복 제거)
+        // Then: DB에서 EventHashtagMap이 2개만 생성되었는지 확인
 
         /** SCENE 5. 예외 - 필수값 누락 (제목 없음) */
         // Given: title=""
@@ -95,11 +128,12 @@ class EventApiTest {
         // - Event_Private (in Private Archive)
 
         /** SCENE 8. PUBLIC 일반 이벤트 조회 - 데이터 무결성 확인 */
-        // Given: UserC(타인) 토큰, Event_Normal ID
+        // Given: UserC(타인) 토큰, Event_Normal ID (hasTime=true, time=14:30, hashtags 포함)
         // When: GET /api/v1/events/{id}
         // Then: 200 OK
-        // Then: title, date, color, hashtags 등 데이터 일치 확인
-        // Then: sportInfo는 null이어야 함
+        // Then: 응답의 title, date, color, hasTime=true, time=14:30, hashtags 등 모든 필드 검증
+        // Then: 응답의 sportInfo는 null이어야 함
+        // Then: 응답의 date 필드의 시간 부분이 14:30:00인지 확인
 
         /** SCENE 9. PUBLIC 스포츠 이벤트 조회 - 스포츠 데이터 확인 */
         // Given: UserC(타인) 토큰, Event_Sport ID
@@ -135,40 +169,60 @@ class EventApiTest {
         // Setup: Event_Normal(시간O, 스포츠X), Event_Sport(시간X, 스포츠O) 생성
 
         /** SCENE 14. 정상 수정 - 기본 정보 (제목, 색상) 변경 */
-        // Given: UserA 토큰, title="Updated", color="#000000"
-        // When: PATCH /api/v1/events/{id}
-        // Then: 200 OK, 응답값 확인
+        // Given: UserA 토큰, Event ID (기존 title="원본", color="#FF5733")
+        // Given: Request Body (title="수정된 제목", color="#000000")
+        // When: PATCH /api/v1/events/{eventId}
+        // Then: 200 OK
+        // Then: **응답 Body 검증** - response.title == "수정된 제목" 확인
+        // Then: **응답 Body 검증** - response.color == "#000000" 확인
+        // Then: **응답 Body 검증** - response.id가 변경되지 않았는지 확인 (동일한 ID)
+        // Then: **DB 검증** - eventRepository.findById(eventId)로 조회 시 엔티티가 존재하는지 확인
+        // Then: **DB 검증** - DB의 Event 엔티티의 title == "수정된 제목" 확인
+        // Then: **DB 검증** - DB의 Event 엔티티의 color == "#000000" 확인
 
         /** SCENE 15. 로직 수정 - 시간 끄기 (hasTime: True -> False) */
-        // Given: Event_Normal (기존 시간 있음)
+        // Given: Event_Normal (기존 시간 있음, hasTime=true, time=14:30)
         // When: PATCH ... body { "hasTime": false }
         // Then: 200 OK
-        // Then: 응답의 hasTime=false, time=null(혹은 무시됨) 확인
+        // Then: 응답의 hasTime=false 확인
+        // Then: 응답의 date 필드의 시간 부분이 00:00:00인지 확인
+        // Then: DB에서 Event 엔티티의 hasTime=false, date의 시간 부분이 00:00:00으로 변경되었는지 확인
 
         /** SCENE 16. 로직 수정 - 시간 켜기 (hasTime: False -> True) */
-        // Given: Event_Sport (기존 시간 없음)
+        // Given: Event_Sport (기존 시간 없음, hasTime=false)
         // When: PATCH ... body { "hasTime": true, "time": "18:00" }
         // Then: 200 OK
-        // Then: 응답의 hasTime=true, time=18:00 확인
+        // Then: 응답의 hasTime=true 확인
+        // Then: 응답의 date 필드의 시간 부분이 18:00:00인지 확인
+        // Then: DB에서 Event 엔티티의 hasTime=true, date의 시간 부분이 18:00:00으로 변경되었는지 확인
 
         /** SCENE 17. 로직 수정 - 스포츠 타입 끄기 (Sport -> Normal) */
-        // Given: Event_Sport (기존 SportRecord 있음)
+        // Given: Event_Sport (기존 SportRecord 있음, isSportType=true)
         // When: PATCH ... body { "isSportType": false }
         // Then: 200 OK
         // Then: 응답의 isSportType=false, sportInfo=null 확인
-        // Then: (선택) DB 조회를 통해 실제 SportRecord 엔티티가 삭제되었는지 확인 (혹은 상세 조회 API 재호출로 확인)
+        // Then: DB에서 Event 엔티티의 isSportType=false로 변경되었는지 확인
+        // Then: DB에서 SportRecord 엔티티가 삭제되었는지 확인 (orphanRemoval 또는 명시적 삭제)
+        // Then: 상세 조회 API 재호출 시 sportInfo=null인지 확인
 
         /** SCENE 18. 로직 수정 - 스포츠 타입 켜기 (Normal -> Sport) */
-        // Given: Event_Normal
-        // When: PATCH ... body { "isSportType": true, "sportInfo": {...} }
+        // Given: Event_Normal (isSportType=false, SportRecord 없음)
+        // When: PATCH ... body { "isSportType": true, "sportInfo": {team1: "A", team2: "B", score1: 1, score2: 0} }
         // Then: 200 OK
         // Then: 응답의 isSportType=true, sportInfo 데이터 확인
+        // Then: DB에서 Event 엔티티의 isSportType=true로 변경되었는지 확인
+        // Then: DB에서 SportRecord 엔티티가 새로 생성되고 Event와 연결되었는지 확인
+        // Then: DB에서 SportRecord의 team1, team2, score1, score2 값이 올바른지 확인
 
         /** SCENE 19. 로직 수정 - 해시태그 전체 교체 */
-        // Given: 기존 태그 ["old1", "old2"]
+        // Given: Event (기존 태그 ["old1", "old2"] 연결됨)
         // When: PATCH ... body { "hashtags": ["new1"] }
         // Then: 200 OK
-        // Then: 상세 조회 시 기존 태그는 없고 ["new1"]만 존재해야 함 (기존 매핑 삭제 확인)
+        // Then: 응답의 hashtags가 ["new1"]인지 확인
+        // Then: DB에서 기존 EventHashtagMap(2개)이 삭제되었는지 확인
+        // Then: DB에서 새로운 EventHashtagMap(1개)이 생성되었는지 확인
+        // Then: DB에서 Hashtag 엔티티("old1", "old2")는 유지되는지 확인 (재사용 가능)
+        // Then: 상세 조회 API 재호출 시 hashtags=["new1"]인지 확인
 
         /** SCENE 20. 로직 수정 - 해시태그 삭제 */
         // When: PATCH ... body { "hashtags": [] } (빈 리스트)
@@ -188,11 +242,15 @@ class EventApiTest {
         // Setup: Event 생성 (해시태그, 스포츠기록 포함)
 
         /** SCENE 22. 정상 삭제 - 연관 데이터 삭제 확인 */
-        // Given: UserA 토큰
-        // When: DELETE /api/v1/events/{id}
-        // Then: 204 No Content
-        // Then: 해당 ID 상세 조회 시 404 Not Found 확인
-        // Note: JPA orphanRemoval 혹은 명시적 삭제 로직에 의해 SportRecord, HashtagMap도 삭제되어야 함
+        // Given: UserA 토큰, Event ID (해시태그 2개, 스포츠기록 포함)
+        // When: DELETE /api/v1/events/{eventId}
+        // Then: 204 No Content (응답 Body 없음)
+        // Then: **재조회 검증** - GET /api/v1/events/{eventId} 호출 시 404 Not Found 확인
+        // Then: **DB 검증** - eventRepository.findById(eventId).isPresent() == false 확인
+        // Then: **DB 검증** - eventHashtagMapRepository.findAllByEventId(eventId)가 빈 리스트인지 확인
+        // Then: **DB 검증** - sportRecordRepository.existsById(eventId) == false 확인 (스포츠 타입인 경우)
+        // Then: **DB 검증** - hashtagRepository.findByName("tag1").isPresent() == true 확인 (재사용 가능)
+        // Then: **DB 검증** - hashtagRepository.findByName("tag2").isPresent() == true 확인 (재사용 가능)
 
         /** SCENE 23. 예외 - 타인이 삭제 시도 */
         // Given: UserC 토큰
@@ -214,11 +272,25 @@ class EventApiTest {
         // - 6월 1일 (Boundary Post)
 
         /** SCENE 24. 정상 조회 - 5월 데이터 조회 */
+        // Setup: UserA Archive에 이벤트 생성
+        //   - Event1: 4월 30일 23:59:59 (Boundary Pre)
+        //   - Event2: 5월 1일 00:00:00 (Boundary Start)
+        //   - Event3: 5월 15일 12:00:00 (Middle)
+        //   - Event4: 5월 31일 23:59:59 (Boundary End)
+        //   - Event5: 6월 1일 00:00:00 (Boundary Post)
         // Given: UserA 토큰, year=2024, month=5
         // When: GET /api/v1/events/monthly/{archiveId}?year=2024&month=5
         // Then: 200 OK
-        // Then: 리스트 사이즈 3 (5/1, 5/15, 5/31) 확인
-        // Then: 4월 30일, 6월 1일 데이터는 포함되지 않아야 함 (경계값 검증)
+        // Then: 리스트 사이즈 3 (Event2, Event3, Event4) 확인
+        // Then: Event1(4월 30일)은 포함되지 않아야 함 (경계값 검증)
+        // Then: Event2(5월 1일)은 포함되어야 함 (경계값 검증)
+        // Then: Event4(5월 31일)은 포함되어야 함 (경계값 검증)
+        // Then: Event5(6월 1일)은 포함되지 않아야 함 (경계값 검증)
+        // Then: **정렬 검증** - 리스트가 date 기준 오름차순으로 정렬되었는지 확인 (ORDER BY e.date ASC)
+        // Then: **실제 데이터 순서 검증** - content.get(0).getDate() < content.get(1).getDate() 확인
+        // Then: content.get(0).getId() == Event2.getId() 확인 (5월 1일)
+        // Then: content.get(1).getId() == Event3.getId() 확인 (5월 15일)
+        // Then: content.get(2).getId() == Event4.getId() 확인 (5월 31일)
 
         /** SCENE 25. 권한 필터링 - RESTRICTED 아카이브 */
         // Setup: UserA의 Restricted Archive
@@ -231,7 +303,10 @@ class EventApiTest {
 
         /** SCENE 27. 해시태그 Fetch Join 검증 (성능 이슈 체크용) */
         // Given: 5월 이벤트 3개 모두 해시태그 보유
-        // When: 월별 조회
-        // Then: 각 이벤트 객체 내에 hashtags 리스트가 정상적으로 채워져 있는지 확인 (N+1 문제 없이 조회되는지 관점)
+        // When: GET /api/v1/events/monthly/{archiveId}?year=2024&month=5
+        // Then: 200 OK
+        // Then: 각 이벤트 객체 내에 hashtags 리스트가 null이 아니고 정상적으로 채워져 있는지 확인
+        // Then: 모든 이벤트의 hashtags가 올바르게 포함되었는지 확인 (N+1 문제 없이 조회되는지 관점)
+        // Then: (선택) 쿼리 로그 확인 또는 프로파일링으로 N+1 문제 없음을 검증
     }
 }

@@ -52,14 +52,25 @@ class TicketApiTest {
         //   - fileId=FileA_1
         // When: POST /api/v1/tickets/{archiveId}
         // Then: 201 Created
-        // Then: 응답 데이터 내 모든 필드(특히 file 정보) 일치 여부 확인
+        // Then: 응답 데이터 내 모든 필드(title, date, location, seat, casting, score, review, file) 일치 여부 확인
+        // Then: 응답의 file 필드가 FileA_1의 정보를 포함하는지 확인
+        // Then: DB에서 Ticket 엔티티의 모든 필드가 올바르게 저장되었는지 확인
+        // Then: DB에서 Ticket 엔티티의 file 필드가 FileA_1과 연결되었는지 확인
+        // Then: DB에서 Ticket 엔티티의 originalKey가 FileA_1의 s3ObjectKey와 일치하는지 확인
 
         /** SCENE 2. 정상 생성 - 이미지 없음 (필수값인 title, date만 포함) */
         // Given: UserA 토큰, Restricted Archive ID
-        // Given: Request Body { title="전시회", date="..." } (fileId=null)
+        // Given: Request Body { title="전시회", date="2024-01-01T19:00:00", fileId=null }
         // When: POST /api/v1/tickets/{archiveId}
         // Then: 201 Created
-        // Then: 응답 내 file 필드가 null인지 확인
+        // Then: **응답 Body 검증** - response.id가 null이 아니고 유효한 Long 값인지 확인
+        // Then: **응답 Body 검증** - response.title == "전시회" 확인
+        // Then: **응답 Body 검증** - response.date == 2024-01-01T19:00:00 확인
+        // Then: **응답 Body 검증** - response.file == null 확인
+        // Then: **DB 검증** - ticketRepository.findById(response.getId())로 조회 시 엔티티가 존재하는지 확인
+        // Then: **DB 검증** - DB의 Ticket 엔티티의 title == "전시회" 확인
+        // Then: **DB 검증** - DB의 Ticket 엔티티의 file == null 확인
+        // Then: **DB 검증** - DB의 Ticket 엔티티의 originalKey == null 확인
 
         /** SCENE 3. 예외 - 필수값 누락 (Title, Date) */
         // Given: Request Body { location="장소만 있음" }
@@ -94,9 +105,12 @@ class TicketApiTest {
         // - Ticket_Pri (in Private Archive)
 
         /** SCENE 7. PUBLIC 티켓 조회 - 누구나 가능 */
-        // Given: UserC(타인) or Anonymous
+        // Given: UserC(타인) or Anonymous, Ticket_Pub ID (파일 포함)
         // When: GET /api/v1/tickets/{ticketPubId}
-        // Then: 200 OK, 데이터 확인
+        // Then: 200 OK
+        // Then: 응답의 모든 필드(title, date, location, seat, casting, score, review 등) 검증
+        // Then: 응답의 file 필드가 null이 아닌 경우, file.cdnUrl이 CDN URL 형식인지 검증 (https://cdn... 형식)
+        // Then: 응답의 file 필드가 null인 경우, file 필드가 null인지 확인
 
         /** SCENE 8. RESTRICTED 티켓 조회 - 친구(UserB) 가능 */
         // Given: UserB 토큰
@@ -126,21 +140,36 @@ class TicketApiTest {
         // Setup: Ticket 생성 (기존 파일: FileA_1)
 
         /** SCENE 12. 정상 수정 - 텍스트 정보만 변경 */
-        // Given: UserA 토큰, title="Updated Title", score=3
-        // When: PATCH /api/v1/tickets/{id}
-        // Then: 200 OK, 제목과 평점 변경 확인, 기존 파일 유지 확인
+        // Given: UserA 토큰, Ticket ID (기존 title="원본", score=5, file=FileA_1)
+        // Given: Request Body (title="수정된 제목", score=3, fileId=null, deleteFile=null)
+        // When: PATCH /api/v1/tickets/{ticketId}
+        // Then: 200 OK
+        // Then: **응답 Body 검증** - response.title == "수정된 제목" 확인
+        // Then: **응답 Body 검증** - response.score == 3 확인
+        // Then: **응답 Body 검증** - response.file != null 확인 (기존 파일 유지)
+        // Then: **응답 Body 검증** - response.file.fileId == FileA_1.getId() 확인
+        // Then: **DB 검증** - ticketRepository.findById(ticketId)로 조회 시 엔티티가 존재하는지 확인
+        // Then: **DB 검증** - DB의 Ticket 엔티티의 title == "수정된 제목" 확인
+        // Then: **DB 검증** - DB의 Ticket 엔티티의 score == 3 확인
+        // Then: **DB 검증** - DB의 Ticket 엔티티의 file.id == FileA_1.getId() 확인 (기존 파일 유지)
 
         /** SCENE 13. 정상 수정 - 이미지 교체 (Replace) */
-        // Given: UserA 토큰, fileId=FileA_2 (새 파일)
+        // Given: UserA 토큰, fileId=FileA_2 (새 파일, 기존 FileA_1 있음)
         // When: PATCH /api/v1/tickets/{id}
         // Then: 200 OK
-        // Then: 응답 내 fileId가 FileA_2로 변경되었는지 확인
+        // Then: 응답 내 file 필드의 fileId가 FileA_2로 변경되었는지 확인
+        // Then: DB에서 Ticket 엔티티의 file 필드가 FileA_2로 변경되었는지 확인
+        // Then: DB에서 Ticket 엔티티의 originalKey가 FileA_2의 s3ObjectKey로 변경되었는지 확인
+        // Then: 기존 FileA_1 엔티티는 삭제되지 않고 유지되는지 확인 (File은 재사용 가능)
 
         /** SCENE 14. 정상 수정 - 이미지 삭제 */
-        // Given: UserA 토큰, deleteFile=true
+        // Given: UserA 토큰, deleteFile=true (기존 FileA_1 있음, fileId=null)
         // When: PATCH /api/v1/tickets/{id}
         // Then: 200 OK
         // Then: 응답 내 file 필드가 null인지 확인
+        // Then: DB에서 Ticket 엔티티의 file 필드가 null인지 확인
+        // Then: DB에서 Ticket 엔티티의 originalKey가 null인지 확인
+        // Then: FileA_1 엔티티는 삭제되지 않고 유지되는지 확인 (File은 재사용 가능)
 
         /** SCENE 15. 예외 - 타인이 수정 시도 */
         // Given: UserC 토큰
@@ -201,10 +230,23 @@ class TicketApiTest {
         // Setup: UserA의 Archive에 티켓 5개 생성 (날짜 다르게)
 
         /** SCENE 21. 정상 조회 - 페이징 및 정렬 (Date 기준) */
+        // Setup: UserA Archive에 티켓 3개 생성 (date 다르게 설정)
+        //   - Ticket1: date = 2024-01-01T19:00:00
+        //   - Ticket2: date = 2024-01-03T19:00:00
+        //   - Ticket3: date = 2024-01-02T19:00:00
         // Given: UserA 토큰
-        // When: GET /api/v1/tickets/book/{archiveId}?page=0&size=10&sort=date
+        // When: GET /api/v1/tickets/book/{archiveId}?page=0&size=10&sort=date&direction=DESC
         // Then: 200 OK
-        // Then: totalElements=5, date 기준 내림차순 정렬 확인
+        // Then: 응답의 totalElements=3, totalPages, hasNext, hasPrevious 확인
+        // Then: **실제 데이터 순서 검증** - content.get(0).getDate().isAfter(content.get(1).getDate()) 확인
+        // Then: content.get(0).getDate() == 2024-01-03T19:00:00 확인 (가장 최신)
+        // Then: content.get(1).getDate() == 2024-01-02T19:00:00 확인
+        // Then: content.get(2).getDate() == 2024-01-01T19:00:00 확인 (가장 오래됨)
+        // Then: **URL 형식 검증** - content의 각 티켓의 thumbnail이 CDN URL 형식인지 확인 (null이 아닌 경우)
+        // When: GET ...?sort=date&direction=ASC
+        // Then: **실제 데이터 순서 검증** - content.get(0).getDate().isBefore(content.get(1).getDate()) 확인
+        // Then: content.get(0).getDate() == 2024-01-01T19:00:00 확인 (가장 오래됨)
+        // Then: content.get(2).getDate() == 2024-01-03T19:00:00 확인 (가장 최신)
 
         /** SCENE 22. 권한 필터링 - RESTRICTED 아카이브 */
         // Given: UserB(친구) -> 200 OK
