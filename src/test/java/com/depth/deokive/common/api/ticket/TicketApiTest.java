@@ -153,28 +153,81 @@ class TicketApiTest extends ApiTestSupport {
         @Test @DisplayName("SCENE 3. 예외 - 필수값 누락")
         void create_BadRequest() {
             given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(Map.of("location", "No Title"))
-                    .post("/api/v1/tickets/{archiveId}", publicArchiveId).then().statusCode(400);
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(400)
+                    .body("error", notNullValue());
         }
 
         @Test @DisplayName("SCENE 4. 예외 - 평점 범위 초과")
         void create_ScoreExceed() {
             Map<String, Object> req = Map.of("title", "T", "date", "2024-01-01T00:00:00", "score", 10);
             given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(req)
-                    .post("/api/v1/tickets/{archiveId}", publicArchiveId).then().statusCode(400);
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(400)
+                    .body("error", notNullValue());
+        }
+
+        @Test @DisplayName("SCENE 7. 예외 - 평점 범위 하한선 (0)")
+        void create_ScoreZero() {
+            Map<String, Object> req = Map.of("title", "T", "date", "2024-01-01T00:00:00", "score", 0);
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(req)
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(201); // 0은 유효한 값 (Min(0)이므로)
+        }
+
+        @Test @DisplayName("SCENE 8. 예외 - 평점 범위 하한선 (음수)")
+        void create_ScoreNegative() {
+            Map<String, Object> req = Map.of("title", "T", "date", "2024-01-01T00:00:00", "score", -1);
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(req)
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(400)
+                    .body("error", notNullValue());
+        }
+
+        @Test @DisplayName("SCENE 9. 예외 - 날짜 형식 오류")
+        void create_InvalidDateFormat() {
+            Map<String, Object> req = Map.of("title", "T", "date", "2024-13-01T00:00:00"); // 잘못된 월
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(req)
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(400)
+                    .body("error", notNullValue());
+        }
+
+        @Test @DisplayName("SCENE 10. 예외 - 날짜 null")
+        void create_DateNull() {
+            Map<String, Object> req = new HashMap<>();
+            req.put("title", "T");
+            req.put("date", null);
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(req)
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(400)
+                    .body("error", notNullValue());
         }
 
         @Test @DisplayName("SCENE 5. 예외 - IDOR (타인 파일)")
         void create_IDOR() {
             Map<String, Object> req = Map.of("title", "Hack", "date", "2024-01-01T00:00:00", "fileId", userCFiles.get(0));
             given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(req)
-                    .post("/api/v1/tickets/{archiveId}", publicArchiveId).then().statusCode(403);
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(403)
+                    .body("error", equalTo("AUTH_FORBIDDEN"));
         }
 
         @Test @DisplayName("SCENE 6. 예외 - 타인 아카이브")
         void create_Forbidden() {
             Map<String, Object> req = Map.of("title", "Hack", "date", "2024-01-01T00:00:00");
             given().cookie("ATK", tokenUserC).contentType(ContentType.JSON).body(req)
-                    .post("/api/v1/tickets/{archiveId}", publicArchiveId).then().statusCode(403);
+                    .post("/api/v1/tickets/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(403)
+                    .body("error", equalTo("AUTH_FORBIDDEN"));
         }
     }
 
@@ -218,7 +271,11 @@ class TicketApiTest extends ApiTestSupport {
 
         @Test @DisplayName("SCENE 11. 존재하지 않는 티켓")
         void readNotFound() {
-            given().cookie("ATK", tokenUserA).get("/api/v1/tickets/{id}", 99999).then().statusCode(404);
+            given().cookie("ATK", tokenUserA)
+                    .get("/api/v1/tickets/{id}", 99999)
+                    .then()
+                    .statusCode(404)
+                    .body("error", notNullValue());
         }
     }
 
@@ -329,7 +386,10 @@ class TicketApiTest extends ApiTestSupport {
         @Test @DisplayName("SCENE 20. 타인 수정")
         void updateTitle_Forbidden() {
             given().cookie("ATK", tokenUserC).contentType(ContentType.JSON).body(Map.of("title", "Hack"))
-                    .patch("/api/v1/tickets/book/{id}", publicArchiveId).then().statusCode(403);
+                    .patch("/api/v1/tickets/book/{id}", publicArchiveId)
+                    .then()
+                    .statusCode(403)
+                    .body("error", equalTo("AUTH_FORBIDDEN"));
         }
     }
 

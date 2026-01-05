@@ -232,6 +232,52 @@ class PostApiTest extends ApiTestSupport {
                     .post("/api/v1/posts").then().statusCode(HttpStatus.NOT_FOUND.value())
                     .body("error", equalTo("FILE_NOT_FOUND")); // Service logic: distinct count check
         }
+
+        @Test
+        @DisplayName("SCENE 8. 썸네일 선정 로직 - PREVIEW 없이 Sequence 0번만 있는 경우")
+        void createPost_Thumbnail_NoPreview_Sequence0() {
+            // Given: PREVIEW 없이 CONTENT만 있고 Sequence가 0번인 경우
+            List<Map<String, Object>> files = List.of(
+                    Map.of("fileId", userAFiles.get(0), "mediaRole", "CONTENT", "sequence", 0)
+            );
+
+            Map<String, Object> request = Map.of(
+                    "title", "No Preview Post",
+                    "content", "Content",
+                    "category", "IDOL",
+                    "files", files
+            );
+
+            // When
+            int postId = given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/posts")
+                    .then()
+                    .statusCode(HttpStatus.CREATED.value())
+                    .extract().jsonPath().getInt("id");
+
+            // Then: Sequence 0번 파일이 썸네일로 선정되어야 함
+            Post post = postRepository.findById((long) postId).orElseThrow();
+            assertThat(post.getThumbnailKey()).isNotNull();
+            
+            // 실제 File 엔티티 조회하여 S3 Key 비교
+            File expectedFile = fileRepository.findById(userAFiles.get(0)).orElseThrow();
+            String expectedThumbKey = ThumbnailUtils.getMediumThumbnailKey(expectedFile.getS3ObjectKey());
+            assertThat(post.getThumbnailKey()).isEqualTo(expectedThumbKey);
+        }
+
+        @Test
+        @DisplayName("SCENE 9. 예외 - 필수값 누락 (에러 메시지 검증)")
+        void createPost_BadRequest_ErrorMessage() {
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(Map.of("category", "IDOL"))
+                    .post("/api/v1/posts")
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue()); // 에러 코드 검증
+        }
     }
 
     // ========================================================================================
@@ -289,7 +335,10 @@ class PostApiTest extends ApiTestSupport {
         @Test
         @DisplayName("SCENE 12. 예외 - 존재하지 않는 게시글")
         void readPost_NotFound() {
-            given().get("/api/v1/posts/{id}", 99999).then().statusCode(404).body("error", equalTo("POST_NOT_FOUND"));
+            given().get("/api/v1/posts/{id}", 99999)
+                    .then()
+                    .statusCode(404)
+                    .body("error", equalTo("POST_NOT_FOUND"));
         }
     }
 
@@ -407,7 +456,11 @@ class PostApiTest extends ApiTestSupport {
         @Test
         @DisplayName("SCENE 19. 예외 - 타인 삭제 시도")
         void deletePost_Forbidden() {
-            given().cookie("ATK", tokenUserB).delete("/api/v1/posts/{id}", postId).then().statusCode(403);
+            given().cookie("ATK", tokenUserB)
+                    .delete("/api/v1/posts/{id}", postId)
+                    .then()
+                    .statusCode(403)
+                    .body("error", equalTo("AUTH_FORBIDDEN"));
         }
     }
 
@@ -464,6 +517,30 @@ class PostApiTest extends ApiTestSupport {
                     .then().statusCode(200)
                     .body("content.size()", equalTo(2)) // Recent + Idol
                     .body("content.category", everyItem(equalTo("IDOL")));
+        }
+
+        @Test
+        @DisplayName("SCENE 26. 카테고리 필터링 강화 - 다른 카테고리 제외 확인")
+        void feed_Category_FilterExclusion() {
+            // Given: 여러 카테고리 데이터가 이미 setUpFeedData에서 생성됨
+            // Actor, Idol(2개) 총 3개
+            
+            // When: IDOL 카테고리만 조회
+            given().param("category", "IDOL")
+                    .get("/api/v1/posts")
+                    .then().statusCode(200)
+                    .body("content.size()", equalTo(2)) // Idol만 2개
+                    .body("content.category", everyItem(equalTo("IDOL")))
+                    .body("content.postId", not(hasItem(actorId.intValue()))); // Actor 제외 확인
+            
+            // When: ACTOR 카테고리만 조회
+            given().param("category", "ACTOR")
+                    .get("/api/v1/posts")
+                    .then().statusCode(200)
+                    .body("content.size()", equalTo(1)) // Actor만 1개
+                    .body("content.category", everyItem(equalTo("ACTOR")))
+                    .body("content.postId", not(hasItem(idolId.intValue()))) // Idol 제외 확인
+                    .body("content.postId", not(hasItem(recentId.intValue()))); // Recent 제외 확인
         }
 
         @Test

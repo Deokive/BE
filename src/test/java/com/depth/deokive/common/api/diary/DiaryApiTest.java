@@ -273,7 +273,103 @@ class DiaryApiTest extends ApiTestSupport { // 상속 변경
                     .when()
                     .post("/api/v1/diary/{archiveId}", publicArchiveId)
                     .then()
-                    .statusCode(HttpStatus.BAD_REQUEST.value());
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
+        }
+
+        @Test
+        @DisplayName("SCENE 8. 예외 - 날짜 형식 오류")
+        void create_Fail_InvalidDateFormat() {
+            // Given: 잘못된 날짜 형식
+            Map<String, Object> request = Map.of(
+                    "title", "Invalid Date",
+                    "content", "Content",
+                    "recordedAt", "2024-13-01", // 잘못된 월
+                    "color", "#FF5733",
+                    "visibility", "PUBLIC"
+            );
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/diary/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
+        }
+
+        @Test
+        @DisplayName("SCENE 9. 예외 - 날짜 null")
+        void create_Fail_DateNull() {
+            // Given: 날짜가 null
+            Map<String, Object> request = new HashMap<>();
+            request.put("title", "No Date");
+            request.put("content", "Content");
+            request.put("recordedAt", null);
+            request.put("color", "#FF5733");
+            request.put("visibility", "PUBLIC");
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/diary/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
+        }
+
+        @Test
+        @DisplayName("SCENE 10. 예외 - 색상 코드 형식 오류 (HEX 코드 아님)")
+        void create_Fail_InvalidColorFormat() {
+            // Given: 잘못된 색상 코드 형식
+            Map<String, Object> request = Map.of(
+                    "title", "Invalid Color",
+                    "content", "Content",
+                    "recordedAt", "2024-01-01",
+                    "color", "FF5733", // # 없음
+                    "visibility", "PUBLIC"
+            );
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/diary/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
+        }
+
+        @Test
+        @DisplayName("SCENE 11. 예외 - 색상 코드 형식 오류 (잘못된 HEX 문자)")
+        void create_Fail_InvalidColorHex() {
+            // Given: 잘못된 HEX 문자 포함
+            Map<String, Object> request = Map.of(
+                    "title", "Invalid Color",
+                    "content", "Content",
+                    "recordedAt", "2024-01-01",
+                    "color", "#GGGGGG", // 잘못된 HEX 문자
+                    "visibility", "PUBLIC"
+            );
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/diary/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
         }
     }
 

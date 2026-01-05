@@ -30,6 +30,7 @@ import org.springframework.http.HttpStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -241,6 +242,74 @@ class EventApiTest extends ApiTestSupport {
         }
 
         @Test
+        @DisplayName("SCENE 8. 예외 - 스포츠 타입인데 sportInfo가 null")
+        void createEvent_SportType_NoSportInfo() {
+            // Given: isSportType=true인데 sportInfo가 null
+            Map<String, Object> request = Map.of(
+                    "title", "Sport Event",
+                    "date", "2024-01-01",
+                    "color", "#FF5733",
+                    "isSportType", true
+                    // sportInfo 없음
+            );
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.CREATED.value());
+
+            // 일단 SportInfo 타입 설정해놓고 나중에 값 변경하고 싶은 상황을 상정해서 201로 처리되도록 함. (유연한게 최고)
+        }
+
+        @Test
+        @DisplayName("SCENE 9. 예외 - 날짜 형식 오류")
+        void createEvent_InvalidDateFormat() {
+            // Given: 잘못된 날짜 형식
+            Map<String, Object> request = Map.of(
+                    "title", "Invalid Date",
+                    "date", "2024-13-01", // 잘못된 월
+                    "color", "#FF5733"
+            );
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
+        }
+
+        @Test
+        @DisplayName("SCENE 10. 예외 - 날짜 null")
+        void createEvent_DateNull() {
+            // Given: 날짜가 null
+            Map<String, Object> request = new HashMap<>();
+            request.put("title", "No Date");
+            request.put("date", null);
+            request.put("color", "#FF5733");
+
+            // When & Then
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
+        }
+
+        @Test
         @DisplayName("SCENE 5. 예외 - 필수값 누락")
         void createEvent_BadRequest() {
             given()
@@ -250,7 +319,8 @@ class EventApiTest extends ApiTestSupport {
                     .when()
                     .post("/api/v1/events/{archiveId}", publicArchiveId)
                     .then()
-                    .statusCode(HttpStatus.BAD_REQUEST.value());
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .body("error", notNullValue());
         }
 
         @Test
@@ -266,7 +336,8 @@ class EventApiTest extends ApiTestSupport {
                     .when()
                     .post("/api/v1/events/{archiveId}", strangerArchiveId)
                     .then()
-                    .statusCode(HttpStatus.FORBIDDEN.value());
+                    .statusCode(HttpStatus.FORBIDDEN.value())
+                    .body("error", equalTo("AUTH_FORBIDDEN"));
         }
 
         @Test
@@ -279,7 +350,8 @@ class EventApiTest extends ApiTestSupport {
                     .when()
                     .post("/api/v1/events/{archiveId}", 999999)
                     .then()
-                    .statusCode(HttpStatus.NOT_FOUND.value());
+                    .statusCode(HttpStatus.NOT_FOUND.value())
+                    .body("error", notNullValue());
         }
     }
 
