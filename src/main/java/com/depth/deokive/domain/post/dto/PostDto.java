@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 
 public class PostDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "게시글 작성 요청 DTO")
+    @Schema(name = "PostCreateRequest", description = "게시글 작성 요청 DTO")
     public static class CreateRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "게시글 제목", example = "짱구는 못말려: 어른 제국의 역습 후기")
@@ -57,7 +57,7 @@ public class PostDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "게시글 수정 요청 DTO")
+    @Schema(name = "PostUpdateRequest", description = "게시글 수정 요청 DTO")
     public static class UpdateRequest {
         @Schema(description = "변경할 제목", example = "수정된 제목")
         private String title;
@@ -73,7 +73,7 @@ public class PostDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "게시글 정보 응답 DTO")
+    @Schema(name = "PostResponse", description = "게시글 정보 응답 DTO")
     public static class Response {
         @Schema(description = "게시글 아이디", example = "1")
         private Long id;

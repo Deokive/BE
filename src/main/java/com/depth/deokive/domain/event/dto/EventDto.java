@@ -22,7 +22,7 @@ import java.util.List;
 public class EventDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "이벤트 생성 요청")
+    @Schema(name = "EventCreateRequest", description = "이벤트 생성 요청")
     public static class CreateRequest {
         @NotBlank(message = "일정 이름은 필수입니다.")
         @Schema(description = "이벤트 제목", example = "콘서트 관람")
@@ -68,7 +68,7 @@ public class EventDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "이벤트 수정 요청")
+    @Schema(name = "EventUpdateRequest", description = "이벤트 수정 요청")
     public static class UpdateRequest {
         @Schema(description = "변경할 제목", example = "변경할 제목")
         private String title;
@@ -98,7 +98,7 @@ public class EventDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "스포츠 경기 정보 요청 DTO")
+    @Schema(name = "EventSportRequest", description = "스포츠 경기 정보 요청 DTO")
     public static class SportRequest {
         @Schema(description = "팀 1 이름", example = "한화 이글스")
         private String team1;
@@ -124,7 +124,7 @@ public class EventDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "이벤트 상세 응답")
+    @Schema(name = "EventResponse", description = "이벤트 상세 응답")
     public static class Response {
         @Schema(description = "이벤트 아이디", example = "1")
         private Long id;
@@ -172,7 +172,7 @@ public class EventDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "스포츠 경기 정보 응답 DTO")
+    @Schema(name = "EventSportResponse", description = "스포츠 경기 정보 응답 DTO")
     public static class SportResponse {
         @Schema(description = "팀 1 이름", example = "한화 이글스")
         private String team1;

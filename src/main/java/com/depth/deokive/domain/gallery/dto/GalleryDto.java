@@ -77,7 +77,7 @@ public class GalleryDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "갤러리 이미지 등록 요청 DTO")
+    @Schema(name = "GalleryCreateRequest", description = "갤러리 이미지 등록 요청 DTO")
     public static class CreateRequest {
         @NotEmpty(message = "파일 ID 리스트는 비어있을 수 없습니다.")
         @Size(max = 10, message = "한 번에 최대 10장까지만 업로드 가능합니다.") // 정책에 따라 조정
@@ -86,7 +86,7 @@ public class GalleryDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "갤러리북 제목 수정 요청 DTO")
+    @Schema(name = "GalleryUpdateTitleRequest", description = "갤러리북 제목 수정 요청 DTO")
     public static class UpdateTitleRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "변경할 갤러리북 제목", example = "2024 제주도 여행 (수정됨)")
@@ -94,7 +94,7 @@ public class GalleryDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "갤러리 이미지 삭제 요청 DTO")
+    @Schema(name = "GalleryDeleteRequest", description = "갤러리 이미지 삭제 요청 DTO")
     public static class DeleteRequest {
         @NotEmpty(message = "삭제할 갤러리 ID 리스트는 비어있을 수 없습니다.")
         @Schema(description = "삭제할 갤러리 ID 리스트", example = "[1, 2, 5]")
@@ -102,7 +102,7 @@ public class GalleryDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "갤러리 이미지 등록 성공 응답")
+    @Schema(name = "GalleryCreateResponse", description = "갤러리 이미지 등록 성공 응답")
     public static class CreateResponse {
         @Schema(description = "생성된 갤러리 아이템 개수", example = "5")
         private int createdCount;
@@ -112,7 +112,7 @@ public class GalleryDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "갤러리북 제목 수정 성공 응답")
+    @Schema(name = "GalleryUpdateTitleResponse", description = "갤러리북 제목 수정 성공 응답")
     public static class UpdateTitleResponse {
         @Schema(description = "수정된 갤러리북 ID (Archive ID)", example = "1")
         private Long galleryBookId;

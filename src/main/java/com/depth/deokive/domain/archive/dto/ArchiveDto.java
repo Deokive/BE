@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 public class ArchiveDto {
 
     @Data @NoArgsConstructor
-    @Schema(description = "아카이브 생성 요청")
+    @Schema(name = "ArchiveCreateRequest", description = "아카이브 생성 요청")
     public static class CreateRequest {
         @NotBlank(message = "아카이브 제목은 필수입니다.")
         @Schema(description = "아카이브 제목", example = "나의 첫 아카이브")
@@ -40,7 +40,7 @@ public class ArchiveDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "아카이브 수정 요청")
+    @Schema(name = "ArchiveUpdateRequest", description = "아카이브 수정 요청")
     public static class UpdateRequest {
         @Schema(description = "아카이브 제목", example = "수정된 아카이브 제목")
         private String title;
@@ -53,7 +53,7 @@ public class ArchiveDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "아카이브 응답 (피드/상세 공용)")
+    @Schema(name = "ArchiveResponse", description = "아카이브 응답 (피드/상세 공용)")
     public static class Response {
         @Schema(description = "아카이브 아이디", example = "1")
         private Long id;

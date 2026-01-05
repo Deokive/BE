@@ -25,7 +25,7 @@ import java.util.List;
 public class TicketDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 생성 요청 DTO")
+    @Schema(name = "TicketCreateRequest", description = "티켓 생성 요청 DTO")
     public static class CreateRequest {
         @NotBlank(message = "공연명은 필수입니다.")
         @Schema(description = "공연명", example = "BTS 월드투어 2024")
@@ -74,7 +74,7 @@ public class TicketDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 수정 요청 DTO (변경할 필드만 전송)")
+    @Schema(name = "TicketUpdateRequest", description = "티켓 수정 요청 DTO (변경할 필드만 전송)")
     public static class UpdateRequest {
         @Schema(description = "변경할 공연명", example = "수정된 공연명")
         private String title;
@@ -109,7 +109,7 @@ public class TicketDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 상세 응답 DTO")
+    @Schema(name = "TicketResponse", description = "티켓 상세 응답 DTO")
     public static class Response {
         @Schema(description = "티켓 아이디", example = "1")
         private Long id;
@@ -170,7 +170,7 @@ public class TicketDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓북 제목 수정 요청 DTO")
+    @Schema(name = "TicketUpdateBookTitleRequest", description = "티켓북 제목 수정 요청 DTO")
     public static class UpdateBookTitleRequest {
         @NotBlank @Size(max = 50)
         @Schema(description = "변경할 티켓북 제목", example = "2024년 콘서트 티켓 모음")
@@ -178,7 +178,7 @@ public class TicketDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "티켓북 제목 수정 성공 응답 DTO")
+    @Schema(name = "TicketUpdateBookTitleResponse", description = "티켓북 제목 수정 성공 응답 DTO")
     public static class UpdateBookTitleResponse {
         @Schema(description = "수정된 티켓북 ID", example = "1")
         private Long ticketBookId;

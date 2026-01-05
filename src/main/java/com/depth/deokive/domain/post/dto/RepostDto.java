@@ -22,7 +22,7 @@ import java.util.List;
 public class RepostDto {
 
     @Data @NoArgsConstructor
-    @Schema(description = "리포스트 생성 요청")
+    @Schema(name = "RepostCreateRequest", description = "리포스트 생성 요청")
     public static class CreateRequest {
         @NotNull(message = "원본 게시글 ID는 필수입니다.")
         @Schema(description = "원본 게시글 ID", example = "1")
@@ -30,7 +30,7 @@ public class RepostDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "리포스트 제목 수정 요청")
+    @Schema(name = "RepostUpdateRequest", description = "리포스트 제목 수정 요청")
     public static class UpdateRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "변경할 리포스트 제목", example = "수정된 제목")
@@ -38,7 +38,7 @@ public class RepostDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "리포스트 응답")
+    @Schema(name = "RepostResponse", description = "리포스트 응답")
     public static class Response {
         @Schema(description = "리포스트 아이디", example = "1")
         private Long id;
@@ -67,7 +67,7 @@ public class RepostDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "리포스트 탭 제목 수정 요청")
+    @Schema(name = "RepostUpdateTabRequest", description = "리포스트 탭 제목 수정 요청")
     public static class UpdateTabRequest {
         @NotBlank(message = "탭 제목은 필수입니다.") // update만 있는 이유는 UX 상 탭추가 누르면 기본 이름(ex. 탭이름)이 먼저 생성됨
         @Schema(description = "변경할 탭 제목", example = "내가 좋아하는 게시글")
@@ -75,7 +75,7 @@ public class RepostDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "리포스트 탭 응답")
+    @Schema(name = "RepostTabResponse", description = "리포스트 탭 응답")
     public static class TabResponse {
         @Schema(description = "리포스트 탭 아이디", example = "1")
         private Long id;

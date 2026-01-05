@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class DiaryDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "일기 작성 요청 DTO")
+    @Schema(name = "DiaryCreateRequest", description = "일기 작성 요청 DTO")
     public static class CreateRequest {
         @NotBlank(message = "일기 제목은 필수입니다.")
         @Schema(description = "일기 제목", example = "오늘의 일기")
@@ -66,7 +66,7 @@ public class DiaryDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "일기 수정 요청 DTO")
+    @Schema(name = "DiaryUpdateRequest", description = "일기 수정 요청 DTO")
     public static class UpdateRequest {
         @Schema(description = "일기 제목", example = "오늘의 일기")
         private String title;
@@ -89,7 +89,7 @@ public class DiaryDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "일기 상세 응답 DTO")
+    @Schema(name = "DiaryResponse", description = "일기 상세 응답 DTO")
     public static class Response {
         private Long id;
         private String title;
@@ -131,7 +131,7 @@ public class DiaryDto {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "다이어리북 제목 수정 요청 DTO")
+    @Schema(name = "DiaryUpdateBookTitleRequest", description = "다이어리북 제목 수정 요청 DTO")
     public static class UpdateBookTitleRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "변경할 다이어리북 제목", example = "2025년 나의 기록 (수정)")
@@ -139,7 +139,7 @@ public class DiaryDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "다이어리북 제목 수정 성공 응답")
+    @Schema(name = "DiaryUpdateBookTitleResponse", description = "다이어리북 제목 수정 성공 응답")
     public static class UpdateBookTitleResponse {
         @Schema(description = "수정된 다이어리북 ID (Archive ID)", example = "1")
         private Long diaryBookId;
