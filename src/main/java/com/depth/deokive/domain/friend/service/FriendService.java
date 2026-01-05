@@ -1,8 +1,10 @@
 package com.depth.deokive.domain.friend.service;
 
+import com.depth.deokive.domain.friend.dto.FriendDto;
 import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
+import com.depth.deokive.domain.friend.repository.FriendQueryRepository;
 import com.depth.deokive.domain.notification.dto.event.NotificationEvent;
 import com.depth.deokive.domain.notification.entity.enums.NotificationType;
 import com.depth.deokive.domain.notification.service.NotificationService;
@@ -13,6 +15,8 @@ import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +29,7 @@ public class FriendService {
     private final FriendMapRepository friendMapRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final FriendQueryRepository friendQueryRepository;
 
     /**
      * 친구 요청
@@ -262,5 +267,15 @@ public class FriendService {
         // SEQ 3. 상태 변경
         myMap.updateStatus(FriendStatus.ACCEPTED);
         friendMap.updateStatus(FriendStatus.ACCEPTED);
+    }
+
+    /**
+     * 친구 목록 조회
+     */
+    @Transactional
+    public FriendDto.FriendListResponse getMyFriends(UserPrincipal userPrincipal, Pageable pageable) {
+        Slice<FriendDto.Response> slice = friendQueryRepository.findMyFriends(userPrincipal.getUserId(), pageable);
+
+        return FriendDto.FriendListResponse.of(slice);
     }
 }
