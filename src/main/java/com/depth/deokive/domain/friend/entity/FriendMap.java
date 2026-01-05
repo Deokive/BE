@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
         )
     },
     indexes = {
-        @Index(name = "idx_friend_map_user", columnList = "user_id")
+            @Index(name = "idx_user_status_time", columnList = "user_id, friend_status, accepted_at")
     }
 )
 public class FriendMap extends TimeBaseEntity {
