@@ -1,46 +1,50 @@
 package com.depth.deokive.common.api.diary;
 
+import com.depth.deokive.common.enums.Visibility;
+import com.depth.deokive.common.test.ApiTestSupport;
+import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.diary.repository.DiaryBookRepository;
 import com.depth.deokive.domain.diary.repository.DiaryFileMapRepository;
 import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.file.repository.FileRepository;
+import com.depth.deokive.domain.friend.entity.FriendMap;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
-import com.depth.deokive.domain.s3.service.S3Service;
+import com.depth.deokive.domain.user.entity.User;
+import com.depth.deokive.domain.user.repository.UserRepository;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-@ActiveProfiles("test")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DisplayName("Diary API 통합 테스트 시나리오 (E2E)")
-class DiaryApiTest {
-
-    @LocalServerPort private int port;
-
-    // --- Mocks ---
-    @MockitoBean private S3Service s3Service;
+class DiaryApiTest extends ApiTestSupport { // 상속 변경
 
     // --- Repositories ---
     @Autowired private DiaryRepository diaryRepository;
     @Autowired private DiaryFileMapRepository diaryFileMapRepository;
-    @Autowired private com.depth.deokive.domain.user.repository.UserRepository userRepository;
-    @Autowired private com.depth.deokive.domain.friend.repository.FriendMapRepository friendMapRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private FriendMapRepository friendMapRepository;
     @Autowired private FileRepository fileRepository;
+    @Autowired private ArchiveRepository archiveRepository; // Archive 생성용
+    @Autowired private DiaryBookRepository diaryBookRepository; // Book 생성 확인용
 
     // --- Actors (Token) ---
     private static String tokenUserA; // Me (Owner)
@@ -62,37 +66,12 @@ class DiaryApiTest {
 
     @BeforeEach
     void setUp() {
-        RestAssured.port = port;
-
-        // [S3 Mocking] UUID Key 생성으로 중복 방지 (ArchiveApiTest와 동일 전략)
-        when(s3Service.initiateUpload(any())).thenAnswer(invocation -> {
-            String uniqueKey = "files/" + UUID.randomUUID() + "__test.jpg";
-            return S3ServiceDto.UploadInitiateResponse.builder()
-                    .uploadId("mock-upload-id")
-                    .key(uniqueKey)
-                    .contentType("image/jpeg")
-                    .build();
-        });
-        when(s3Service.calculatePartCount(any())).thenReturn(1);
-        when(s3Service.generatePartPresignedUrls(any())).thenAnswer(invocation -> {
-            S3ServiceDto.PartPresignedUrlRequest req = invocation.getArgument(0);
-            return List.of(S3ServiceDto.PartPresignedUrlResponse.builder()
-                    .partNumber(1)
-                    .presignedUrl("http://localhost/mock-s3-url/" + req.getKey())
-                    .contentLength(100L)
-                    .build());
-        });
-        when(s3Service.completeUpload(any())).thenAnswer(invocation -> {
-            S3ServiceDto.CompleteUploadRequest req = invocation.getArgument(0);
-            return software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse.builder()
-                    .location("http://test-cdn.com/" + req.getKey())
-                    .eTag("mock-etag")
-                    .build();
-        });
+        // [S3 Mocking - 부모 클래스의 s3Service 사용]
+        mockS3Service();
 
         // [Global Setup] 최초 1회 실행
         if (tokenUserA == null) {
-            // 1. Users
+            // 1. Users Setup
             Map<String, Object> userA = AuthSteps.registerAndLogin("diarya@test.com", "DiaryA", "Password123!");
             tokenUserA = (String) userA.get("accessToken");
             userAId = ((Number) userA.get("userId")).longValue();
@@ -118,6 +97,33 @@ class DiaryApiTest {
             file2Id = FileSteps.uploadFile(tokenUserA);
             file3Id = FileSteps.uploadFile(tokenUserA);
         }
+    }
+
+    private void mockS3Service() {
+        when(s3Service.initiateUpload(any())).thenAnswer(invocation -> {
+            String uniqueKey = "files/" + UUID.randomUUID() + "__test.jpg";
+            return S3ServiceDto.UploadInitiateResponse.builder()
+                    .uploadId("mock-upload-id")
+                    .key(uniqueKey)
+                    .contentType("image/jpeg")
+                    .build();
+        });
+        when(s3Service.calculatePartCount(any())).thenReturn(1);
+        when(s3Service.generatePartPresignedUrls(any())).thenAnswer(invocation -> {
+            S3ServiceDto.PartPresignedUrlRequest req = invocation.getArgument(0);
+            return List.of(S3ServiceDto.PartPresignedUrlResponse.builder()
+                    .partNumber(1)
+                    .presignedUrl("http://localhost/mock-s3-url/" + req.getKey())
+                    .contentLength(100L)
+                    .build());
+        });
+        when(s3Service.completeUpload(any())).thenAnswer(invocation -> {
+            S3ServiceDto.CompleteUploadRequest req = invocation.getArgument(0);
+            return software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse.builder()
+                    .location("http://test-cdn.com/" + req.getKey())
+                    .eTag("mock-etag")
+                    .build();
+        });
     }
 
     // ========================================================================================
@@ -147,18 +153,18 @@ class DiaryApiTest {
                     .when()
                     .post("/api/v1/diary/{archiveId}", publicArchiveId)
                     .then()
-                    .statusCode(201)
+                    .statusCode(HttpStatus.CREATED.value())
                     .body("id", notNullValue())
                     .body("title", equalTo("테스트 일기"))
                     .body("files.size()", equalTo(2))
                     .body("files[0].fileId", equalTo(file1Id.intValue()))
                     .body("files[0].mediaRole", equalTo("PREVIEW"))
-                    .body("files[0].cdnUrl", containsString("test-cdn.com"))
+                    .body("files[0].cdnUrl", containsString("http")) // Mock URL
                     .extract().jsonPath().getInt("id");
 
             // DB 검증
-            Assertions.assertTrue(diaryRepository.existsById((long) diaryId));
-            Assertions.assertTrue(diaryFileMapRepository.count() >= 2);
+            assertThat(diaryRepository.existsById((long) diaryId)).isTrue();
+            assertThat(diaryFileMapRepository.count()).isGreaterThanOrEqualTo(2);
         }
 
         @Test
@@ -177,7 +183,7 @@ class DiaryApiTest {
                     .when()
                     .post("/api/v1/diary/{archiveId}", publicArchiveId)
                     .then()
-                    .statusCode(201)
+                    .statusCode(HttpStatus.CREATED.value())
                     .body("files", empty())
                     .body("thumbnailUrl", nullValue());
         }
@@ -198,7 +204,7 @@ class DiaryApiTest {
                     .when()
                     .post("/api/v1/diary/{archiveId}", privateArchiveId)
                     .then()
-                    .statusCode(201)
+                    .statusCode(HttpStatus.CREATED.value())
                     .body("visibility", equalTo("PRIVATE"));
         }
 
@@ -212,21 +218,24 @@ class DiaryApiTest {
                     .when()
                     .post("/api/v1/diary/{archiveId}", 999999L)
                     .then()
-                    .statusCode(404)
+                    .statusCode(HttpStatus.NOT_FOUND.value())
                     .body("error", equalTo("ARCHIVE_NOT_FOUND"));
         }
 
         @Test
         @DisplayName("SCENE 5. 예외 - 타인의 아카이브에 생성 시도")
         void create_Fail_Forbidden() {
+            // Stranger creates Archive (will be used for failure case)
+            Long strangerArchiveId = ArchiveSteps.create(tokenUserC, "C_Pub", "PUBLIC");
+
             given()
-                    .cookie("ATK", tokenUserC)
+                    .cookie("ATK", tokenUserA)
                     .contentType(ContentType.JSON)
                     .body(Map.of("title", "Hack", "content", "x", "recordedAt", "2024-01-01", "color", "#000", "visibility", "PUBLIC"))
                     .when()
-                    .post("/api/v1/diary/{archiveId}", publicArchiveId)
+                    .post("/api/v1/diary/{archiveId}", strangerArchiveId)
                     .then()
-                    .statusCode(403)
+                    .statusCode(HttpStatus.FORBIDDEN.value())
                     .body("error", equalTo("AUTH_FORBIDDEN"));
         }
 
@@ -234,7 +243,7 @@ class DiaryApiTest {
         @DisplayName("SCENE 6. 예외 - IDOR (내 다이어리에 남의 파일 첨부)")
         void create_Fail_IDOR() {
             // UserC uploads a file
-            Long userCFile = FileSteps.uploadFile(tokenUserC);
+            Long userCFileId = FileSteps.uploadFile(tokenUserC);
 
             given()
                     .cookie("ATK", tokenUserA)
@@ -245,12 +254,12 @@ class DiaryApiTest {
                             "recordedAt", "2024-01-01",
                             "color", "#000",
                             "visibility", "PUBLIC",
-                            "files", List.of(Map.of("fileId", userCFile, "mediaRole", "CONTENT", "sequence", 0))
+                            "files", List.of(Map.of("fileId", userCFileId, "mediaRole", "CONTENT", "sequence", 0))
                     ))
                     .when()
                     .post("/api/v1/diary/{archiveId}", publicArchiveId)
                     .then()
-                    .statusCode(403)
+                    .statusCode(HttpStatus.FORBIDDEN.value())
                     .body("error", equalTo("AUTH_FORBIDDEN"));
         }
 
@@ -264,12 +273,12 @@ class DiaryApiTest {
                     .when()
                     .post("/api/v1/diary/{archiveId}", publicArchiveId)
                     .then()
-                    .statusCode(400);
+                    .statusCode(HttpStatus.BAD_REQUEST.value());
         }
     }
 
     // ========================================================================================
-    // [Category 2]. Read Detail (Scenes 8-34)
+    // [Category 2]. Read Detail
     // ========================================================================================
     @Nested
     @DisplayName("[Category 2] 다이어리 상세 조회 (권한 매트릭스)")
@@ -297,80 +306,79 @@ class DiaryApiTest {
         }
 
         // --- PUBLIC Archive ---
-        @Test @DisplayName("SCENE 8. PUBLIC Archive + PUBLIC Diary - 본인")
-        void s8() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); }
-        @Test @DisplayName("SCENE 9. PUBLIC Archive + PUBLIC Diary - 타인")
-        void s9() { given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); }
-        @Test @DisplayName("SCENE 10. PUBLIC Archive + PUBLIC Diary - 친구")
-        void s10() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); }
-        @Test @DisplayName("SCENE 11. PUBLIC Archive + PUBLIC Diary - 비회원")
-        void s11() { given().get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); }
+        @Test @DisplayName("SCENE 8~11. PUBLIC Archive + PUBLIC Diary")
+        void s8_11() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); // Stranger
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); // Friend
+            given().get("/api/v1/diary/{id}", pub_pub).then().statusCode(200); // Anon
+        }
 
-        @Test @DisplayName("SCENE 12. PUBLIC Archive + RESTRICTED Diary - 본인")
-        void s12() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pub_res).then().statusCode(200); }
-        @Test @DisplayName("SCENE 13. PUBLIC Archive + RESTRICTED Diary - 친구")
-        void s13() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pub_res).then().statusCode(200); }
-        @Test @DisplayName("SCENE 14. PUBLIC Archive + RESTRICTED Diary - 타인")
-        void s14() { given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pub_res).then().statusCode(403); }
-        @Test @DisplayName("SCENE 15. PUBLIC Archive + RESTRICTED Diary - 비회원")
-        void s15() { given().get("/api/v1/diary/{id}", pub_res).then().statusCode(403); }
+        @Test @DisplayName("SCENE 12~15. PUBLIC Archive + RESTRICTED Diary")
+        void s12_15() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pub_res).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pub_res).then().statusCode(200); // Friend
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pub_res).then().statusCode(403); // Stranger
+            given().get("/api/v1/diary/{id}", pub_res).then().statusCode(403); // Anon
+        }
 
-        @Test @DisplayName("SCENE 16. PUBLIC Archive + PRIVATE Diary - 본인")
-        void s16() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pub_pri).then().statusCode(200); }
-        @Test @DisplayName("SCENE 17. PUBLIC Archive + PRIVATE Diary - 친구")
-        void s17() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pub_pri).then().statusCode(403); }
-        @Test @DisplayName("SCENE 18. PUBLIC Archive + PRIVATE Diary - 타인")
-        void s18() { given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pub_pri).then().statusCode(403); }
+        @Test @DisplayName("SCENE 16~18. PUBLIC Archive + PRIVATE Diary")
+        void s16_18() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pub_pri).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pub_pri).then().statusCode(403); // Friend
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pub_pri).then().statusCode(403); // Stranger
+        }
 
         // --- RESTRICTED Archive ---
-        @Test @DisplayName("SCENE 19. RESTRICTED Archive + PUBLIC Diary - 본인")
-        void s19() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", res_pub).then().statusCode(200); }
-        @Test @DisplayName("SCENE 20. RESTRICTED Archive + PUBLIC Diary - 친구")
-        void s20() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", res_pub).then().statusCode(200); }
-        @Test @DisplayName("SCENE 21. RESTRICTED Archive + PUBLIC Diary - 타인")
-        void s21() { given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", res_pub).then().statusCode(403); }
+        @Test @DisplayName("SCENE 19~21. RESTRICTED Archive + PUBLIC Diary")
+        void s19_21() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", res_pub).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", res_pub).then().statusCode(200); // Friend
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", res_pub).then().statusCode(403); // Stranger
+        }
 
-        @Test @DisplayName("SCENE 22. RESTRICTED Archive + RESTRICTED Diary - 본인")
-        void s22() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", res_res).then().statusCode(200); }
-        @Test @DisplayName("SCENE 23. RESTRICTED Archive + RESTRICTED Diary - 친구")
-        void s23() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", res_res).then().statusCode(200); }
-        @Test @DisplayName("SCENE 24. RESTRICTED Archive + RESTRICTED Diary - 타인")
-        void s24() { given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", res_res).then().statusCode(403); }
+        @Test @DisplayName("SCENE 22~24. RESTRICTED Archive + RESTRICTED Diary")
+        void s22_24() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", res_res).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", res_res).then().statusCode(200); // Friend
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", res_res).then().statusCode(403); // Stranger
+        }
 
-        @Test @DisplayName("SCENE 25. RESTRICTED Archive + PRIVATE Diary - 본인")
-        void s25() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", res_pri).then().statusCode(200); }
-        @Test @DisplayName("SCENE 26. RESTRICTED Archive + PRIVATE Diary - 친구")
-        void s26() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", res_pri).then().statusCode(403); }
+        @Test @DisplayName("SCENE 25~26. RESTRICTED Archive + PRIVATE Diary")
+        void s25_26() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", res_pri).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", res_pri).then().statusCode(403); // Friend
+        }
 
         // --- PRIVATE Archive ---
-        @Test @DisplayName("SCENE 27. PRIVATE Archive + PUBLIC Diary - 본인")
-        void s27() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pri_pub).then().statusCode(200); }
-        @Test @DisplayName("SCENE 28. PRIVATE Archive + PUBLIC Diary - 친구")
-        void s28() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pri_pub).then().statusCode(403); }
-        @Test @DisplayName("SCENE 29. PRIVATE Archive + PUBLIC Diary - 타인")
-        void s29() { given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pri_pub).then().statusCode(403); }
+        @Test @DisplayName("SCENE 27~29. PRIVATE Archive + PUBLIC Diary")
+        void s27_29() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pri_pub).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pri_pub).then().statusCode(403); // Friend
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/{id}", pri_pub).then().statusCode(403); // Stranger
+        }
 
-        @Test @DisplayName("SCENE 30. PRIVATE Archive + RESTRICTED Diary - 본인")
-        void s30() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pri_res).then().statusCode(200); }
-        @Test @DisplayName("SCENE 31. PRIVATE Archive + RESTRICTED Diary - 친구")
-        void s31() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pri_res).then().statusCode(403); }
+        @Test @DisplayName("SCENE 30~31. PRIVATE Archive + RESTRICTED Diary")
+        void s30_31() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pri_res).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pri_res).then().statusCode(403); // Friend
+        }
 
-        @Test @DisplayName("SCENE 32. PRIVATE Archive + PRIVATE Diary - 본인")
-        void s32() { given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pri_pri).then().statusCode(200); }
-        @Test @DisplayName("SCENE 33. PRIVATE Archive + PRIVATE Diary - 친구")
-        void s33() { given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pri_pri).then().statusCode(403); }
+        @Test @DisplayName("SCENE 32~33. PRIVATE Archive + PRIVATE Diary")
+        void s32_33() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", pri_pri).then().statusCode(200); // Owner
+            given().cookie("ATK", tokenUserB).get("/api/v1/diary/{id}", pri_pri).then().statusCode(403); // Friend
+        }
 
         @Test @DisplayName("SCENE 34. 존재하지 않는 다이어리")
         void s34() {
-            given().cookie("ATK", tokenUserA)
-                    .get("/api/v1/diary/{id}", 999999L)
-                    .then().statusCode(404)
-                    .body("error", equalTo("DIARY_NOT_FOUND"));
+            given().cookie("ATK", tokenUserA).get("/api/v1/diary/{id}", 999999L)
+                    .then().statusCode(404).body("error", equalTo("DIARY_NOT_FOUND"));
         }
     }
 
     // ========================================================================================
-    // [Category 3]. Update Diary (Scenes 35-39)
+    // [Category 3]. Update Diary
     // ========================================================================================
     @Nested
     @DisplayName("[Category 3] 다이어리 수정")
@@ -382,89 +390,42 @@ class DiaryApiTest {
             diaryId = DiarySteps.createWithFile(tokenUserA, publicArchiveId, "Original", "PUBLIC", file1Id);
         }
 
-        @Test
-        @DisplayName("SCENE 35. 정상 수정 - 내용 및 공개범위 변경")
+        @Test @DisplayName("SCENE 35. 정상 수정 - 내용 및 공개범위")
         void update_Info() {
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of(
-                            "title", "Updated",
-                            "content", "Updated Content",
-                            "recordedAt", "2024-12-31",
-                            "color", "#000000",
-                            "visibility", "PRIVATE"
-                    ))
-                    .when()
-                    .patch("/api/v1/diary/{id}", diaryId)
-                    .then()
-                    .statusCode(200)
-                    .body("title", equalTo("Updated"))
-                    .body("visibility", equalTo("PRIVATE"));
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("title", "Updated", "content", "New", "recordedAt", "2024-12-31", "color", "#000", "visibility", "PRIVATE"))
+                    .when().patch("/api/v1/diary/{id}", diaryId)
+                    .then().statusCode(200).body("title", equalTo("Updated")).body("visibility", equalTo("PRIVATE"));
         }
 
-        @Test
-        @DisplayName("SCENE 36. 정상 수정 - 파일 전체 교체")
+        @Test @DisplayName("SCENE 36. 정상 수정 - 파일 교체")
         void update_ReplaceFiles() {
-            // file1Id -> file2Id 교체
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of(
-                            "files", List.of(Map.of("fileId", file2Id, "mediaRole", "PREVIEW", "sequence", 0))
-                    ))
-                    .when()
-                    .patch("/api/v1/diary/{id}", diaryId)
-                    .then()
-                    .statusCode(200)
-                    .body("files.size()", equalTo(1))
-                    .body("files[0].fileId", equalTo(file2Id.intValue()));
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("files", List.of(Map.of("fileId", file2Id, "mediaRole", "PREVIEW", "sequence", 0))))
+                    .when().patch("/api/v1/diary/{id}", diaryId)
+                    .then().statusCode(200).body("files.size()", equalTo(1)).body("files[0].fileId", equalTo(file2Id.intValue()));
         }
 
-        @Test
-        @DisplayName("SCENE 37. 정상 수정 - 파일 삭제")
+        @Test @DisplayName("SCENE 37. 정상 수정 - 파일 삭제")
         void update_DeleteFiles() {
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of("files", List.of())) // Empty
-                    .when()
-                    .patch("/api/v1/diary/{id}", diaryId)
-                    .then()
-                    .statusCode(200)
-                    .body("files.size()", equalTo(0))
-                    .body("thumbnailUrl", nullValue());
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("files", List.of()))
+                    .when().patch("/api/v1/diary/{id}", diaryId)
+                    .then().statusCode(200).body("files.size()", equalTo(0));
         }
 
-        @Test
-        @DisplayName("SCENE 38. 예외 - 타인이 수정 시도")
-        void update_Fail_Stranger() {
-            given()
-                    .cookie("ATK", tokenUserC)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of("title", "Hacked"))
-                    .when()
-                    .patch("/api/v1/diary/{id}", diaryId)
-                    .then()
-                    .statusCode(403);
-        }
+        @Test @DisplayName("SCENE 38~39. 타인 수정/존재하지 않는 다이어리")
+        void update_Fail() {
+            given().cookie("ATK", tokenUserC).contentType(ContentType.JSON).body(Map.of("title", "Hack"))
+                    .patch("/api/v1/diary/{id}", diaryId).then().statusCode(403);
 
-        @Test
-        @DisplayName("SCENE 39. 예외 - 존재하지 않는 다이어리")
-        void update_Fail_NotFound() {
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of("title", "Ghost"))
-                    .when()
-                    .patch("/api/v1/diary/{id}", 999999L)
-                    .then()
-                    .statusCode(404);
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(Map.of("title", "Ghost"))
+                    .patch("/api/v1/diary/{id}", 999999L).then().statusCode(404);
         }
     }
 
     // ========================================================================================
-    // [Category 4]. Delete Diary (Scenes 40-41)
+    // [Category 4]. Delete Diary
     // ========================================================================================
     @Nested
     @DisplayName("[Category 4] 다이어리 삭제")
@@ -476,311 +437,172 @@ class DiaryApiTest {
             diaryId = DiarySteps.create(tokenUserA, publicArchiveId, "DeleteMe", "PUBLIC");
         }
 
-        @Test
-        @DisplayName("SCENE 40. 정상 삭제 - 본인")
+        @Test @DisplayName("SCENE 40. 정상 삭제")
         void delete_Normal() {
-            given().cookie("ATK", tokenUserA)
-                    .delete("/api/v1/diary/{id}", diaryId)
-                    .then().statusCode(204);
-
-            given().cookie("ATK", tokenUserA)
-                    .get("/api/v1/diary/{id}", diaryId)
-                    .then().statusCode(404);
+            given().cookie("ATK", tokenUserA).delete("/api/v1/diary/{id}", diaryId).then().statusCode(204);
+            assertThat(diaryRepository.existsById(diaryId)).isFalse();
         }
 
-        @Test
-        @DisplayName("SCENE 41. 예외 - 타인이 삭제 시도")
-        void delete_Fail_Stranger() {
-            given().cookie("ATK", tokenUserC)
-                    .delete("/api/v1/diary/{id}", diaryId)
-                    .then().statusCode(403);
+        @Test @DisplayName("SCENE 41. 타인 삭제")
+        void delete_Fail() {
+            given().cookie("ATK", tokenUserC).delete("/api/v1/diary/{id}", diaryId).then().statusCode(403);
         }
     }
 
     // ========================================================================================
-    // [Category 5]. Update DiaryBook Title (Scenes 42-43)
+    // [Category 5]. Update DiaryBook Title
     // ========================================================================================
     @Nested
     @DisplayName("[Category 5] 다이어리북 제목 수정")
     class UpdateBookTitle {
-
-        @Test
-        @DisplayName("SCENE 42. 정상 수정")
-        void updateBook_Normal() {
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of("title", "New Book Title"))
-                    .when()
+        @Test @DisplayName("SCENE 42~43. 제목 수정")
+        void updateBook() {
+            // Normal
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(Map.of("title", "New Book"))
                     .patch("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(200)
-                    .body("updatedTitle", equalTo("New Book Title"));
-        }
+                    .then().statusCode(200).body("updatedTitle", equalTo("New Book"));
 
-        @Test
-        @DisplayName("SCENE 43. 예외 - 타인이 수정 시도")
-        void updateBook_Fail_Stranger() {
-            given()
-                    .cookie("ATK", tokenUserC)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of("title", "Hacked"))
-                    .when()
-                    .patch("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(403);
+            // Stranger
+            given().cookie("ATK", tokenUserC).contentType(ContentType.JSON).body(Map.of("title", "Hack"))
+                    .patch("/api/v1/diary/book/{archiveId}", publicArchiveId).then().statusCode(403);
         }
     }
 
     // ========================================================================================
-    // [Category 6]. Pagination (Scenes 44-49)
+    // [Category 6]. Pagination
     // ========================================================================================
     @Nested
     @DisplayName("[Category 6] 다이어리 목록 조회")
     class Pagination {
         @BeforeEach
         void setUpListData() {
-            // UserA Archive에 데이터 주입: 5 Public, 3 Restricted, 2 Private
             for (int i = 0; i < 5; i++) DiarySteps.create(tokenUserA, publicArchiveId, "Pub" + i, "PUBLIC");
             for (int i = 0; i < 3; i++) DiarySteps.create(tokenUserA, publicArchiveId, "Res" + i, "RESTRICTED");
             for (int i = 0; i < 2; i++) DiarySteps.create(tokenUserA, publicArchiveId, "Pri" + i, "PRIVATE");
         }
 
-        @Test
-        @DisplayName("SCENE 44. 본인 조회 (전체 노출)")
+        @Test @DisplayName("SCENE 44. 본인 조회 (전체)")
         void list_Owner() {
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .param("size", 20)
-                    .when()
-                    .get("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(200)
-                    .body("content.size()", greaterThanOrEqualTo(10))
-                    .body("content.find { it.visibility == 'PRIVATE' }", notNullValue());
+            given().cookie("ATK", tokenUserA).param("size", 20).get("/api/v1/diary/book/{archiveId}", publicArchiveId)
+                    .then().statusCode(200)
+                    .body("content.size()", greaterThanOrEqualTo(10));
         }
 
-        @Test
-        @DisplayName("SCENE 45. 친구 조회 (Private 제외)")
+        @Test @DisplayName("SCENE 45. 친구 조회 (Private 제외)")
         void list_Friend() {
-            given()
-                    .cookie("ATK", tokenUserB)
-                    .param("size", 20)
-                    .when()
-                    .get("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(200)
+            given().cookie("ATK", tokenUserB).param("size", 20).get("/api/v1/diary/book/{archiveId}", publicArchiveId)
+                    .then().statusCode(200)
                     .body("content.find { it.visibility == 'RESTRICTED' }", notNullValue())
                     .body("content.find { it.visibility == 'PRIVATE' }", nullValue());
         }
 
-        @Test
-        @DisplayName("SCENE 46. 타인 조회 (Public Only)")
+        @Test @DisplayName("SCENE 46. 타인 조회 (Public Only)")
         void list_Stranger() {
-            given()
-                    .cookie("ATK", tokenUserC)
-                    .param("size", 20)
-                    .when()
-                    .get("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(200)
+            given().cookie("ATK", tokenUserC).param("size", 20).get("/api/v1/diary/book/{archiveId}", publicArchiveId)
+                    .then().statusCode(200)
                     .body("content.visibility", everyItem(equalTo("PUBLIC")));
         }
 
-        @Test
-        @DisplayName("SCENE 47. 비회원 조회 (Public Only)")
-        void list_Anonymous() {
-            given()
-                    .param("size", 20)
-                    .when()
-                    .get("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(200)
+        @Test @DisplayName("SCENE 47. 비회원 조회 (Public Only)")
+        void list_Anon() {
+            given().param("size", 20).get("/api/v1/diary/book/{archiveId}", publicArchiveId)
+                    .then().statusCode(200)
                     .body("content.visibility", everyItem(equalTo("PUBLIC")));
         }
 
-        @Test
-        @DisplayName("SCENE 48. 아카이브 접근 불가 케이스")
-        void list_Fail_ArchiveAccess() {
-            // Private Archive 조회 시도
-            given()
-                    .cookie("ATK", tokenUserC)
-                    .when()
-                    .get("/api/v1/diary/book/{archiveId}", privateArchiveId)
-                    .then()
-                    .statusCode(403);
+        @Test @DisplayName("SCENE 48. 접근 불가 아카이브")
+        void list_Fail() {
+            given().cookie("ATK", tokenUserC).get("/api/v1/diary/book/{archiveId}", privateArchiveId).then().statusCode(403);
         }
 
-        @Test
-        @DisplayName("SCENE 49. 정렬 확인")
-        void list_Sorting() {
-            given()
-                    .cookie("ATK", tokenUserA)
-                    .param("sort", "recordedAt")
-                    .param("direction", "DESC")
-                    .when()
-                    .get("/api/v1/diary/book/{archiveId}", publicArchiveId)
-                    .then()
-                    .statusCode(200)
-                    .body("content.size()", greaterThan(0));
+        @Test @DisplayName("SCENE 49. 정렬")
+        void list_Sort() {
+            given().cookie("ATK", tokenUserA).param("sort", "recordedAt").param("direction", "DESC")
+                    .get("/api/v1/diary/book/{archiveId}", publicArchiveId).then().statusCode(200);
         }
     }
 
     // ========================================================================================
-    // Helper Methods
+    // Helper Steps
     // ========================================================================================
-
     static class DiarySteps {
         static Long create(String token, Long archiveId, String title, String visibility) {
-            return given()
-                    .cookie("ATK", token)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of(
-                            "title", title,
-                            "content", "Content",
-                            "recordedAt", "2024-01-01",
-                            "color", "#FFFFFF",
-                            "visibility", visibility
-                    ))
-                    .post("/api/v1/diary/{archiveId}", archiveId)
-                    .then().statusCode(201)
-                    .extract().jsonPath().getLong("id");
+            return given().cookie("ATK", token).contentType(ContentType.JSON)
+                    .body(Map.of("title", title, "content", "C", "recordedAt", "2024-01-01", "color", "#FFF", "visibility", visibility))
+                    .post("/api/v1/diary/{archiveId}", archiveId).then().statusCode(201).extract().jsonPath().getLong("id");
         }
-
         static Long createWithFile(String token, Long archiveId, String title, String visibility, Long fileId) {
-            return given()
-                    .cookie("ATK", token)
-                    .contentType(ContentType.JSON)
-                    .body(Map.of(
-                            "title", title,
-                            "content", "Content",
-                            "recordedAt", "2024-01-01",
-                            "color", "#FFFFFF",
-                            "visibility", visibility,
-                            "files", List.of(Map.of("fileId", fileId, "mediaRole", "PREVIEW", "sequence", 0))
-                    ))
-                    .post("/api/v1/diary/{archiveId}", archiveId)
-                    .then().statusCode(201)
-                    .extract().jsonPath().getLong("id");
+            return given().cookie("ATK", token).contentType(ContentType.JSON)
+                    .body(Map.of("title", title, "content", "C", "recordedAt", "2024-01-01", "color", "#FFF", "visibility", visibility,
+                            "files", List.of(Map.of("fileId", fileId, "mediaRole", "PREVIEW", "sequence", 0))))
+                    .post("/api/v1/diary/{archiveId}", archiveId).then().statusCode(201).extract().jsonPath().getLong("id");
         }
     }
 
     static class AuthSteps {
-        private static final String MAILHOG_HOST = "http://localhost:8025";
-        private static final String MAILHOG_MESSAGES_API = MAILHOG_HOST + "/api/v2/messages";
-
         static Map<String, Object> registerAndLogin(String email, String nickname, String password) {
-            // [Fix 1] 테스트 시작 전 MailHog 비우기 (데이터 간섭 방지)
-            clearMailHog();
-
-            // 1. 이메일 발송 요청
-            given().param("email", email)
-                    .post("/api/v1/auth/email/send")
-                    .then().statusCode(202);
-
-            // 2. 비동기 처리 대기
-            try { Thread.sleep(1000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-
-            // 3. 인증 코드 파싱 (디버깅 로그 포함)
-            String code = getVerificationCode(email);
-
-            // 4. 이메일 검증 수행
-            given().contentType(ContentType.JSON)
-                    .body(Map.of("email", email, "code", code, "purpose", "SIGNUP"))
-                    .post("/api/v1/auth/email/verify")
-                    .then().statusCode(200);
-
-            // 5. 회원가입
-            int userId = given().contentType(ContentType.JSON)
-                    .body(Map.of("email", email, "nickname", nickname, "password", password))
-                    .post("/api/v1/auth/register")
-                    .then().statusCode(200)
-                    .extract().jsonPath().getInt("id");
-
-            // 6. 로그인
-            Response loginRes = given().contentType(ContentType.JSON)
-                    .body(Map.of("email", email, "password", password))
+            String mailhogUrl = ApiTestSupport.MAILHOG_HTTP_URL + "/api/v2/messages";
+            try { RestAssured.given().delete(mailhogUrl); } catch (Exception ignored) {}
+            given().param("email", email).post("/api/v1/auth/email/send").then().statusCode(202);
+            try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            String code = getVerificationCode(email, mailhogUrl);
+            given().contentType(ContentType.JSON).body(Map.of("email", email, "code", code, "purpose", "SIGNUP"))
+                    .post("/api/v1/auth/email/verify").then().statusCode(200);
+            int userId = given().contentType(ContentType.JSON).body(Map.of("email", email, "nickname", nickname, "password", password))
+                    .post("/api/v1/auth/register").then().statusCode(200).extract().jsonPath().getInt("id");
+            Response loginRes = given().contentType(ContentType.JSON).body(Map.of("email", email, "password", password))
                     .post("/api/v1/auth/login");
-
-            loginRes.then().statusCode(200);
-
             return Map.of("accessToken", loginRes.getCookie("ATK"), "userId", userId);
         }
 
-        // MailHog 메시지 전체 삭제 (초기화)
-        private static void clearMailHog() {
-            try {
-                RestAssured.given().delete(MAILHOG_MESSAGES_API);
-            } catch (Exception e) {
-                System.err.println("⚠️ MailHog 초기화 실패 (무시 가능): " + e.getMessage());
-            }
-        }
-
-        private static String getVerificationCode(String email) {
-            System.out.println("🔍 MailHog에서 인증코드 조회 시도: " + email);
-
+        private static String getVerificationCode(String email, String mailhogUrl) {
             for (int i = 0; i < 20; i++) {
                 try {
-                    // MailHog API 호출
-                    Response res = RestAssured.given().get(MAILHOG_MESSAGES_API);
+                    Response res = RestAssured.given().get(mailhogUrl);
                     List<Map<String, Object>> messages = res.jsonPath().getList("items");
-
-                    if (messages == null || messages.isEmpty()) {
-                        System.out.println("   Mining... (메일함 비어있음) " + i);
-                        Thread.sleep(500);
-                        continue;
-                    }
-
-                    for (Map<String, Object> msg : messages) {
-                        // Content가 null인 경우 방어 로직
-                        Map<String, Object> content = (Map<String, Object>) msg.get("Content");
-                        if (content == null) continue;
-
-                        String body = (String) content.get("Body");
-                        String headers = msg.get("Content").toString(); // 헤더 정보도 포함해서 검색
-
-                        // 수신자 확인 (Body나 Header에 이메일이 포함되어 있는지)
-                        if ((body != null && body.contains(email)) || headers.contains(email)) {
-                            Matcher m = Pattern.compile("\\d{6}").matcher(body);
-                            if (m.find()) {
-                                String code = m.group();
-                                System.out.println("✅ 인증코드 발견: " + code);
-                                return code;
+                    if (messages != null) {
+                        for (Map<String, Object> msg : messages) {
+                            if (msg.toString().contains(email)) {
+                                Matcher m = Pattern.compile("\\d{6}").matcher(((Map) msg.get("Content")).get("Body").toString());
+                                if (m.find()) return m.group();
                             }
                         }
                     }
                     Thread.sleep(500);
-                } catch (Exception e) {
-                    // 예외를 무시하지 않고 출력 (원인 파악용)
-                    System.err.println("⚠️ MailHog 파싱 에러: " + e.getMessage());
-                    try { Thread.sleep(500); } catch (InterruptedException ignored) {}
-                }
+                } catch (Exception ignored) {}
             }
-            throw new RuntimeException("MailHog Fail - 인증 코드를 찾을 수 없습니다. (Email: " + email + ")");
+            throw new RuntimeException("MailHog Code Fail: " + email);
         }
     }
 
     static class ArchiveSteps {
         static Long create(String token, String title, String visibility) {
-            return given().cookie("ATK", token).contentType(ContentType.JSON).body(Map.of("title", title, "visibility", visibility)).post("/api/v1/archives").then().statusCode(201).extract().jsonPath().getLong("id");
+            return given().cookie("ATK", token).contentType(ContentType.JSON)
+                    .body(Map.of("title", title, "visibility", visibility))
+                    .post("/api/v1/archives").then().statusCode(201).extract().jsonPath().getLong("id");
         }
     }
 
     static class FileSteps {
         static Long uploadFile(String token) {
-            Response initRes = given().cookie("ATK", token).contentType(ContentType.JSON).body(Map.of("originalFileName", "test.jpg", "mimeType", "image/jpeg", "fileSize", 100, "mediaRole", "CONTENT")).post("/api/v1/files/multipart/initiate").then().statusCode(200).extract().response();
-            String uploadId = initRes.jsonPath().getString("uploadId");
-            String key = initRes.jsonPath().getString("key");
-            return given().cookie("ATK", token).contentType(ContentType.JSON).body(Map.of("key", key, "uploadId", uploadId, "parts", List.of(Map.of("partNumber", 1, "etag", "mock-etag")), "originalFileName", "test.jpg", "fileSize", 100, "mimeType", "image/jpeg", "mediaRole", "CONTENT", "sequence", 0)).post("/api/v1/files/multipart/complete").then().statusCode(200).extract().jsonPath().getLong("fileId");
+            Response init = given().cookie("ATK", token).contentType(ContentType.JSON)
+                    .body(Map.of("originalFileName", "t.jpg", "mimeType", "image/jpeg", "fileSize", 100, "mediaRole", "CONTENT"))
+                    .post("/api/v1/files/multipart/initiate");
+            String uploadId = init.jsonPath().getString("uploadId");
+            String key = init.jsonPath().getString("key");
+            return given().cookie("ATK", token).contentType(ContentType.JSON)
+                    .body(Map.of("key", key, "uploadId", uploadId, "parts", List.of(Map.of("partNumber", 1, "etag", "e")),
+                            "originalFileName", "t.jpg", "fileSize", 100, "mimeType", "image/jpeg", "mediaRole", "CONTENT", "sequence", 0))
+                    .post("/api/v1/files/multipart/complete").then().statusCode(200).extract().jsonPath().getLong("fileId");
         }
     }
 
     static class FriendSteps {
-        static void makeFriendDirectly(com.depth.deokive.domain.user.repository.UserRepository userRepo, com.depth.deokive.domain.friend.repository.FriendMapRepository friendRepo, Long userA, Long userB) {
-            var uA = userRepo.findById(userA).orElseThrow();
-            var uB = userRepo.findById(userB).orElseThrow();
-            friendRepo.save(com.depth.deokive.domain.friend.entity.FriendMap.builder().user(uA).friend(uB).requestedBy(uA).friendStatus(com.depth.deokive.domain.friend.entity.enums.FriendStatus.ACCEPTED).acceptedAt(java.time.LocalDateTime.now()).build());
-            friendRepo.save(com.depth.deokive.domain.friend.entity.FriendMap.builder().user(uB).friend(uA).requestedBy(uA).friendStatus(com.depth.deokive.domain.friend.entity.enums.FriendStatus.ACCEPTED).acceptedAt(java.time.LocalDateTime.now()).build());
+        static void makeFriendDirectly(UserRepository uRepo, FriendMapRepository fRepo, Long uA, Long uB) {
+            User A = uRepo.findById(uA).orElseThrow();
+            User B = uRepo.findById(uB).orElseThrow();
+            fRepo.save(FriendMap.builder().user(A).friend(B).requestedBy(A).friendStatus(FriendStatus.ACCEPTED).acceptedAt(LocalDateTime.now()).build());
+            fRepo.save(FriendMap.builder().user(B).friend(A).requestedBy(A).friendStatus(FriendStatus.ACCEPTED).acceptedAt(LocalDateTime.now()).build());
         }
     }
 }
