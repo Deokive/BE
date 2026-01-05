@@ -38,6 +38,7 @@ public class GalleryController {
 
     @PostMapping("/{archiveId}")
     @Operation(summary = "갤러리 이미지 등록")
+    @ApiResponse(responseCode = "201", description = "갤러리 이미지 등록 성공")
     public ResponseEntity<GalleryDto.CreateResponse> createGalleries(
           @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
           @PathVariable Long archiveId,
@@ -49,6 +50,7 @@ public class GalleryController {
 
     @PatchMapping("/{archiveId}")
     @Operation(summary = "갤러리북 제목 수정")
+    @ApiResponse(responseCode = "200", description = "갤러리북 제목 수정 성공")
     public ResponseEntity<GalleryDto.UpdateTitleResponse> updateGalleryBookTitle(
           @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
           @PathVariable Long archiveId,
@@ -60,6 +62,7 @@ public class GalleryController {
 
     @DeleteMapping("/{archiveId}")
     @Operation(summary = "갤러리 이미지 삭제", description = "선택한 갤러리 이미지들을 삭제합니다.")
+    @ApiResponse(responseCode = "204", description = "갤러리 이미지 삭제 성공")
     public ResponseEntity<Void> deleteGalleries(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,

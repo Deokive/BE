@@ -27,6 +27,7 @@ public class PostController {
 
     @PostMapping
     @Operation(summary = "게시글 생성", description = "파일 선업로드 후 받은 fileId들을 포함하여 게시글을 생성합니다.")
+    @ApiResponse(responseCode = "201", description = "게시글 생성 성공")
     public ResponseEntity<PostDto.Response> createPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @RequestBody PostDto.CreateRequest request
@@ -37,6 +38,7 @@ public class PostController {
 
     @GetMapping("/{postId}")
     @Operation(summary = "게시글 상세 조회", description = "게시글 ID로 상세 정보를 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "게시글 조회 성공")
     public ResponseEntity<PostDto.Response> getPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId
@@ -47,6 +49,7 @@ public class PostController {
 
     @PatchMapping("/{postId}")
     @Operation(summary = "게시글 수정", description = "게시글 제목, 내용, 카테고리 및 첨부파일 목록을 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "게시글 수정 성공")
     public ResponseEntity<PostDto.Response> updatePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId,
@@ -58,6 +61,7 @@ public class PostController {
 
     @DeleteMapping("/{postId}")
     @Operation(summary = "게시글 삭제", description = "게시글을 삭제합니다.")
+    @ApiResponse(responseCode = "204", description = "게시글 삭제 성공")
     public ResponseEntity<Void> deletePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId

@@ -25,6 +25,7 @@ public class TicketController {
 
     @PostMapping("/{archiveId}")
     @Operation(summary = "티켓 생성")
+    @ApiResponse(responseCode = "201", description = "티켓 생성 성공")
     public ResponseEntity<TicketDto.Response> createTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
@@ -36,6 +37,7 @@ public class TicketController {
 
     @GetMapping("/{ticketId}")
     @Operation(summary = "티켓 상세 조회")
+    @ApiResponse(responseCode = "200", description = "티켓 조회 성공")
     public ResponseEntity<TicketDto.Response> getTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId
@@ -46,6 +48,7 @@ public class TicketController {
 
     @PatchMapping("/{ticketId}")
     @Operation(summary = "티켓 수정")
+    @ApiResponse(responseCode = "200", description = "티켓 수정 성공")
     public ResponseEntity<TicketDto.Response> updateTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId,
@@ -57,6 +60,7 @@ public class TicketController {
 
     @DeleteMapping("/{ticketId}")
     @Operation(summary = "티켓 삭제")
+    @ApiResponse(responseCode = "204", description = "티켓 삭제 성공")
     public ResponseEntity<Void> deleteTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId
@@ -67,6 +71,7 @@ public class TicketController {
 
     @PatchMapping("/book/{archiveId}")
     @Operation(summary = "티켓북 제목 수정")
+    @ApiResponse(responseCode = "200", description = "티켓북 제목 수정 성공")
     public ResponseEntity<TicketDto.UpdateBookTitleResponse> updateTicketBookTitle(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,

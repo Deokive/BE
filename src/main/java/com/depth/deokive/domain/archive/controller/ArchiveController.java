@@ -38,6 +38,7 @@ public class ArchiveController {
 
     @GetMapping("/{archiveId}")
     @Operation(summary = "아카이브 상세 조회", description = "아카이브의 기본 정보(제목, 배너, 카운트 등)를 조회합니다. (공개 범위 권한 체크 포함)")
+    @ApiResponse(responseCode = "200", description = "아카이브 조회 성공")
     public ResponseEntity<ArchiveDto.Response> getArchiveDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long archiveId
@@ -47,6 +48,7 @@ public class ArchiveController {
 
     @PatchMapping("/{archiveId}")
     @Operation(summary = "아카이브 정보 수정", description = "제목, 공개 범위, 배너 이미지를 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "아카이브 수정 성공")
     public ResponseEntity<ArchiveDto.Response> updateArchive(
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long archiveId,

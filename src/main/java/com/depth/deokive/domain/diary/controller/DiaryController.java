@@ -25,6 +25,7 @@ public class DiaryController {
 
     @PostMapping("/{archiveId}")
     @Operation(summary = "일기 작성", description = "특정 아카이브에 일기를 작성합니다.")
+    @ApiResponse(responseCode = "201", description = "일기 작성 성공")
     public ResponseEntity<DiaryDto.Response> createDiary(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
@@ -36,6 +37,7 @@ public class DiaryController {
 
     @GetMapping("/{diaryId}")
     @Operation(summary = "일기 상세 조회", description = "일기 상세 내용을 조회합니다. (공개 범위에 따라 접근이 제한될 수 있음)")
+    @ApiResponse(responseCode = "200", description = "일기 조회 성공")
     public ResponseEntity<DiaryDto.Response> getDiary(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long diaryId
@@ -46,6 +48,7 @@ public class DiaryController {
 
     @PatchMapping("/{diaryId}")
     @Operation(summary = "일기 수정")
+    @ApiResponse(responseCode = "200", description = "일기 수정 성공")
     public ResponseEntity<DiaryDto.Response> updateDiary(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long diaryId,
@@ -57,6 +60,7 @@ public class DiaryController {
 
     @DeleteMapping("/{diaryId}")
     @Operation(summary = "일기 삭제")
+    @ApiResponse(responseCode = "204", description = "일기 삭제 성공")
     public ResponseEntity<Void> deleteDiary(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long diaryId
@@ -67,6 +71,7 @@ public class DiaryController {
 
     @PatchMapping("/book/{archiveId}")
     @Operation(summary = "다이어리북 제목 수정", description = "다이어리북(폴더)의 제목을 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "다이어리북 제목 수정 성공")
     public ResponseEntity<DiaryDto.UpdateBookTitleResponse> updateDiaryBookTitle(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
