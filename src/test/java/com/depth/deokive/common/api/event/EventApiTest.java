@@ -1,37 +1,106 @@
 package com.depth.deokive.common.api.event;
 
+import com.depth.deokive.common.enums.Visibility;
+import com.depth.deokive.common.test.ApiTestSupport;
+import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.event.dto.EventDto;
+import com.depth.deokive.domain.event.entity.Event;
+import com.depth.deokive.domain.event.entity.SportRecord;
+import com.depth.deokive.domain.event.repository.EventHashtagMapRepository;
+import com.depth.deokive.domain.event.repository.EventRepository;
+import com.depth.deokive.domain.event.repository.HashtagRepository;
+import com.depth.deokive.domain.event.repository.SportRecordRepository;
+import com.depth.deokive.domain.friend.entity.FriendMap;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
+import com.depth.deokive.domain.s3.dto.S3ServiceDto;
+import com.depth.deokive.domain.s3.service.S3Service;
+import com.depth.deokive.domain.user.entity.User;
+import com.depth.deokive.domain.user.repository.UserRepository;
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import io.restassured.response.Response;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 
-/**
- * [ Event 도메인 API 레벨 E2E 테스트 시나리오 ]
- *
- * ■ 사전 조건 (Prerequisites)
- * 1. 환경: SpringBootTest (RandomPort), Redis, MailHog
- * 2. 공통 유틸 (AuthSteps, ArchiveSteps, FriendSteps):
- * - 회원가입/로그인, 아카이브 생성, 친구 맺기 등의 선행 작업 수행
- *
- * ■ 테스트 액터 (Actors)
- * - UserA (Me): 이벤트 주인
- * - UserB (Friend): UserA의 친구
- * - UserC (Stranger): 타인
- * - Anonymous: 비회원
- *
- * ■ 주요 검증 포인트
- * - hasTime 토글에 따른 시간 데이터 처리 검증
- * - isSportType 토글에 따른 SportRecord 생성/삭제 생명주기 검증
- * - 해시태그(Hashtag) 등록, 중복 제거, 수정 시 교체 로직 검증
- * - 월별 조회(Monthly) 시 날짜 범위 필터링 정확도
- */
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
 @DisplayName("Event API 통합 테스트 시나리오")
-class EventApiTest {
+class EventApiTest extends ApiTestSupport {
 
-    /**
-     * [Setup]
-     * 1. AuthSteps: UserA, UserB, UserC 토큰 확보
-     * 2. FriendSteps: UserA <-> UserB 친구 설정
-     * 3. ArchiveSteps: UserA의 Public, Restricted, Private 아카이브 생성 -> ID 확보
-     */
+    // --- Repositories ---
+    @Autowired private EventRepository eventRepository;
+    @Autowired private SportRecordRepository sportRecordRepository;
+    @Autowired private HashtagRepository hashtagRepository;
+    @Autowired private EventHashtagMapRepository eventHashtagMapRepository;
+    @Autowired private ArchiveRepository archiveRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private FriendMapRepository friendMapRepository;
+
+    // --- Actors (Token) ---
+    private static String tokenUserA; // Me (Owner)
+    private static String tokenUserB; // Friend
+    private static String tokenUserC; // Stranger
+
+    // --- Shared Data ---
+    private static Long userAId;
+    private static Long userBId;
+
+    // --- Fixtures for UserA ---
+    private static Long publicArchiveId;
+    private static Long restrictedArchiveId;
+    private static Long privateArchiveId;
+
+    @BeforeEach
+    void setUp() {
+        RestAssured.port = port;
+
+        // [S3 Mocking] - Event 도메인에선 S3를 직접 쓰진 않지만, Archive 생성 시 내부적으로 사용될 수 있으므로 설정
+        when(s3Service.initiateUpload(any())).thenAnswer(invocation -> S3ServiceDto.UploadInitiateResponse.builder().build());
+        when(s3Service.calculatePartCount(any())).thenReturn(1);
+        when(s3Service.generatePartPresignedUrls(any())).thenReturn(List.of());
+        when(s3Service.completeUpload(any())).thenAnswer(invocation -> software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse.builder().build());
+
+        // [Global Setup] 최초 1회 실행
+        if (tokenUserA == null) {
+            // 1. Users
+            Map<String, Object> userA = AuthSteps.registerAndLogin("event.a@test.com", "EventA", "Password123!");
+            tokenUserA = (String) userA.get("accessToken");
+            userAId = ((Number) userA.get("userId")).longValue();
+
+            Map<String, Object> userB = AuthSteps.registerAndLogin("event.b@test.com", "EventB", "Password123!");
+            tokenUserB = (String) userB.get("accessToken");
+            userBId = ((Number) userB.get("userId")).longValue();
+
+            Map<String, Object> userC = AuthSteps.registerAndLogin("event.c@test.com", "EventC", "Password123!");
+            tokenUserC = (String) userC.get("accessToken");
+
+            // 2. Friend (A-B)
+            FriendSteps.makeFriendDirectly(userRepository, friendMapRepository, userAId, userBId);
+
+            // 3. Archives (For UserA)
+            publicArchiveId = ArchiveSteps.create(tokenUserA, "E_Public", "PUBLIC");
+            restrictedArchiveId = ArchiveSteps.create(tokenUserA, "E_Restricted", "RESTRICTED");
+            privateArchiveId = ArchiveSteps.create(tokenUserA, "E_Private", "PRIVATE");
+        }
+    }
 
     // ========================================================================================
     // [Category 1]. Create Event (POST /api/v1/events/{archiveId})
@@ -40,221 +109,377 @@ class EventApiTest {
     @DisplayName("[Category 1] 이벤트 생성")
     class CreateEvent {
 
-        /** SCENE 1. 정상 생성 - 일반 이벤트 (시간 포함, 해시태그 포함) */
-        // Given: UserA 토큰, Public Archive ID
-        // Given: Request Body (title="콘서트", date=2024-01-01, hasTime=true, time=14:30, color="#FF5733", hashtags=["concert", "live"])
-        // When: POST /api/v1/events/{archiveId}
-        // Then: 201 Created
-        // Then: **응답 Body 검증** - response.id가 null이 아니고 유효한 Long 값인지 확인
-        // Then: **응답 Body 검증** - response.title == "콘서트" 확인
-        // Then: **응답 Body 검증** - response.date == 2024-01-01 확인
-        // Then: **응답 Body 검증** - response.hasTime == true 확인
-        // Then: **응답 Body 검증** - response.time == 14:30 확인
-        // Then: **응답 Body 검증** - response.color == "#FF5733" 확인
-        // Then: **응답 Body 검증** - response.isSportType == false 확인
-        // Then: **응답 Body 검증** - response.sportInfo == null 확인
-        // Then: **응답 Body 검증** - response.hashtags 리스트가 2개인지 확인
-        // Then: **응답 Body 검증** - response.hashtags.contains("concert") 확인
-        // Then: **응답 Body 검증** - response.hashtags.contains("live") 확인
-        // Then: **DB 검증** - eventRepository.findById(response.getId())로 조회 시 엔티티가 존재하는지 확인
-        // Then: **DB 검증** - DB의 Event 엔티티의 title == "콘서트" 확인
-        // Then: **DB 검증** - DB의 Event 엔티티의 hasTime == true 확인
-        // Then: **DB 검증** - DB의 Event 엔티티의 date.toLocalTime() == 14:30 확인
-        // Then: **DB 검증** - eventHashtagMapRepository.findAllByEventId(response.getId())가 2개인지 확인
-        // Then: **DB 검증** - hashtagRepository.findByName("concert").isPresent() == true 확인
-        // Then: **DB 검증** - hashtagRepository.findByName("live").isPresent() == true 확인
+        @Test
+        @DisplayName("SCENE 1. 정상 생성 - 일반 이벤트 (시간, 해시태그 포함)")
+        void createEvent_Normal() {
+            // Given
+            Map<String, Object> request = Map.of(
+                    "title", "콘서트",
+                    "date", "2024-01-01",
+                    "hasTime", true,
+                    "time", "14:30:00",
+                    "color", "#FF5733",
+                    "hashtags", List.of("concert", "live")
+            );
 
-        /** SCENE 2. 정상 생성 - 시간 없는 이벤트 (All Day) */
-        // Given: UserA 토큰, Public Archive ID
-        // Given: hasTime=false, time=null (혹은 값 있어도 무시되어야 함)
-        // When: POST /api/v1/events/{archiveId}
-        // Then: 201 Created
-        // Then: 응답 데이터에 hasTime=false 확인
-        // Then: 응답의 date 필드의 시간 부분이 00:00:00인지 확인 (또는 무시됨)
-        // Then: DB에서 Event 엔티티의 hasTime=false, date의 시간 부분이 00:00:00인지 확인
+            // When
+            int eventId = given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.CREATED.value())
+                    // Then: Response Validation
+                    .body("id", notNullValue())
+                    .body("title", equalTo("콘서트"))
+                    .body("date", equalTo("2024-01-01"))
+                    .body("hasTime", equalTo(true))
+                    .body("time", equalTo("14:30"))
+                    .body("hashtags", hasItems("concert", "live"))
+                    .extract().jsonPath().getInt("id");
 
-        /** SCENE 3. 정상 생성 - 스포츠 이벤트 (SportRecord 포함) */
-        // Given: UserA 토큰, Public Archive ID
-        // Given: Request Body (title="야구 경기", isSportType=true, sportInfo={team1: "A", team2: "B", score1: 1, score2: 0})
-        // When: POST /api/v1/events/{archiveId}
-        // Then: 201 Created
-        // Then: **응답 Body 검증** - response.isSportType == true 확인
-        // Then: **응답 Body 검증** - response.sportInfo != null 확인
-        // Then: **응답 Body 검증** - response.sportInfo.team1 == "A" 확인
-        // Then: **응답 Body 검증** - response.sportInfo.team2 == "B" 확인
-        // Then: **응답 Body 검증** - response.sportInfo.score1 == 1 확인
-        // Then: **응답 Body 검증** - response.sportInfo.score2 == 0 확인
-        // Then: **DB 검증** - eventRepository.findById(response.getId())로 조회 시 엔티티가 존재하는지 확인
-        // Then: **DB 검증** - DB의 Event 엔티티의 isSportType == true 확인
-        // Then: **DB 검증** - sportRecordRepository.existsById(response.getId()) == true 확인
-        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().team1 == "A" 확인
-        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().team2 == "B" 확인
-        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().score1 == 1 확인
-        // Then: **DB 검증** - sportRecordRepository.findById(response.getId()).get().score2 == 0 확인
+            // Then: DB Validation
+            Event event = eventRepository.findById((long) eventId).orElseThrow();
+            assertThat(event.getTitle()).isEqualTo("콘서트");
+            assertThat(event.isHasTime()).isTrue();
+            assertThat(event.getDate().toLocalTime()).isEqualTo(LocalTime.of(14, 30));
+            assertThat(eventHashtagMapRepository.findHashtagNamesByEventId((long) eventId)).hasSize(2);
+        }
 
-        /** SCENE 4. 정상 생성 - 중복 해시태그 처리 */
-        // Given: UserA 토큰, hashtags=["tag1", "tag1", "tag2"]
-        // When: POST /api/v1/events/{archiveId}
-        // Then: 201 Created
-        // Then: 응답 내 hashtags가 ["tag1", "tag2"]로 중복 제거되었는지 확인
-        // Then: DB에서 Hashtag 엔티티가 2개만 생성되었는지 확인 (중복 제거)
-        // Then: DB에서 EventHashtagMap이 2개만 생성되었는지 확인
+        @Test
+        @DisplayName("SCENE 2. 정상 생성 - 시간 없는 이벤트 (All Day)")
+        void createEvent_NoTime() {
+            // Given: hasTime=false
+            Map<String, Object> request = Map.of(
+                    "title", "All Day Event",
+                    "date", "2024-01-01",
+                    "hasTime", false,
+                    "color", "#FF5733"
+            );
 
-        /** SCENE 5. 예외 - 필수값 누락 (제목 없음) */
-        // Given: title=""
-        // When: POST /api/v1/events/{archiveId}
-        // Then: 400 Bad Request
+            // When
+            int eventId = given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.CREATED.value())
+                    .body("hasTime", equalTo(false))
+                    .body("time", nullValue())
+                    .extract().jsonPath().getInt("id");
 
-        /** SCENE 6. 예외 - 타인의 아카이브에 생성 시도 */
-        // Given: UserC 토큰, UserA의 Archive ID
-        // When: POST /api/v1/events/{archiveId}
-        // Then: 403 Forbidden (AUTH_FORBIDDEN)
+            // Then: DB Validation
+            Event event = eventRepository.findById((long) eventId).orElseThrow();
+            assertThat(event.isHasTime()).isFalse();
+            // 시간은 00:00:00으로 저장되어야 함 (LocalDateTime 특성상)
+            assertThat(event.getDate().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+        }
 
-        /** SCENE 7. 예외 - 존재하지 않는 아카이브 */
-        // Given: Random ID
-        // Then: 404 Not Found (ARCHIVE_NOT_FOUND)
+        @Test
+        @DisplayName("SCENE 3. 정상 생성 - 스포츠 이벤트")
+        void createEvent_Sport() {
+            // Given
+            Map<String, Object> sportInfo = Map.of("team1", "A", "team2", "B", "score1", 1, "score2", 0);
+            Map<String, Object> request = Map.of(
+                    "title", "야구 경기",
+                    "date", "2024-01-01",
+                    "color", "#FF5733",
+                    "isSportType", true,
+                    "sportInfo", sportInfo
+            );
+
+            // When
+            int eventId = given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.CREATED.value())
+                    .body("isSportType", equalTo(true))
+                    .body("sportInfo.team1", equalTo("A"))
+                    .extract().jsonPath().getInt("id");
+
+            // Then: DB Validation
+            Event event = eventRepository.findById((long) eventId).orElseThrow();
+            assertThat(event.isSportType()).isTrue();
+            SportRecord record = sportRecordRepository.findById((long) eventId).orElseThrow();
+            assertThat(record.getTeam1()).isEqualTo("A");
+            assertThat(record.getScore1()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("SCENE 4. 정상 생성 - 중복 해시태그 처리")
+        void createEvent_DuplicateTags() {
+            // Given
+            Map<String, Object> request = Map.of(
+                    "title", "Dup Tags",
+                    "date", "2024-01-01",
+                    "color", "#FF5733",
+                    "hashtags", List.of("tag1", "tag1", "tag2")
+            );
+
+            // When
+            int eventId = given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(request)
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.CREATED.value())
+                    .extract().jsonPath().getInt("id");
+
+            // Then: DB Validation (중복 제거되어 2개만 저장)
+            List<String> tags = eventHashtagMapRepository.findHashtagNamesByEventId((long) eventId);
+            assertThat(tags).hasSize(2).containsExactlyInAnyOrder("tag1", "tag2");
+        }
+
+        @Test
+        @DisplayName("SCENE 5. 예외 - 필수값 누락")
+        void createEvent_BadRequest() {
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(Map.of("date", "2024-01-01")) // title 없음
+                    .when()
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.BAD_REQUEST.value());
+        }
+
+        @Test
+        @DisplayName("SCENE 6. 예외 - 타인 아카이브 생성 시도")
+        void createEvent_Forbidden() {
+            // Stranger creates Archive
+            Long strangerArchiveId = ArchiveSteps.create(tokenUserC, "C_Pub", "PUBLIC");
+
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(Map.of("title", "Hack", "date", "2024-01-01", "color", "#000"))
+                    .when()
+                    .post("/api/v1/events/{archiveId}", strangerArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.FORBIDDEN.value());
+        }
+
+        @Test
+        @DisplayName("SCENE 7. 예외 - 존재하지 않는 아카이브")
+        void createEvent_NotFound() {
+            given()
+                    .cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(Map.of("title", "Fail", "date", "2024-01-01", "color", "#000"))
+                    .when()
+                    .post("/api/v1/events/{archiveId}", 999999)
+                    .then()
+                    .statusCode(HttpStatus.NOT_FOUND.value());
+        }
     }
 
     // ========================================================================================
-    // [Category 2]. Read Detail (GET /api/v1/events/{eventId})
+    // [Category 2]. Read Detail
     // ========================================================================================
     @Nested
-    @DisplayName("[Category 2] 이벤트 상세 조회 (권한 및 데이터)")
+    @DisplayName("[Category 2] 이벤트 상세 조회")
     class ReadEvent {
-        // Setup: UserA가 다양한 타입의 이벤트를 미리 생성
-        // - Event_Normal (in Public Archive)
-        // - Event_Sport (in Public Archive)
-        // - Event_Restricted (in Restricted Archive)
-        // - Event_Private (in Private Archive)
+        private Long normalEventId;
+        private Long sportEventId;
+        private Long restrictedEventId;
+        private Long privateEventId;
 
-        /** SCENE 8. PUBLIC 일반 이벤트 조회 - 데이터 무결성 확인 */
-        // Given: UserC(타인) 토큰, Event_Normal ID (hasTime=true, time=14:30, hashtags 포함)
-        // When: GET /api/v1/events/{id}
-        // Then: 200 OK
-        // Then: 응답의 title, date, color, hasTime=true, time=14:30, hashtags 등 모든 필드 검증
-        // Then: 응답의 sportInfo는 null이어야 함
-        // Then: 응답의 date 필드의 시간 부분이 14:30:00인지 확인
+        @BeforeEach
+        void initEvents() {
+            // Public Archive Events
+            normalEventId = EventSteps.create(tokenUserA, publicArchiveId, "Normal", false, false);
+            sportEventId = EventSteps.create(tokenUserA, publicArchiveId, "Sport", true, true);
 
-        /** SCENE 9. PUBLIC 스포츠 이벤트 조회 - 스포츠 데이터 확인 */
-        // Given: UserC(타인) 토큰, Event_Sport ID
-        // When: GET /api/v1/events/{id}
-        // Then: 200 OK
-        // Then: sportInfo가 null이 아니고 점수 정보가 포함되어야 함
+            // Restricted Archive Event
+            restrictedEventId = EventSteps.create(tokenUserA, restrictedArchiveId, "Restricted", false, false);
 
-        /** SCENE 10. RESTRICTED 이벤트 조회 - 친구(UserB) 가능 */
-        // Given: UserB 토큰, Event_Restricted ID
-        // When: GET /api/v1/events/{id}
-        // Then: 200 OK
+            // Private Archive Event
+            privateEventId = EventSteps.create(tokenUserA, privateArchiveId, "Private", false, false);
+        }
 
-        /** SCENE 11. RESTRICTED 이벤트 조회 - 타인(UserC) 불가 */
-        // Given: UserC 토큰, Event_Restricted ID
-        // When: GET /api/v1/events/{id}
-        // Then: 403 Forbidden (Archive 레벨 권한 체크)
+        @Test
+        @DisplayName("SCENE 8. PUBLIC 일반 이벤트 조회")
+        void readPublic_Normal() {
+            // Stranger Read
+            given().cookie("ATK", tokenUserC)
+                    .when().get("/api/v1/events/{id}", normalEventId)
+                    .then()
+                    .statusCode(200)
+                    .body("title", equalTo("Normal"))
+                    .body("sportInfo", nullValue());
+        }
 
-        /** SCENE 12. PRIVATE 이벤트 조회 - 타인 불가 */
-        // Given: UserC 토큰, Event_Private ID
-        // Then: 403 Forbidden
+        @Test
+        @DisplayName("SCENE 9. PUBLIC 스포츠 이벤트 조회")
+        void readPublic_Sport() {
+            // Stranger Read
+            given().cookie("ATK", tokenUserC)
+                    .when().get("/api/v1/events/{id}", sportEventId)
+                    .then()
+                    .statusCode(200)
+                    .body("isSportType", equalTo(true))
+                    .body("sportInfo", notNullValue());
+        }
 
-        /** SCENE 13. 존재하지 않는 이벤트 조회 */
-        // When: GET /api/v1/events/99999
-        // Then: 404 Not Found (EVENT_NOT_FOUND)
+        @Test
+        @DisplayName("SCENE 10~11. RESTRICTED 조회 권한")
+        void readRestricted() {
+            // 10: Friend -> OK
+            given().cookie("ATK", tokenUserB).get("/api/v1/events/{id}", restrictedEventId).then().statusCode(200);
+
+            // 11: Stranger -> Forbidden
+            given().cookie("ATK", tokenUserC).get("/api/v1/events/{id}", restrictedEventId).then().statusCode(403);
+        }
+
+        @Test
+        @DisplayName("SCENE 12. PRIVATE 조회 - 타인 실패")
+        void readPrivate() {
+            given().cookie("ATK", tokenUserC).get("/api/v1/events/{id}", privateEventId).then().statusCode(403);
+        }
+
+        @Test
+        @DisplayName("SCENE 13. 존재하지 않는 이벤트")
+        void readNotFound() {
+            given().cookie("ATK", tokenUserA).get("/api/v1/events/{id}", 999999).then().statusCode(404);
+        }
     }
 
     // ========================================================================================
-    // [Category 3]. Update Event (PATCH /api/v1/events/{eventId})
+    // [Category 3]. Update Event
     // ========================================================================================
     @Nested
-    @DisplayName("[Category 3] 이벤트 수정 (토글 및 생명주기)")
+    @DisplayName("[Category 3] 이벤트 수정")
     class UpdateEvent {
-        // Setup: Event_Normal(시간O, 스포츠X), Event_Sport(시간X, 스포츠O) 생성
+        private Long eventId;
 
-        /** SCENE 14. 정상 수정 - 기본 정보 (제목, 색상) 변경 */
-        // Given: UserA 토큰, Event ID (기존 title="원본", color="#FF5733")
-        // Given: Request Body (title="수정된 제목", color="#000000")
-        // When: PATCH /api/v1/events/{eventId}
-        // Then: 200 OK
-        // Then: **응답 Body 검증** - response.title == "수정된 제목" 확인
-        // Then: **응답 Body 검증** - response.color == "#000000" 확인
-        // Then: **응답 Body 검증** - response.id가 변경되지 않았는지 확인 (동일한 ID)
-        // Then: **DB 검증** - eventRepository.findById(eventId)로 조회 시 엔티티가 존재하는지 확인
-        // Then: **DB 검증** - DB의 Event 엔티티의 title == "수정된 제목" 확인
-        // Then: **DB 검증** - DB의 Event 엔티티의 color == "#000000" 확인
+        @BeforeEach
+        void init() {
+            // Normal Event (Time=True, Sport=False)
+            eventId = EventSteps.create(tokenUserA, publicArchiveId, "Original", false, true);
+        }
 
-        /** SCENE 15. 로직 수정 - 시간 끄기 (hasTime: True -> False) */
-        // Given: Event_Normal (기존 시간 있음, hasTime=true, time=14:30)
-        // When: PATCH ... body { "hasTime": false }
-        // Then: 200 OK
-        // Then: 응답의 hasTime=false 확인
-        // Then: 응답의 date 필드의 시간 부분이 00:00:00인지 확인
-        // Then: DB에서 Event 엔티티의 hasTime=false, date의 시간 부분이 00:00:00으로 변경되었는지 확인
+        @Test
+        @DisplayName("SCENE 14. 정상 수정 - 기본 정보")
+        void update_Info() {
+            given().cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(Map.of("title", "Updated", "color", "#000000"))
+                    .when().patch("/api/v1/events/{id}", eventId)
+                    .then().statusCode(200)
+                    .body("title", equalTo("Updated"))
+                    .body("color", equalTo("#000000"));
+        }
 
-        /** SCENE 16. 로직 수정 - 시간 켜기 (hasTime: False -> True) */
-        // Given: Event_Sport (기존 시간 없음, hasTime=false)
-        // When: PATCH ... body { "hasTime": true, "time": "18:00" }
-        // Then: 200 OK
-        // Then: 응답의 hasTime=true 확인
-        // Then: 응답의 date 필드의 시간 부분이 18:00:00인지 확인
-        // Then: DB에서 Event 엔티티의 hasTime=true, date의 시간 부분이 18:00:00으로 변경되었는지 확인
+        @Test
+        @DisplayName("SCENE 15. 로직 - 시간 끄기")
+        void update_TurnOffTime() {
+            // hasTime: True -> False
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("hasTime", false))
+                    .when().patch("/api/v1/events/{id}", eventId)
+                    .then().statusCode(200)
+                    .body("hasTime", equalTo(false))
+                    .body("time", nullValue());
+        }
 
-        /** SCENE 17. 로직 수정 - 스포츠 타입 끄기 (Sport -> Normal) */
-        // Given: Event_Sport (기존 SportRecord 있음, isSportType=true)
-        // When: PATCH ... body { "isSportType": false }
-        // Then: 200 OK
-        // Then: 응답의 isSportType=false, sportInfo=null 확인
-        // Then: DB에서 Event 엔티티의 isSportType=false로 변경되었는지 확인
-        // Then: DB에서 SportRecord 엔티티가 삭제되었는지 확인 (orphanRemoval 또는 명시적 삭제)
-        // Then: 상세 조회 API 재호출 시 sportInfo=null인지 확인
+        @Test
+        @DisplayName("SCENE 17. 로직 - 스포츠 끄기")
+        void update_TurnOffSport() {
+            // Setup Sport Event first
+            Long sportId = EventSteps.create(tokenUserA, publicArchiveId, "Sport", true, true);
 
-        /** SCENE 18. 로직 수정 - 스포츠 타입 켜기 (Normal -> Sport) */
-        // Given: Event_Normal (isSportType=false, SportRecord 없음)
-        // When: PATCH ... body { "isSportType": true, "sportInfo": {team1: "A", team2: "B", score1: 1, score2: 0} }
-        // Then: 200 OK
-        // Then: 응답의 isSportType=true, sportInfo 데이터 확인
-        // Then: DB에서 Event 엔티티의 isSportType=true로 변경되었는지 확인
-        // Then: DB에서 SportRecord 엔티티가 새로 생성되고 Event와 연결되었는지 확인
-        // Then: DB에서 SportRecord의 team1, team2, score1, score2 값이 올바른지 확인
+            // Turn Off
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("isSportType", false))
+                    .when().patch("/api/v1/events/{id}", sportId)
+                    .then().statusCode(200)
+                    .body("isSportType", equalTo(false))
+                    .body("sportInfo", nullValue());
 
-        /** SCENE 19. 로직 수정 - 해시태그 전체 교체 */
-        // Given: Event (기존 태그 ["old1", "old2"] 연결됨)
-        // When: PATCH ... body { "hashtags": ["new1"] }
-        // Then: 200 OK
-        // Then: 응답의 hashtags가 ["new1"]인지 확인
-        // Then: DB에서 기존 EventHashtagMap(2개)이 삭제되었는지 확인
-        // Then: DB에서 새로운 EventHashtagMap(1개)이 생성되었는지 확인
-        // Then: DB에서 Hashtag 엔티티("old1", "old2")는 유지되는지 확인 (재사용 가능)
-        // Then: 상세 조회 API 재호출 시 hashtags=["new1"]인지 확인
+            assertThat(sportRecordRepository.existsById(sportId)).isFalse();
+        }
 
-        /** SCENE 20. 로직 수정 - 해시태그 삭제 */
-        // When: PATCH ... body { "hashtags": [] } (빈 리스트)
-        // Then: 200 OK, 태그 목록 비어있음 확인
+        @Test
+        @DisplayName("SCENE 18. 로직 - 스포츠 켜기")
+        void update_TurnOnSport() {
+            Map<String, Object> sportInfo = Map.of("team1", "A", "team2", "B", "score1", 1, "score2", 0);
 
-        /** SCENE 21. 예외 - 타인이 수정 시도 */
-        // Given: UserC 토큰
-        // Then: 403 Forbidden
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("isSportType", true, "sportInfo", sportInfo))
+                    .when().patch("/api/v1/events/{id}", eventId)
+                    .then().statusCode(200)
+                    .body("isSportType", equalTo(true))
+                    .body("sportInfo.team1", equalTo("A"));
+
+            assertThat(sportRecordRepository.existsById(eventId)).isTrue();
+        }
+
+        @Test
+        @DisplayName("SCENE 19. 로직 - 해시태그 교체")
+        void update_ReplaceHashtags() {
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
+                    .body(Map.of("hashtags", List.of("new1", "new2")))
+                    .when().patch("/api/v1/events/{id}", eventId)
+                    .then().statusCode(200)
+                    .body("hashtags", hasSize(2));
+
+            assertThat(eventHashtagMapRepository.findHashtagNamesByEventId(eventId))
+                    .containsExactlyInAnyOrder("new1", "new2");
+        }
+
+        @Test
+        @DisplayName("SCENE 21. 예외 - 타인 수정")
+        void update_Forbidden() {
+            given().cookie("ATK", tokenUserC).contentType(ContentType.JSON)
+                    .body(Map.of("title", "Hack"))
+                    .when().patch("/api/v1/events/{id}", eventId)
+                    .then().statusCode(403);
+        }
     }
 
     // ========================================================================================
-    // [Category 4]. Delete Event (DELETE /api/v1/events/{eventId})
+    // [Category 4]. Delete Event
     // ========================================================================================
     @Nested
     @DisplayName("[Category 4] 이벤트 삭제")
     class DeleteEvent {
-        // Setup: Event 생성 (해시태그, 스포츠기록 포함)
+        private Long eventId;
 
-        /** SCENE 22. 정상 삭제 - 연관 데이터 삭제 확인 */
-        // Given: UserA 토큰, Event ID (해시태그 2개, 스포츠기록 포함)
-        // When: DELETE /api/v1/events/{eventId}
-        // Then: 204 No Content (응답 Body 없음)
-        // Then: **재조회 검증** - GET /api/v1/events/{eventId} 호출 시 404 Not Found 확인
-        // Then: **DB 검증** - eventRepository.findById(eventId).isPresent() == false 확인
-        // Then: **DB 검증** - eventHashtagMapRepository.findAllByEventId(eventId)가 빈 리스트인지 확인
-        // Then: **DB 검증** - sportRecordRepository.existsById(eventId) == false 확인 (스포츠 타입인 경우)
-        // Then: **DB 검증** - hashtagRepository.findByName("tag1").isPresent() == true 확인 (재사용 가능)
-        // Then: **DB 검증** - hashtagRepository.findByName("tag2").isPresent() == true 확인 (재사용 가능)
+        @BeforeEach
+        void init() {
+            // Sport Event with hashtags
+            eventId = EventSteps.create(tokenUserA, publicArchiveId, "Del", true, true);
+        }
 
-        /** SCENE 23. 예외 - 타인이 삭제 시도 */
-        // Given: UserC 토큰
-        // Then: 403 Forbidden
+        @Test
+        @DisplayName("SCENE 22. 정상 삭제 - 연관 데이터 포함")
+        void delete_Normal() {
+            given().cookie("ATK", tokenUserA)
+                    .when().delete("/api/v1/events/{id}", eventId)
+                    .then().statusCode(204);
+
+            assertThat(eventRepository.existsById(eventId)).isFalse();
+            assertThat(sportRecordRepository.existsById(eventId)).isFalse();
+            assertThat(eventHashtagMapRepository.findHashtagNamesByEventId(eventId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("SCENE 23. 예외 - 타인 삭제")
+        void delete_Forbidden() {
+            given().cookie("ATK", tokenUserC)
+                    .when().delete("/api/v1/events/{id}", eventId)
+                    .then().statusCode(403);
+        }
     }
 
     // ========================================================================================
@@ -263,50 +488,154 @@ class EventApiTest {
     @Nested
     @DisplayName("[Category 5] 월별 이벤트 조회")
     class MonthlyEvents {
-        // Setup:
-        // UserA Archive에 다음과 같이 이벤트 생성
-        // - 4월 30일 (Boundary Pre)
-        // - 5월 1일 (Boundary Start)
-        // - 5월 15일 (Middle)
-        // - 5월 31일 (Boundary End)
-        // - 6월 1일 (Boundary Post)
+        private final int YEAR = 2024;
+        private final int MONTH = 5;
 
-        /** SCENE 24. 정상 조회 - 5월 데이터 조회 */
-        // Setup: UserA Archive에 이벤트 생성
-        //   - Event1: 4월 30일 23:59:59 (Boundary Pre)
-        //   - Event2: 5월 1일 00:00:00 (Boundary Start)
-        //   - Event3: 5월 15일 12:00:00 (Middle)
-        //   - Event4: 5월 31일 23:59:59 (Boundary End)
-        //   - Event5: 6월 1일 00:00:00 (Boundary Post)
-        // Given: UserA 토큰, year=2024, month=5
-        // When: GET /api/v1/events/monthly/{archiveId}?year=2024&month=5
-        // Then: 200 OK
-        // Then: 리스트 사이즈 3 (Event2, Event3, Event4) 확인
-        // Then: Event1(4월 30일)은 포함되지 않아야 함 (경계값 검증)
-        // Then: Event2(5월 1일)은 포함되어야 함 (경계값 검증)
-        // Then: Event4(5월 31일)은 포함되어야 함 (경계값 검증)
-        // Then: Event5(6월 1일)은 포함되지 않아야 함 (경계값 검증)
-        // Then: **정렬 검증** - 리스트가 date 기준 오름차순으로 정렬되었는지 확인 (ORDER BY e.date ASC)
-        // Then: **실제 데이터 순서 검증** - content.get(0).getDate() < content.get(1).getDate() 확인
-        // Then: content.get(0).getId() == Event2.getId() 확인 (5월 1일)
-        // Then: content.get(1).getId() == Event3.getId() 확인 (5월 15일)
-        // Then: content.get(2).getId() == Event4.getId() 확인 (5월 31일)
+        // 독립적인 아카이브 ID 사용
+        private Long monthlyPublicArchiveId;
+        private Long monthlyRestrictedArchiveId;
 
-        /** SCENE 25. 권한 필터링 - RESTRICTED 아카이브 */
-        // Setup: UserA의 Restricted Archive
-        // Given: UserB(친구) -> 200 OK (목록 반환)
-        // Given: UserC(타인) -> 403 Forbidden (아카이브 접근 불가 시 목록 조회도 불가)
+        @BeforeEach
+        void setUpMonthlyData() {
+            // [중요] 테스트 간 데이터 간섭 방지를 위해 새로운 아카이브 생성
+            monthlyPublicArchiveId = ArchiveSteps.create(tokenUserA, "Monthly_Pub", "PUBLIC");
+            monthlyRestrictedArchiveId = ArchiveSteps.create(tokenUserA, "Monthly_Res", "RESTRICTED");
 
-        /** SCENE 26. 빈 달 조회 */
-        // Given: 데이터 없는 12월 조회
-        // Then: 200 OK, 빈 리스트([]) 반환
+            // 4/30, 5/1, 5/15, 5/31, 6/1 생성 (새로 만든 아카이브에 연결)
+            EventSteps.createDirectly(userRepository, archiveRepository, eventRepository, userAId, monthlyPublicArchiveId, LocalDate.of(YEAR, 4, 30));
+            EventSteps.createDirectly(userRepository, archiveRepository, eventRepository, userAId, monthlyPublicArchiveId, LocalDate.of(YEAR, 5, 1));
+            EventSteps.createDirectly(userRepository, archiveRepository, eventRepository, userAId, monthlyPublicArchiveId, LocalDate.of(YEAR, 5, 15));
+            EventSteps.createDirectly(userRepository, archiveRepository, eventRepository, userAId, monthlyPublicArchiveId, LocalDate.of(YEAR, 5, 31));
+            EventSteps.createDirectly(userRepository, archiveRepository, eventRepository, userAId, monthlyPublicArchiveId, LocalDate.of(YEAR, 6, 1));
+        }
 
-        /** SCENE 27. 해시태그 Fetch Join 검증 (성능 이슈 체크용) */
-        // Given: 5월 이벤트 3개 모두 해시태그 보유
-        // When: GET /api/v1/events/monthly/{archiveId}?year=2024&month=5
-        // Then: 200 OK
-        // Then: 각 이벤트 객체 내에 hashtags 리스트가 null이 아니고 정상적으로 채워져 있는지 확인
-        // Then: 모든 이벤트의 hashtags가 올바르게 포함되었는지 확인 (N+1 문제 없이 조회되는지 관점)
-        // Then: (선택) 쿼리 로그 확인 또는 프로파일링으로 N+1 문제 없음을 검증
+        @Test
+        @DisplayName("SCENE 24. 정상 조회 - 5월 데이터 조회 (경계값 검증)")
+        void getMonthly_Normal() {
+            // 5/1, 5/15, 5/31 만 조회되어야 함 (총 3개)
+            given().cookie("ATK", tokenUserA)
+                    .param("year", YEAR).param("month", MONTH)
+                    .when().get("/api/v1/events/monthly/{archiveId}", monthlyPublicArchiveId) // 수정된 ID 사용
+                    .then().statusCode(200)
+                    .body("size()", equalTo(3))
+                    .body("date", hasItems("2024-05-01", "2024-05-15", "2024-05-31"))
+                    .body("date", not(hasItems("2024-04-30", "2024-06-01")));
+        }
+
+        @Test
+        @DisplayName("SCENE 25. 권한 필터링 - RESTRICTED 아카이브")
+        void getMonthly_Restricted() {
+            // Stranger Access to Restricted Archive
+            given().cookie("ATK", tokenUserC)
+                    .param("year", YEAR).param("month", MONTH)
+                    .when().get("/api/v1/events/monthly/{archiveId}", monthlyRestrictedArchiveId) // 수정된 ID 사용
+                    .then().statusCode(403);
+        }
+
+        @Test
+        @DisplayName("SCENE 26. 빈 달 조회")
+        void getMonthly_Empty() {
+            given().cookie("ATK", tokenUserA)
+                    .param("year", YEAR).param("month", 12)
+                    .when().get("/api/v1/events/monthly/{archiveId}", monthlyPublicArchiveId) // 수정된 ID 사용
+                    .then().statusCode(200)
+                    .body("size()", equalTo(0));
+        }
+
+        @Test
+        @DisplayName("SCENE 27. 해시태그 Fetch Join 검증")
+        void getMonthly_FetchJoin() {
+            given().cookie("ATK", tokenUserA)
+                    .param("year", YEAR).param("month", MONTH)
+                    .when().get("/api/v1/events/monthly/{archiveId}", monthlyPublicArchiveId)
+                    .then().statusCode(200)
+                    .body("hashtags", notNullValue());
+        }
+    }
+
+    // ========================================================================================
+    // Helper Steps
+    // ========================================================================================
+    static class EventSteps {
+        static Long create(String token, Long archiveId, String title, boolean isSport, boolean hasTime) {
+            Map<String, Object> req = new java.util.HashMap<>(Map.of(
+                    "title", title,
+                    "date", "2024-01-01",
+                    "color", "#000",
+                    "isSportType", isSport,
+                    "hasTime", hasTime
+            ));
+            if(hasTime) req.put("time", "12:00:00");
+            if(isSport) req.put("sportInfo", Map.of("team1", "A", "team2", "B", "score1", 1, "score2", 0));
+
+            return given().cookie("ATK", token).contentType(ContentType.JSON).body(req)
+                    .post("/api/v1/events/{archiveId}", archiveId)
+                    .then().statusCode(201).extract().jsonPath().getLong("id");
+        }
+
+        // Setup for Monthly (Direct DB Insert to avoid API overhead)
+        static void createDirectly(UserRepository uRepo, ArchiveRepository aRepo, EventRepository eRepo, Long userId, Long archiveId, LocalDate date) {
+            Event event = Event.builder()
+                    .title("Boundary")
+                    .date(date.atStartOfDay())
+                    .color("#000")
+                    .hasTime(false)
+                    .archive(aRepo.findById(archiveId).get())
+                    .build();
+            eRepo.save(event);
+        }
+    }
+
+    // ... (AuthSteps, ArchiveSteps, FileSteps, FriendSteps는 ArchiveApiTest와 동일) ...
+    // 복사하여 사용하거나 공통 클래스로 분리 가능
+    static class AuthSteps {
+        static Map<String, Object> registerAndLogin(String email, String nickname, String password) {
+            String mailhogUrl = ApiTestSupport.MAILHOG_HTTP_URL + "/api/v2/messages";
+            try { RestAssured.given().delete(mailhogUrl); } catch (Exception ignored) {}
+            given().param("email", email).post("/api/v1/auth/email/send").then().statusCode(202);
+            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            String code = getVerificationCode(email, mailhogUrl);
+            given().contentType(ContentType.JSON).body(Map.of("email", email, "code", code, "purpose", "SIGNUP"))
+                    .post("/api/v1/auth/email/verify").then().statusCode(200);
+            int userId = given().contentType(ContentType.JSON).body(Map.of("email", email, "nickname", nickname, "password", password))
+                    .post("/api/v1/auth/register").then().statusCode(200).extract().jsonPath().getInt("id");
+            Response loginRes = given().contentType(ContentType.JSON).body(Map.of("email", email, "password", password))
+                    .post("/api/v1/auth/login");
+            return Map.of("accessToken", loginRes.getCookie("ATK"), "userId", userId);
+        }
+
+        private static String getVerificationCode(String email, String mailhogUrl) {
+            for (int i = 0; i < 20; i++) {
+                try {
+                    Response res = RestAssured.given().get(mailhogUrl);
+                    List<Map<String, Object>> messages = res.jsonPath().getList("items");
+                    if (messages != null) {
+                        for (Map<String, Object> msg : messages) {
+                            if (msg.toString().contains(email)) {
+                                Matcher m = Pattern.compile("\\d{6}").matcher(((Map) msg.get("Content")).get("Body").toString());
+                                if (m.find()) return m.group();
+                            }
+                        }
+                    }
+                    Thread.sleep(500);
+                } catch (Exception ignored) {}
+            }
+            throw new RuntimeException("MailHog Fail: " + email);
+        }
+    }
+    static class ArchiveSteps {
+        static Long create(String token, String title, String visibility) {
+            return given().cookie("ATK", token).contentType(ContentType.JSON)
+                    .body(Map.of("title", title, "visibility", visibility))
+                    .post("/api/v1/archives").then().statusCode(201).extract().jsonPath().getLong("id");
+        }
+    }
+    static class FriendSteps {
+        static void makeFriendDirectly(UserRepository uRepo, FriendMapRepository fRepo, Long uA, Long uB) {
+            User A = uRepo.findById(uA).orElseThrow();
+            User B = uRepo.findById(uB).orElseThrow();
+            fRepo.save(FriendMap.builder().user(A).friend(B).requestedBy(A).friendStatus(FriendStatus.ACCEPTED).acceptedAt(LocalDateTime.now()).build());
+            fRepo.save(FriendMap.builder().user(B).friend(A).requestedBy(A).friendStatus(FriendStatus.ACCEPTED).acceptedAt(LocalDateTime.now()).build());
+        }
     }
 }
