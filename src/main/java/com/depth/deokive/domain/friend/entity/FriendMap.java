@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
         )
     },
     indexes = {
-            @Index(name = "idx_user_status_time", columnList = "user_id, friend_status, accepted_at")
+            @Index(name = "idx_user_status_time", columnList = "user_id, friend_status, accepted_at, friend_id")
     }
 )
 public class FriendMap extends TimeBaseEntity {
@@ -46,6 +46,9 @@ public class FriendMap extends TimeBaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "friend_id", nullable = false)
     private User friend;
+
+    @Column(name = "friend_id", insertable = false, updatable = false)
+    private Long friendId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requested_by", nullable = false)
