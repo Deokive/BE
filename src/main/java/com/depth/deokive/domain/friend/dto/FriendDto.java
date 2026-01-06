@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Slice;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class FriendDto {
@@ -19,6 +20,9 @@ public class FriendDto {
 
         @Schema(description = "닉네임", example = "덕후123")
         private String nickname;
+
+        @Schema(description = "친구 수락 시간", example = "2026-01-06T12:00:00")
+        private LocalDateTime acceptedAt;
     }
 
     @Data @Builder @AllArgsConstructor
@@ -27,29 +31,18 @@ public class FriendDto {
         @Schema(description = "친구 데이터 목록")
         private List<Response> content;
 
-        @Schema(description = "페이지 메타데이터")
-        private PageInfo page;
+        @Schema(description = "다음 페이지 존재 여부")
+        private boolean hasNext;
+
+        @Schema(description = "요청한 페이지 사이즈")
+        private int pageSize;
 
         public static FriendListResponse of(Slice<Response> sliceData) {
             return FriendListResponse.builder()
                     .content(sliceData.getContent())
-                    .page(new PageInfo(sliceData))
+                    .hasNext(sliceData.hasNext())
+                    .pageSize(sliceData.getSize())
                     .build();
-        }
-    }
-
-    @Data @AllArgsConstructor
-    public static class PageInfo {
-        private int size;
-        private int pageNumber;
-        private boolean hasNext;
-        private boolean hasPrev;
-
-        public PageInfo(Slice<?> slice) {
-            this.size = slice.getSize();
-            this.pageNumber = slice.getNumber();
-            this.hasNext = slice.hasNext();
-            this.hasPrev = slice.hasPrevious();
         }
     }
 }
