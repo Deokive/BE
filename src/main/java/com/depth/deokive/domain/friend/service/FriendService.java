@@ -20,6 +20,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -273,9 +274,16 @@ public class FriendService {
      * 친구 목록 조회
      */
     @Transactional
-    public FriendDto.FriendListResponse getMyFriends(UserPrincipal userPrincipal, Pageable pageable) {
-        Slice<FriendDto.Response> slice = friendQueryRepository.findMyFriends(userPrincipal.getUserId(), pageable);
-
+    public FriendDto.FriendListResponse getMyFriends(UserPrincipal userPrincipal,
+                                                     Long lastFriendId,
+                                                     LocalDateTime lastAcceptedAt,
+                                                     Pageable pageable) {
+        Slice<FriendDto.Response> slice = friendQueryRepository.findMyFriends(
+                userPrincipal.getUserId(),
+                lastFriendId,
+                lastAcceptedAt,
+                pageable
+        );
         return FriendDto.FriendListResponse.of(slice);
     }
 }
