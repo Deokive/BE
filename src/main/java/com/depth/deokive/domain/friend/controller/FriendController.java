@@ -7,11 +7,15 @@ import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 @Tag(name = "Friend API", description = "친구 관련 API")
 @RestController
@@ -85,9 +89,18 @@ public class FriendController {
     @GetMapping
     public ResponseEntity<FriendDto.FriendListResponse> getMyFriends(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @PageableDefault(size = 20) Pageable pageable
+            @RequestParam(required = false) Long lastFriendId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime lastAcceptedAt,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        FriendDto.FriendListResponse response = friendService.getMyFriends(userPrincipal, pageable);
+
+        Pageable pageable = PageRequest.of(0, size);
+        FriendDto.FriendListResponse response = friendService.getMyFriends(
+                userPrincipal,
+                lastFriendId,
+                lastAcceptedAt,
+                pageable
+        );
         return ResponseEntity.ok(response);
     }
 }
