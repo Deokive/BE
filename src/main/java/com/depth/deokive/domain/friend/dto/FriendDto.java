@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.friend.dto;
 
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -60,5 +61,12 @@ public class FriendDto {
                     .pageSize(sliceData.getSize())
                     .build();
         }
+    }
+
+    @Data @AllArgsConstructor
+    @Schema(description = "친구 상태 응답")
+    public static class FriendStatusResponse {
+        @Schema(description = "친구 상태 (PENDING: 요청보냄, ACCEPTED: 친구, REJECTED: 거절당함, CANCELED: 손절)", example = "ACCEPTED")
+        private FriendStatus status;
     }
 }
