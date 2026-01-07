@@ -25,7 +25,9 @@ import java.time.LocalDateTime;
         )
     },
     indexes = {
-            @Index(name = "idx_user_status_time", columnList = "user_id, friend_status, accepted_at, friend_id")
+            @Index(name = "idx_user_status_time", columnList = "user_id, friend_status, accepted_at, friend_id"), // 친구 목록 조회
+            @Index(name = "idx_friend_status_created", columnList = "friend_id, friend_status, created_at"), // 받은 친구 요청 목록 조회
+            @Index(name = "idx_user_status_created", columnList = "user_id, friend_status, created_at") // 보낸 요청 목록 조회
     }
 )
 public class FriendMap extends TimeBaseEntity {
