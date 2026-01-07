@@ -118,6 +118,12 @@ public class ArchiveQueryRepository {
             orders.add(new OrderSpecifier<>(Order.DESC, archive.createdAt));
         }
 
+        boolean hasIdSort = orders.stream().anyMatch(o -> o.getTarget().equals(archive.id));
+        if (!hasIdSort) {
+            Order lastDirection = orders.get(orders.size() - 1).getOrder();
+            orders.add(new OrderSpecifier<>(lastDirection, archive.id));
+        }
+
         // Tie-Breaker -> for Integrity
         orders.add(new OrderSpecifier<>(Order.DESC, archive.id));
 

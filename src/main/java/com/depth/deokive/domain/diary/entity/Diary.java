@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Getter
 @Table(name = "diary", indexes = {
-        @Index(name = "idx_diary_book_recorded_at", columnList = "diary_book_id, recorded_at DESC, visibility")
+        @Index(name = "idx_diary_book_recorded_at", columnList = "diary_book_id, recorded_at DESC, visibility, id DESC")
 })
 public class Diary extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

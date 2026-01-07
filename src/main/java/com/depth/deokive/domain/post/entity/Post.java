@@ -23,19 +23,19 @@ import lombok.experimental.SuperBuilder;
     name = "post",
     indexes = {
         // 1. 카테고리별 정렬 조회 최적화 (category 필터 있을 때)
-        @Index(name = "idx_post_cat_hot", columnList = "category, hot_score DESC"),
-        @Index(name = "idx_post_cat_new", columnList = "category, created_at DESC"),
-        @Index(name = "idx_post_cat_view", columnList = "category, view_count DESC"),
-        @Index(name = "idx_post_cat_like", columnList = "category, like_count DESC"),
+        @Index(name = "idx_post_cat_hot", columnList = "category, hot_score DESC, id DESC"),
+        @Index(name = "idx_post_cat_new", columnList = "category, created_at DESC, id DESC"),
+        @Index(name = "idx_post_cat_view", columnList = "category, view_count DESC, id DESC"),
+        @Index(name = "idx_post_cat_like", columnList = "category, like_count DESC, id DESC"),
 
         // 2. 전체 조회 정렬 최적화 (category 필터 없을 때)
-        @Index(name = "idx_post_hot", columnList = "hot_score DESC"),
-        @Index(name = "idx_post_new", columnList = "created_at DESC"),
-        @Index(name = "idx_post_view", columnList = "view_count DESC"),
-        @Index(name = "idx_post_like", columnList = "like_count DESC"),
+        @Index(name = "idx_post_hot", columnList = "hot_score DESC, id DESC"),
+        @Index(name = "idx_post_new", columnList = "created_at DESC, id DESC"),
+        @Index(name = "idx_post_view", columnList = "view_count DESC, id DESC"),
+        @Index(name = "idx_post_like", columnList = "like_count DESC, id DESC"),
 
         // 3. 마이페이지용 (내 글 조회)
-        @Index(name = "idx_post_user_new", columnList = "user_id, created_at DESC")
+        @Index(name = "idx_post_user_new", columnList = "user_id, created_at DESC, id DESC")
     }
 )
 public class Post extends UserBaseEntity {

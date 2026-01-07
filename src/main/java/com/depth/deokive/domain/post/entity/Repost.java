@@ -15,7 +15,7 @@ import lombok.experimental.SuperBuilder;
 @Table(
     name = "repost",
     indexes = {
-        @Index(name = "idx_repost_tab_created", columnList = "repost_tab_id, created_at DESC")
+        @Index(name = "idx_repost_tab_created", columnList = "repost_tab_id, created_at DESC, id DESC")
     },
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_repost_tab_post", columnNames = {"repost_tab_id", "post_id"})

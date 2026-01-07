@@ -25,15 +25,15 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Table(name = "archive", indexes = {
         // 1. 마이/친구 아카이브용 (유저별 + 생성/수정일 정렬)
-        @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC"),
-        @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC"), // updated_at은 TimeBaseEntity
+        @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC, id DESC"),
+        @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC, id DESC"),
 
         // 2. 피드/핫피드용 (공개범위 + 핫스코어/조회수/좋아요 정렬)
         // 커버링 인덱스 효과를 극대화하기 위해 visibility를 선행 컬럼으로 둠
-        @Index(name = "idx_archive_pub_hot", columnList = "visibility, hot_score DESC"),
-        @Index(name = "idx_archive_pub_view", columnList = "visibility, view_count DESC"),
-        @Index(name = "idx_archive_pub_like", columnList = "visibility, like_count DESC"),
-        @Index(name = "idx_archive_pub_new", columnList = "visibility, created_at DESC")
+        @Index(name = "idx_archive_pub_hot", columnList = "visibility, hot_score DESC, id DESC"),
+        @Index(name = "idx_archive_pub_view", columnList = "visibility, view_count DESC, id DESC"),
+        @Index(name = "idx_archive_pub_like", columnList = "visibility, like_count DESC, id DESC"),
+        @Index(name = "idx_archive_pub_new", columnList = "visibility, created_at DESC, id DESC")
 })
 public class Archive extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

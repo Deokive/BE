@@ -97,10 +97,15 @@ public class PostQueryRepository {
 
         // 정렬 기준이 없거나 값이 같을 경우를 대비해 ID 역순 추가 (Pagination 안정성)
         if (orders.isEmpty()) {
-            orders.add(new OrderSpecifier<>(Order.DESC, post.id));
+            orders.add(new OrderSpecifier<>(Order.DESC, post.createdAt));
         }
 
-        orders.add(new OrderSpecifier<>(Order.DESC, post.id));
+        boolean hasIdSort = orders.stream().anyMatch(o -> o.getTarget().equals(post.id));
+
+        if (!hasIdSort) {
+            Order lastDirection = orders.isEmpty() ? Order.DESC : orders.get(orders.size() - 1).getOrder();
+            orders.add(new OrderSpecifier<>(lastDirection, post.id));
+        }
 
         return orders.toArray(new OrderSpecifier[0]);
     }

@@ -87,6 +87,12 @@ public class GalleryQueryRepository {
             orders.add(new OrderSpecifier<>(Order.DESC, gallery.createdAt));
         }
 
+        boolean hasIdSort = orders.stream().anyMatch(o -> o.getTarget().equals(gallery.id));
+        if (!hasIdSort) {
+            Order lastDirection = orders.get(orders.size() - 1).getOrder();
+            orders.add(new OrderSpecifier<>(lastDirection, gallery.id));
+        }
+
         // Tie-Breaker -> for Integrity
         orders.add(new OrderSpecifier<>(Order.DESC, gallery.id));
 
