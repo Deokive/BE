@@ -1,306 +1,804 @@
 package com.depth.deokive.domain.event.service;
 
+import com.depth.deokive.common.enums.Visibility;
+import com.depth.deokive.common.test.IntegrationTestSupport;
+import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.archive.service.ArchiveService;
 import com.depth.deokive.domain.event.dto.EventDto;
-import com.depth.deokive.domain.event.entity.*;
-import com.depth.deokive.domain.event.repository.*;
+import com.depth.deokive.domain.event.entity.Event;
+import com.depth.deokive.domain.event.entity.EventHashtagMap;
+import com.depth.deokive.domain.event.entity.SportRecord;
+import com.depth.deokive.domain.event.repository.EventHashtagMapRepository;
+import com.depth.deokive.domain.event.repository.EventRepository;
+import com.depth.deokive.domain.event.repository.HashtagRepository;
+import com.depth.deokive.domain.event.repository.SportRecordRepository;
+import com.depth.deokive.domain.friend.entity.FriendMap;
+import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
+import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
+import com.depth.deokive.domain.user.entity.enums.UserType;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class EventServiceTest {
+@DisplayName("EventService 통합 테스트")
+class EventServiceTest extends IntegrationTestSupport {
 
-    @InjectMocks private EventService eventService;
+    @Autowired EventService eventService;
+    @Autowired ArchiveService archiveService;
 
-    @Mock private EventRepository eventRepository;
-    @Mock private SportRecordRepository sportRecordRepository;
-    @Mock private HashtagRepository hashtagRepository;
-    @Mock private EventHashtagMapRepository eventHashtagMapRepository;
-    @Mock private ArchiveRepository archiveRepository;
+    // Core Repositories
+    @Autowired EventRepository eventRepository;
+    @Autowired SportRecordRepository sportRecordRepository;
+    @Autowired HashtagRepository hashtagRepository;
+    @Autowired EventHashtagMapRepository eventHashtagMapRepository;
+    @Autowired ArchiveRepository archiveRepository;
+    @Autowired FriendMapRepository friendMapRepository;
 
-    // --- Fixture Helpers ---
-    private UserPrincipal makePrincipal(Long userId) {
-        return UserPrincipal.builder().userId(userId).role(Role.USER).build();
+    // Test Data
+    private User userA; // Me
+    private User userB; // Friend
+    private User userC; // Stranger
+
+    private Archive archiveAPublic;
+    private Archive archiveARestricted;
+    private Archive archiveAPrivate;
+    private Archive archiveBPublic;
+
+    @BeforeEach
+    void setUp() {
+        // 1. Users Setup
+        userA = createTestUser("usera@test.com", "UserA");
+        userB = createTestUser("userb@test.com", "UserB");
+        userC = createTestUser("userc@test.com", "UserC");
+
+        // 2. Friend Setup (A <-> B)
+        friendMapRepository.save(FriendMap.builder().user(userA).friend(userB).requestedBy(userA).friendStatus(FriendStatus.ACCEPTED).build());
+        friendMapRepository.save(FriendMap.builder().user(userB).friend(userA).requestedBy(userA).friendStatus(FriendStatus.ACCEPTED).build());
+
+        // 3. Archives Setup
+        setupMockUser(userA);
+        archiveAPublic = createArchiveByService(userA, Visibility.PUBLIC);
+        archiveARestricted = createArchiveByService(userA, Visibility.RESTRICTED);
+        archiveAPrivate = createArchiveByService(userA, Visibility.PRIVATE);
+
+        setupMockUser(userB);
+        archiveBPublic = createArchiveByService(userB, Visibility.PUBLIC);
+
+        SecurityContextHolder.clearContext();
     }
 
-    private User createUser(Long id) {
-        User user = User.builder().build();
-        ReflectionTestUtils.setField(user, "id", id);
-        return user;
-    }
-
-    private Archive createArchive(Long id, User owner) {
-        Archive archive = Archive.builder().user(owner).visibility(Visibility.PUBLIC).build();
-        ReflectionTestUtils.setField(archive, "id", id);
-        return archive;
-    }
-
-    private Event createEvent(Long id, Archive archive, boolean isSport) {
-        Event event = Event.builder()
-                .archive(archive)
-                .title("Test Event")
-                .date(LocalDateTime.now())
-                .isSportType(isSport)
+    private User createTestUser(String email, String nickname) {
+        User user = User.builder()
+                .email(email)
+                .username("user_" + UUID.randomUUID())
+                .nickname(nickname)
+                .password("password")
+                .role(Role.USER)
+                .userType(UserType.COMMON)
+                .isEmailVerified(true)
                 .build();
-        ReflectionTestUtils.setField(event, "id", id);
-        return event;
+        return userRepository.save(user);
     }
 
-    private EventDto.Request createRequest(boolean hasTime, boolean isSport) {
-        EventDto.Request req = new EventDto.Request();
-        req.setTitle("New Event");
-        req.setDate(LocalDate.of(2025, 5, 5));
-        req.setHasTime(hasTime);
-        req.setColor("#000000");
-        req.setIsSportType(isSport);
-        if (hasTime) req.setTime(LocalTime.of(10, 0));
-        if (isSport) {
-            EventDto.SportRequest sport = new EventDto.SportRequest();
-            sport.setTeam1("A");
-            sport.setTeam2("B");
-            sport.setScore1(1);
-            sport.setScore2(2);
-            req.setSportInfo(sport);
-        }
-        return req;
+    private Archive createArchiveByService(User owner, Visibility visibility) {
+        setupMockUser(owner);
+        UserPrincipal principal = UserPrincipal.from(owner);
+
+        ArchiveDto.CreateRequest req = new ArchiveDto.CreateRequest();
+        req.setTitle("Archive " + visibility);
+        req.setVisibility(visibility);
+
+        ArchiveDto.Response response = archiveService.createArchive(principal, req);
+        SecurityContextHolder.clearContext();
+        return archiveRepository.findById(response.getId()).orElseThrow();
     }
 
+    // ========================================================================================
+    // [Category 1]: Create
+    // ========================================================================================
     @Nested
-    @DisplayName("📝 일정 생성 (Create)")
-    class CreateTest {
-
+    @DisplayName("[Category 1] Create Event")
+    class Create {
         @Test
-        @DisplayName("성공: 스포츠 기록과 태그가 포함된 완전한 일정을 생성한다.")
-        void createEvent_Success_FullOption() {
-            // given
-            Long userId = 1L;
-            Long archiveId = 100L;
-            UserPrincipal principal = makePrincipal(userId);
-            User user = createUser(userId);
-            Archive archive = createArchive(archiveId, user);
-            EventDto.Request request = createRequest(true, true);
-            request.setHashtags(List.of("축구", "결승"));
+        @DisplayName("SCENE 1: 정상 케이스 (일반 이벤트, 해시태그 포함)")
+        void createEvent_Normal() {
+            // Given
+            setupMockUser(userA);
+            UserPrincipal principal = UserPrincipal.from(userA);
 
-            given(archiveRepository.findById(archiveId)).willReturn(Optional.of(archive));
-            given(eventRepository.save(any(Event.class))).willAnswer(inv -> {
-                Event e = inv.getArgument(0);
-                ReflectionTestUtils.setField(e, "id", 1L);
-                return e;
-            });
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("Event 1")
+                    .date(LocalDate.now())
+                    .time(LocalTime.of(14, 30))
+                    .hasTime(true)
+                    .color("#FF5733")
+                    .hashtags(List.of("tag1", "tag2"))
+                    .build();
 
-            given(sportRecordRepository.save(any(SportRecord.class))).willAnswer(inv -> inv.getArgument(0));
+            // When
+            EventDto.Response response = eventService.createEvent(principal, archiveAPublic.getId(), request);
 
-            // Hashtag Mocking (Find or Create)
-            given(hashtagRepository.findByName(anyString())).willReturn(Optional.empty()); // 항상 새로 생성 가정
-            given(hashtagRepository.save(any(Hashtag.class))).willAnswer(inv -> inv.getArgument(0));
+            // Then
+            Event savedEvent = eventRepository.findById(response.getId()).orElseThrow();
+            assertThat(savedEvent.getTitle()).isEqualTo("Event 1");
+            assertThat(savedEvent.isHasTime()).isTrue();
+            assertThat(savedEvent.getDate().toLocalTime()).isEqualTo(LocalTime.of(14, 30));
 
-            // when
-            EventDto.Response response = eventService.createEvent(principal, archiveId, request);
-
-            // then
-            assertThat(response.getTitle()).isEqualTo("New Event");
-            assertThat(response.getSportInfo()).isNotNull();
-            assertThat(response.getSportInfo().getTeam1()).isEqualTo("A");
-            verify(sportRecordRepository).save(any(SportRecord.class)); // 스포츠 기록 저장 확인
-            verify(eventHashtagMapRepository, times(2)).save(any(EventHashtagMap.class)); // 태그 2개 저장 확인
+            List<String> tags = eventHashtagMapRepository.findHashtagNamesByEventId(savedEvent.getId());
+            assertThat(tags).containsExactlyInAnyOrder("tag1", "tag2");
         }
 
         @Test
-        @DisplayName("실패: 아카이브 주인이 아니면 생성할 수 없다.")
-        void createEvent_Fail_Forbidden() {
-            // given
-            Long ownerId = 1L;
-            Long intruderId = 2L;
-            UserPrincipal intruder = makePrincipal(intruderId);
-            User owner = createUser(ownerId);
-            Archive archive = createArchive(100L, owner);
-            EventDto.Request request = createRequest(false, false);
+        @DisplayName("SCENE 2: 시간 없이 생성 (hasTime = false)")
+        void createEvent_NoTime() {
+            // Given
+            setupMockUser(userA);
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("No Time Event")
+                    .date(LocalDate.now())
+                    .hasTime(false)
+                    .color("#FF5733")
+                    .build();
 
-            given(archiveRepository.findById(100L)).willReturn(Optional.of(archive));
+            // When
+            EventDto.Response response = eventService.createEvent(UserPrincipal.from(userA), archiveAPublic.getId(), request);
 
-            // when & then
-            assertThatThrownBy(() -> eventService.createEvent(intruder, 100L, request))
-                    .isInstanceOf(RestException.class)
-                    .extracting("errorCode").isEqualTo(ErrorCode.AUTH_FORBIDDEN);
-        }
-    }
-
-    @Nested
-    @DisplayName("📅 월별 조회 (Monthly View)")
-    class MonthlyTest {
-
-        @Test
-        @DisplayName("성공: N+1 문제 없이 이벤트와 해시태그를 대량 조회한다.")
-        void getMonthlyEvents_Success_Optimization() {
-            // given
-            Long userId = 1L;
-            Long archiveId = 100L;
-            UserPrincipal principal = makePrincipal(userId);
-            User user = createUser(userId);
-            Archive archive = createArchive(archiveId, user);
-
-            // Event 2개 준비
-            Event e1 = createEvent(10L, archive, false);
-            Event e2 = createEvent(20L, archive, false);
-            List<Event> events = List.of(e1, e2);
-
-            // Hashtag Map 준비 (Bulk Fetch 결과 모킹)
-            Hashtag tag1 = Hashtag.builder().name("TagA").build();
-            Hashtag tag2 = Hashtag.builder().name("TagB").build();
-
-            EventHashtagMap map1 = EventHashtagMap.builder().event(e1).hashtag(tag1).build(); // Event 1 -> TagA
-            EventHashtagMap map2 = EventHashtagMap.builder().event(e2).hashtag(tag2).build(); // Event 2 -> TagB
-
-            given(archiveRepository.findById(archiveId)).willReturn(Optional.of(archive));
-            given(eventRepository.findAllByArchiveAndDateRange(eq(archiveId), any(), any())).willReturn(events);
-
-            // ⭐ 핵심: ID 리스트로 한 번에 조회하는지 검증
-            given(eventHashtagMapRepository.findAllByEventIdIn(List.of(10L, 20L))).willReturn(List.of(map1, map2));
-
-            // when
-            List<EventDto.Response> responses = eventService.getMonthlyEvents(principal, archiveId, 2025, 5);
-
-            // then
-            assertThat(responses).hasSize(2);
-
-            // 메모리 매핑 검증
-            EventDto.Response res1 = responses.stream().filter(r -> r.getId().equals(10L)).findFirst().get();
-            assertThat(res1.getHashtags()).containsExactly("TagA");
-
-            EventDto.Response res2 = responses.stream().filter(r -> r.getId().equals(20L)).findFirst().get();
-            assertThat(res2.getHashtags()).containsExactly("TagB");
-        }
-    }
-
-    @Nested
-    @DisplayName("🔄 일정 수정 (Update)")
-    class UpdateTest {
-
-        @Test
-        @DisplayName("성공: 해시태그 수정 시 'Diff 방식'으로 동작하여 불필요한 삭제를 방지한다.")
-        void updateEvent_Success_TagDiff() {
-            // given
-            // 상황: 기존 태그 [A, B] -> 요청 태그 [B, C]
-            // 기대: A 삭제, C 추가, B 유지
-            Long eventId = 10L;
-            UserPrincipal principal = makePrincipal(1L);
-            User user = createUser(1L);
-            Archive archive = createArchive(100L, user);
-            Event event = createEvent(eventId, archive, false);
-
-            EventDto.Request request = createRequest(false, false);
-            request.setHashtags(List.of("B", "C"));
-
-            // 기존 태그 데이터 Mocking
-            Hashtag tagA = Hashtag.builder().name("A").build();
-            Hashtag tagB = Hashtag.builder().name("B").build();
-            EventHashtagMap mapA = EventHashtagMap.builder().event(event).hashtag(tagA).build();
-            EventHashtagMap mapB = EventHashtagMap.builder().event(event).hashtag(tagB).build();
-
-            given(eventRepository.findById(eventId)).willReturn(Optional.of(event));
-            // 기존 매핑 조회
-            given(eventHashtagMapRepository.findAllByEventId(eventId)).willReturn(List.of(mapA, mapB));
-
-            // "C" 태그 생성 Mocking
-            given(hashtagRepository.findByName("C")).willReturn(Optional.empty());
-            given(hashtagRepository.save(any(Hashtag.class))).willAnswer(inv -> {
-                Hashtag h = inv.getArgument(0);
-                return Hashtag.builder().name(h.getName()).build();
-            });
-
-            // when
-            eventService.updateEvent(principal, eventId, request);
-
-            // then
-            // 1. Delete 검증: "A"만 포함된 리스트가 삭제되어야 함
-            @SuppressWarnings("unchecked")
-            ArgumentCaptor<List<EventHashtagMap>> deleteCaptor = ArgumentCaptor.forClass(List.class);
-            verify(eventHashtagMapRepository).deleteAll(deleteCaptor.capture());
-
-            List<EventHashtagMap> deletedList = deleteCaptor.getValue();
-            assertThat(deletedList).hasSize(1);
-            assertThat(deletedList.get(0).getHashtag().getName()).isEqualTo("A");
-
-            // 2. Insert 검증: "C"만 추가되어야 함
-            ArgumentCaptor<EventHashtagMap> saveCaptor = ArgumentCaptor.forClass(EventHashtagMap.class);
-            verify(eventHashtagMapRepository).save(saveCaptor.capture());
-            assertThat(saveCaptor.getValue().getHashtag().getName()).isEqualTo("C");
+            // Then
+            Event savedEvent = eventRepository.findById(response.getId()).orElseThrow();
+            assertThat(savedEvent.isHasTime()).isFalse();
+            assertThat(savedEvent.getDate().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
         }
 
         @Test
-        @DisplayName("성공: 스포츠 기능을 끄면(OFF) 기존 스포츠 기록이 삭제된다.")
-        void updateEvent_Success_SportToggleOff() {
-            // given
-            Long eventId = 10L;
-            UserPrincipal principal = makePrincipal(1L);
-            Archive archive = createArchive(100L, createUser(1L));
+        @DisplayName("SCENE 3: 스포츠 타입 이벤트 생성")
+        void createEvent_SportType() {
+            // Given
+            setupMockUser(userA);
+            EventDto.SportRequest sportInfo = EventDto.SportRequest.builder()
+                    .team1("Team A").team2("Team B").score1(1).score2(2).build();
 
-            Event event = createEvent(eventId, archive, true);
-            SportRecord record = SportRecord.builder().event(event).build();
-            ReflectionTestUtils.setField(event, "sportRecord", record); // 양방향 매핑 강제 주입
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("Sport Event")
+                    .date(LocalDate.now())
+                    .color("#FF5733")
+                    .isSportType(true)
+                    .sportInfo(sportInfo)
+                    .build();
 
-            EventDto.Request request = createRequest(false, false); // 요청은 스포츠 OFF
+            // When
+            EventDto.Response response = eventService.createEvent(UserPrincipal.from(userA), archiveAPublic.getId(), request);
 
-            given(eventRepository.findById(eventId)).willReturn(Optional.of(event));
+            // Then
+            Event savedEvent = eventRepository.findById(response.getId()).orElseThrow();
+            assertThat(savedEvent.isSportType()).isTrue();
 
-            // when
-            eventService.updateEvent(principal, eventId, request);
+            SportRecord record = sportRecordRepository.findById(savedEvent.getId()).orElseThrow();
+            assertThat(record.getTeam1()).isEqualTo("Team A");
+            assertThat(record.getEvent().getId()).isEqualTo(savedEvent.getId());
+        }
 
-            // then
-            verify(sportRecordRepository).deleteById(eventId);
+        @Test
+        @DisplayName("SCENE 4: 해시태그 없이 생성")
+        void createEvent_NoHashtags() {
+            setupMockUser(userA);
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("No Tag Event").date(LocalDate.now()).color("#FF5733").hashtags(null).build();
+
+            EventDto.Response response = eventService.createEvent(UserPrincipal.from(userA), archiveAPublic.getId(), request);
+
+            List<EventHashtagMap> maps = eventHashtagMapRepository.findAllByEventId(response.getId());
+            assertThat(maps).isEmpty();
+        }
+
+        @Test
+        @DisplayName("SCENE 5: 중복 해시태그 처리")
+        void createEvent_DuplicateHashtags() {
+            setupMockUser(userA);
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("Dup Tag Event").date(LocalDate.now()).color("#FF5733")
+                    .hashtags(List.of("tag1", "tag1", "tag2")) // 중복
+                    .build();
+
+            EventDto.Response response = eventService.createEvent(UserPrincipal.from(userA), archiveAPublic.getId(), request);
+
+            List<String> tags = eventHashtagMapRepository.findHashtagNamesByEventId(response.getId());
+            assertThat(tags).hasSize(2).containsExactlyInAnyOrder("tag1", "tag2");
+        }
+
+        @Test
+        @DisplayName("SCENE 6: 존재하지 않는 Archive")
+        void createEvent_ArchiveNotFound() {
+            setupMockUser(userA);
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("Ghost").date(LocalDate.now()).color("#FF5733").build();
+
+            assertThatThrownBy(() -> eventService.createEvent(UserPrincipal.from(userA), 99999L, request))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.ARCHIVE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 7: 타인 Archive에 생성 시도")
+        void createEvent_Forbidden() {
+            setupMockUser(userA);
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("Hacked").date(LocalDate.now()).color("#FF5733").build();
+
+            assertThatThrownBy(() -> eventService.createEvent(UserPrincipal.from(userA), archiveBPublic.getId(), request))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
         }
     }
 
+    // ========================================================================================
+    // [Category 2]: Read
+    // ========================================================================================
     @Nested
-    @DisplayName("🗑️ 일정 삭제 (Delete)")
-    class DeleteTest {
+    @DisplayName("[Category 2] Read Event")
+    class Read {
+        private Event normalEvent;
+        private Event sportEvent;
+        private Event restrictedEvent;
+        private Event privateEvent;
+
+        @BeforeEach
+        void initEvents() {
+            // Public Archive
+            normalEvent = createEventByService(userA, archiveAPublic.getId(), false, true, List.of("tag1", "tag2", "tag3"));
+            sportEvent = createEventByService(userA, archiveAPublic.getId(), true, true, List.of("sport"));
+
+            // Restricted: Normal(HasTime=False)
+            restrictedEvent = createEventByService(userA, archiveARestricted.getId(), false, false, null);
+
+            // Private: Normal(HasTime=False)
+            privateEvent = createEventByService(userA, archiveAPrivate.getId(), false, false, null);
+        }
 
         @Test
-        @DisplayName("성공: 일정 삭제 시 태그 매핑과 스포츠 기록도 명시적으로 삭제한다.")
-        void deleteEvent_Success() {
-            // given
-            Long eventId = 10L;
-            UserPrincipal principal = makePrincipal(1L);
-            Archive archive = createArchive(100L, createUser(1L));
-            Event event = createEvent(eventId, archive, true); // 스포츠 타입
+        @DisplayName("SCENE 8~11: PUBLIC Archive + 일반 Event")
+        void getEvent_Public_Normal() {
+            // 8: Owner
+            EventDto.Response resOwner = eventService.getEvent(UserPrincipal.from(userA), normalEvent.getId());
+            assertThat(resOwner.getId()).isEqualTo(normalEvent.getId());
+            assertThat(resOwner.getHashtags()).hasSize(3);
 
-            given(eventRepository.findById(eventId)).willReturn(Optional.of(event));
-
-            // when
-            eventService.deleteEvent(principal, eventId);
-
-            // then
-            verify(eventHashtagMapRepository).deleteByEventId(eventId); // 태그 삭제
-            verify(sportRecordRepository).deleteById(eventId); // 스포츠 기록 삭제
-            verify(eventRepository).delete(event); // 이벤트 삭제
+            // 9: Stranger
+            assertThat(eventService.getEvent(UserPrincipal.from(userC), normalEvent.getId())).isNotNull();
+            // 10: Friend
+            assertThat(eventService.getEvent(UserPrincipal.from(userB), normalEvent.getId())).isNotNull();
+            // 11: Anonymous
+            assertThat(eventService.getEvent(null, normalEvent.getId())).isNotNull();
         }
+
+        @Test
+        @DisplayName("SCENE 12~15: PUBLIC Archive + 스포츠 Event")
+        void getEvent_Public_Sport() {
+            // 12: Owner
+            EventDto.Response resOwner = eventService.getEvent(UserPrincipal.from(userA), sportEvent.getId());
+            assertThat(resOwner.isSportType()).isTrue();
+            assertThat(resOwner.getSportInfo()).isNotNull();
+
+            // 13~15: Others
+            assertThat(eventService.getEvent(UserPrincipal.from(userC), sportEvent.getId()).getSportInfo()).isNotNull();
+            assertThat(eventService.getEvent(UserPrincipal.from(userB), sportEvent.getId()).getSportInfo()).isNotNull();
+            assertThat(eventService.getEvent(null, sportEvent.getId()).getSportInfo()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("SCENE 16~19: RESTRICTED Archive")
+        void getEvent_Restricted() {
+            // 16, 17: Owner & Friend OK
+            assertThat(eventService.getEvent(UserPrincipal.from(userA), restrictedEvent.getId())).isNotNull();
+            assertThat(eventService.getEvent(UserPrincipal.from(userB), restrictedEvent.getId())).isNotNull();
+
+            // 18, 19: Stranger & Anonymous Fail
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userC), restrictedEvent.getId())).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> eventService.getEvent(null, restrictedEvent.getId())).isInstanceOf(RestException.class);
+        }
+
+        @Test
+        @DisplayName("SCENE 20~23: RESTRICTED + Sport (권한 동일)")
+        void getEvent_Restricted_Sport() {
+            Event rSportEvent = createEventByService(userA, archiveARestricted.getId(), true, true, null);
+
+            assertThat(eventService.getEvent(UserPrincipal.from(userA), rSportEvent.getId())).isNotNull();
+            assertThat(eventService.getEvent(UserPrincipal.from(userB), rSportEvent.getId())).isNotNull();
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userC), rSportEvent.getId())).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> eventService.getEvent(null, rSportEvent.getId())).isInstanceOf(RestException.class);
+        }
+
+        @Test
+        @DisplayName("SCENE 24~27: PRIVATE Archive + 일반 Event")
+        void getEvent_Private() {
+            // 24: Owner OK
+            assertThat(eventService.getEvent(UserPrincipal.from(userA), privateEvent.getId())).isNotNull();
+
+            // 25~27: Others Fail
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userC), privateEvent.getId())).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userB), privateEvent.getId())).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> eventService.getEvent(null, privateEvent.getId())).isInstanceOf(RestException.class);
+        }
+
+        @Test
+        @DisplayName("SCENE 28~31: PRIVATE Archive + 스포츠 Event")
+        void getEvent_Private_Sport() {
+            // Given: Private Archive에 Sport Event 생성
+            Event pSportEvent = createEventByService(userA, archiveAPrivate.getId(), true, true, null);
+
+            // 28: Owner OK
+            assertThat(eventService.getEvent(UserPrincipal.from(userA), pSportEvent.getId())).isNotNull();
+            assertThat(eventService.getEvent(UserPrincipal.from(userA), pSportEvent.getId()).getSportInfo()).isNotNull();
+
+            // 29~31: Others Fail (Stranger, Friend, Anonymous)
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userC), pSportEvent.getId()))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userB), pSportEvent.getId()))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+            assertThatThrownBy(() -> eventService.getEvent(null, pSportEvent.getId()))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        @Test
+        @DisplayName("SCENE 32~33: hasTime 값 검증")
+        void getEvent_HasTime() {
+            // 32: hasTime=true
+            EventDto.Response resTime = eventService.getEvent(UserPrincipal.from(userA), normalEvent.getId());
+            assertThat(resTime.isHasTime()).isTrue();
+            assertThat(resTime.getTime()).isNotNull();
+
+            // 33: hasTime=false
+            EventDto.Response resNoTime = eventService.getEvent(UserPrincipal.from(userA), restrictedEvent.getId());
+            assertThat(resNoTime.isHasTime()).isFalse();
+            // Service DTO 변환 로직: hasTime이 false면 time은 null 또는 00:00 (여기선 null로 가정)
+            assertThat(resNoTime.getTime()).isNull();
+        }
+
+        @Test
+        @DisplayName("SCENE 34: 존재하지 않는 Event")
+        void getEvent_NotFound() {
+            assertThatThrownBy(() -> eventService.getEvent(UserPrincipal.from(userA), 99999L))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_FOUND);
+        }
+    }
+
+    // ========================================================================================
+    // [Category 3]: Update
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 3] Update Event")
+    class Update {
+        private Event event;
+
+        @BeforeEach
+        void init() {
+            event = createEventByService(userA, archiveAPublic.getId(), false, true, List.of("old1", "old2"));
+        }
+
+        @Test
+        @DisplayName("SCENE 35~36: 정상 수정")
+        void updateEvent_Normal() {
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // Given: 초기 상태 확인 (hasTime=true, time=12:00)
+            Event original = eventRepository.findById(event.getId()).get();
+            assertThat(original.isHasTime()).isTrue();
+
+            // 35: Full Update
+            LocalDate newDate = LocalDate.of(2025, 12, 25);
+            LocalTime newTime = LocalTime.of(10, 0);
+            EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder()
+                    .title("New Title")
+                    .date(newDate)
+                    .time(newTime)
+                    .hasTime(true)
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req1);
+            flushAndClear();
+            
+            Event updated = eventRepository.findById(event.getId()).get();
+            assertThat(updated.getTitle()).isEqualTo("New Title");
+            assertThat(updated.getDate().toLocalDate()).isEqualTo(newDate);
+            assertThat(updated.isHasTime()).isTrue();
+            assertThat(updated.getDate().toLocalTime()).isEqualTo(newTime);
+
+            // 36: Date Only (Time Keep) - hasTime이 true일 때 시간 유지
+            EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder()
+                    .date(LocalDate.of(2026, 1, 1))
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req2);
+            flushAndClear();
+            
+            updated = eventRepository.findById(event.getId()).get();
+            assertThat(updated.getDate().toLocalDate()).isEqualTo(LocalDate.of(2026, 1, 1));
+            assertThat(updated.isHasTime()).isTrue(); // hasTime 상태 유지
+            assertThat(updated.getDate().toLocalTime()).isEqualTo(newTime); // 시간 유지
+        }
+
+        @Test
+        @DisplayName("SCENE 37~38: 해시태그 수정")
+        void updateEvent_Hashtags() {
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // 37: Replace
+            EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder().hashtags(List.of("new1")).build();
+            eventService.updateEvent(principal, event.getId(), req1);
+            assertThat(eventHashtagMapRepository.findHashtagNamesByEventId(event.getId())).containsExactly("new1");
+
+            // 38: Keep (null)
+            EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder().hashtags(null).build();
+            eventService.updateEvent(principal, event.getId(), req2);
+            assertThat(eventHashtagMapRepository.findHashtagNamesByEventId(event.getId())).containsExactly("new1");
+        }
+
+        @Test
+        @DisplayName("SCENE 39~41: 스포츠 타입 변경")
+        void updateEvent_SportType() {
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // 39: OFF -> ON
+            EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder()
+                    .isSportType(true)
+                    .sportInfo(new EventDto.SportRequest("A", "B", 1, 0))
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req1);
+            assertThat(eventRepository.findById(event.getId()).get().isSportType()).isTrue();
+            assertThat(sportRecordRepository.existsById(event.getId())).isTrue();
+
+            // 41: Update Info
+            EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder()
+                    .sportInfo(new EventDto.SportRequest("A", "B", 5, 5))
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req2);
+            assertThat(sportRecordRepository.findById(event.getId()).get().getScore1()).isEqualTo(5);
+
+            // 40: ON -> OFF
+            EventDto.UpdateRequest req3 = EventDto.UpdateRequest.builder().isSportType(false).build();
+            eventService.updateEvent(principal, event.getId(), req3);
+
+            flushAndClear(); // [중요] DB 반영
+            assertThat(sportRecordRepository.existsById(event.getId())).isFalse();
+        }
+
+        @Test
+        @DisplayName("SCENE 42~43: hasTime 변경")
+        void updateEvent_HasTime() {
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // Given: 초기 상태 (hasTime=true, time=12:00)
+            Event original = eventRepository.findById(event.getId()).get();
+            assertThat(original.isHasTime()).isTrue();
+
+            // 43: True -> False (시간이 MIDNIGHT로 설정됨)
+            EventDto.UpdateRequest req2 = EventDto.UpdateRequest.builder().hasTime(false).build();
+            eventService.updateEvent(principal, event.getId(), req2);
+            flushAndClear();
+            
+            Event updated = eventRepository.findById(event.getId()).get();
+            assertThat(updated.isHasTime()).isFalse();
+            assertThat(updated.getDate().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+
+            // 42: False -> True (시간을 명시적으로 설정해야 함)
+            LocalTime newTime = LocalTime.of(9, 0);
+            EventDto.UpdateRequest req1 = EventDto.UpdateRequest.builder()
+                    .hasTime(true)
+                    .time(newTime)
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req1);
+            flushAndClear();
+            
+            Event updated2 = eventRepository.findById(event.getId()).get();
+            assertThat(updated2.isHasTime()).isTrue();
+            assertThat(updated2.getDate().toLocalTime()).isEqualTo(newTime);
+            
+            // hasTime=false일 때 time을 설정하지 않으면 MIDNIGHT 유지
+            EventDto.UpdateRequest req3 = EventDto.UpdateRequest.builder()
+                    .hasTime(false)
+                    .build();
+            eventService.updateEvent(principal, event.getId(), req3);
+            flushAndClear();
+            
+            Event updated3 = eventRepository.findById(event.getId()).get();
+            assertThat(updated3.isHasTime()).isFalse();
+            assertThat(updated3.getDate().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+        }
+
+        @Test
+        @DisplayName("SCENE 44~45: 예외 케이스")
+        void updateEvent_Exceptions() {
+            EventDto.UpdateRequest req = new EventDto.UpdateRequest();
+            req.setTitle("Hacked");
+
+            // 44: Forbidden
+            assertThatThrownBy(() -> eventService.updateEvent(UserPrincipal.from(userC), event.getId(), req))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 45: Not Found
+            assertThatThrownBy(() -> eventService.updateEvent(UserPrincipal.from(userA), 99999L, req))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_FOUND);
+        }
+    }
+
+    // ========================================================================================
+    // [Category 4]: Delete
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 4] Delete Event")
+    class Delete {
+        @Test
+        @DisplayName("SCENE 46: 정상 삭제 (일반 이벤트)")
+        void deleteEvent_Normal() {
+            // Given
+            Event event = createEventByService(userA, archiveAPublic.getId(), false, true, List.of("tag1"));
+            Long eventId = event.getId();
+
+            flushAndClear(); // [추가] 생성 후 클리어
+
+            // When
+            eventService.deleteEvent(UserPrincipal.from(userA), eventId);
+            flushAndClear(); // [추가] 삭제 후 클리어
+
+            // Then
+            assertThat(eventRepository.existsById(eventId)).isFalse();
+            assertThat(eventHashtagMapRepository.findHashtagNamesByEventId(eventId)).isEmpty();
+            assertThat(hashtagRepository.findByName("tag1")).isPresent(); // 태그 엔티티는 유지
+        }
+
+        @Test
+        @DisplayName("SCENE 47: 정상 삭제 (스포츠 이벤트)")
+        void deleteEvent_Sport() {
+            // Given
+            Event event = createEventByService(userA, archiveAPublic.getId(), true, true, null);
+            Long eventId = event.getId();
+
+            flushAndClear(); // [추가] 생성 후 클리어
+
+            // When
+            eventService.deleteEvent(UserPrincipal.from(userA), eventId);
+            flushAndClear(); // [추가] 삭제 후 클리어
+
+            // Then
+            assertThat(eventRepository.existsById(eventId)).isFalse();
+            assertThat(sportRecordRepository.existsById(eventId)).isFalse();
+        }
+
+        @Test
+        @DisplayName("SCENE 48~49: 예외 케이스")
+        void deleteEvent_Exceptions() {
+            Event event = createEventByService(userA, archiveAPublic.getId(), false, false, null);
+
+            // 48: Forbidden
+            assertThatThrownBy(() -> eventService.deleteEvent(UserPrincipal.from(userC), event.getId()))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 49: Not Found
+            assertThatThrownBy(() -> eventService.deleteEvent(UserPrincipal.from(userA), 99999L))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_FOUND);
+        }
+    }
+
+    // ========================================================================================
+    // [Category 5]: Read-Pagination (Monthly)
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 5] Monthly Events")
+    class Monthly {
+        private final int YEAR = 2024;
+        private final int MONTH = 5;
+
+        @BeforeEach
+        void setUpMonthlyData() {
+            setupMockUser(userA);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            for (int i = 1; i <= 10; i++) {
+                boolean isSport = (i % 2 == 0);
+                boolean hasTime = (i % 2 != 0);
+
+                EventDto.SportRequest sportInfo = isSport ? new EventDto.SportRequest("A", "B", 1, 1) : null;
+                EventDto.CreateRequest req = EventDto.CreateRequest.builder()
+                        .title("Event " + i)
+                        .date(LocalDate.of(YEAR, MONTH, i))
+                        .hasTime(hasTime)
+                        .time(hasTime ? LocalTime.of(12, 0) : null)
+                        .color("#000000")
+                        .isSportType(isSport)
+                        .sportInfo(sportInfo)
+                        .hashtags(List.of("tag"))
+                        .build();
+                eventService.createEvent(principal, archiveAPublic.getId(), req);
+            }
+            SecurityContextHolder.clearContext();
+
+            // [중요] DB 반영 및 캐시 초기화 (Fetch Join 테스트 및 연관관계 로딩 보장)
+            flushAndClear();
+        }
+
+        @Test
+        @DisplayName("SCENE 50~53: PUBLIC Archive")
+        void getMonthly_Public() {
+            // 50: Owner
+            List<EventDto.Response> resOwner = eventService.getMonthlyEvents(UserPrincipal.from(userA), archiveAPublic.getId(), YEAR, MONTH);
+            assertThat(resOwner).hasSize(10);
+
+            // 51: Stranger
+            List<EventDto.Response> resStranger = eventService.getMonthlyEvents(UserPrincipal.from(userC), archiveAPublic.getId(), YEAR, MONTH);
+            assertThat(resStranger).hasSize(10);
+
+            // 52: Friend
+            List<EventDto.Response> resFriend = eventService.getMonthlyEvents(UserPrincipal.from(userB), archiveAPublic.getId(), YEAR, MONTH);
+            assertThat(resFriend).hasSize(10);
+
+            // 53: Anonymous
+            List<EventDto.Response> resAnon = eventService.getMonthlyEvents(null, archiveAPublic.getId(), YEAR, MONTH);
+            assertThat(resAnon).hasSize(10);
+        }
+
+        @Test
+        @DisplayName("SCENE 54~57: RESTRICTED Archive")
+        void getMonthly_Restricted() {
+            // 54: Owner -> OK
+            assertThat(eventService.getMonthlyEvents(UserPrincipal.from(userA), archiveARestricted.getId(), YEAR, MONTH)).isEmpty();
+
+            // 55: Friend -> OK
+            assertThat(eventService.getMonthlyEvents(UserPrincipal.from(userB), archiveARestricted.getId(), YEAR, MONTH)).isEmpty();
+
+            // 56: Stranger -> Fail
+            assertThatThrownBy(() -> eventService.getMonthlyEvents(UserPrincipal.from(userC), archiveARestricted.getId(), YEAR, MONTH))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 57: Anonymous -> Fail
+            assertThatThrownBy(() -> eventService.getMonthlyEvents(null, archiveARestricted.getId(), YEAR, MONTH))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        @Test
+        @DisplayName("SCENE 58~61: PRIVATE Archive")
+        void getMonthly_Private() {
+            // 58: Owner -> OK
+            assertThat(eventService.getMonthlyEvents(UserPrincipal.from(userA), archiveAPrivate.getId(), YEAR, MONTH)).isEmpty();
+
+            // 59~61: Others -> Fail
+            assertThatThrownBy(() -> eventService.getMonthlyEvents(UserPrincipal.from(userB), archiveAPrivate.getId(), YEAR, MONTH)).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> eventService.getMonthlyEvents(UserPrincipal.from(userC), archiveAPrivate.getId(), YEAR, MONTH)).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> eventService.getMonthlyEvents(null, archiveAPrivate.getId(), YEAR, MONTH)).isInstanceOf(RestException.class);
+        }
+
+        @Test
+        @DisplayName("SCENE 62~63: 빈 결과, 존재하지 않는 아카이브")
+        void getMonthly_Edge() {
+            assertThat(eventService.getMonthlyEvents(UserPrincipal.from(userA), archiveAPublic.getId(), YEAR, MONTH + 1)).isEmpty();
+            assertThatThrownBy(() -> eventService.getMonthlyEvents(UserPrincipal.from(userA), 99999L, YEAR, MONTH))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.ARCHIVE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 64~67: 월 경계 처리")
+        void getMonthly_Boundary() {
+            // Setup: 4월 30일, 5월 1일, 5월 31일, 6월 1일 데이터 생성
+            setupMockUser(userA);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // setUpMonthlyData와 별개로 추가
+            createEventDirectly(principal, archiveAPublic.getId(), LocalDate.of(YEAR, 4, 30));
+            createEventDirectly(principal, archiveAPublic.getId(), LocalDate.of(YEAR, 5, 1));
+            createEventDirectly(principal, archiveAPublic.getId(), LocalDate.of(YEAR, 5, 31));
+            createEventDirectly(principal, archiveAPublic.getId(), LocalDate.of(YEAR, 6, 1));
+
+            flushAndClear(); // [중요] DB 반영
+
+            // When: 5월 조회
+            List<EventDto.Response> results = eventService.getMonthlyEvents(principal, archiveAPublic.getId(), YEAR, 5);
+
+            // Then
+            // 5월 1일 ~ 5월 10일(setupData: 10개) + 5월 1일(boundary: 1개) + 5월 31일(boundary: 1개)
+            // 총 12개여야 함
+            assertThat(results).hasSize(12);
+            
+            // 모든 결과가 5월인지 검증
+            assertThat(results).extracting(EventDto.Response::getDate)
+                    .allMatch(d -> d.getMonthValue() == 5);
+            
+            // 4월 30일은 제외되는지 검증
+            assertThat(results).extracting(EventDto.Response::getDate)
+                    .noneMatch(d -> d.getMonthValue() == 4);
+            
+            // 6월 1일은 제외되는지 검증
+            assertThat(results).extracting(EventDto.Response::getDate)
+                    .noneMatch(d -> d.getMonthValue() == 6);
+            
+            // 5월 1일과 5월 31일이 포함되는지 검증
+            List<LocalDate> resultDates = results.stream()
+                    .map(EventDto.Response::getDate)
+                    .toList();
+            assertThat(resultDates).contains(LocalDate.of(YEAR, 5, 1));
+            assertThat(resultDates).contains(LocalDate.of(YEAR, 5, 31));
+        }
+
+        @Test
+        @DisplayName("SCENE 68: 스포츠 타입 이벤트 포함 확인")
+        void getMonthly_SportType() {
+            // Given: Event 1 (홀수: 일반), Event 2 (짝수: 스포츠)
+            List<EventDto.Response> results = eventService.getMonthlyEvents(
+                    UserPrincipal.from(userA), archiveAPublic.getId(), YEAR, MONTH);
+
+            assertThat(results).hasSize(10);
+
+            // 1. 일반 이벤트 검증
+            EventDto.Response normalEvent = results.stream().filter(e -> e.getTitle().equals("Event 1")).findFirst().orElseThrow();
+            assertThat(normalEvent.isSportType()).isFalse();
+            assertThat(normalEvent.getSportInfo()).isNull();
+
+            // 2. 스포츠 이벤트 검증
+            EventDto.Response sportEvent = results.stream().filter(e -> e.getTitle().equals("Event 2")).findFirst().orElseThrow();
+            assertThat(sportEvent.isSportType()).isTrue();
+            assertThat(sportEvent.getSportInfo()).isNotNull();
+            assertThat(sportEvent.getSportInfo().getTeam1()).isEqualTo("A");
+        }
+
+        @Test
+        @DisplayName("SCENE 69: hasTime 케이스 포함 확인")
+        void getMonthly_HasTime() {
+            // Given: Event 1 (홀수: hasTime=true), Event 2 (짝수: hasTime=false)
+            List<EventDto.Response> results = eventService.getMonthlyEvents(
+                    UserPrincipal.from(userA), archiveAPublic.getId(), YEAR, MONTH);
+
+            // 1. hasTime = True
+            EventDto.Response hasTimeEvent = results.stream().filter(e -> e.getTitle().equals("Event 1")).findFirst().orElseThrow();
+            assertThat(hasTimeEvent.isHasTime()).isTrue();
+            assertThat(hasTimeEvent.getTime()).isEqualTo(LocalTime.of(12, 0));
+
+            // 2. hasTime = False
+            EventDto.Response noTimeEvent = results.stream().filter(e -> e.getTitle().equals("Event 2")).findFirst().orElseThrow();
+            assertThat(noTimeEvent.isHasTime()).isFalse();
+            assertThat(noTimeEvent.getTime()).isNull();
+        }
+    }
+
+    // --- Helpers ---
+    private Event createEventByService(User owner, Long archiveId, boolean isSport, boolean hasTime, List<String> hashtags) {
+        setupMockUser(owner);
+        UserPrincipal principal = UserPrincipal.from(owner);
+
+        EventDto.SportRequest sportInfo = isSport ? new EventDto.SportRequest("A", "B", 1, 2) : null;
+
+        EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                .title("Test Event")
+                .date(LocalDate.now())
+                .time(hasTime ? LocalTime.of(12, 0) : null) // hasTime True면 시간 설정, 아니면 null
+                .hasTime(hasTime)
+                .color("#FF5733")
+                .isSportType(isSport)
+                .sportInfo(sportInfo)
+                .hashtags(hashtags)
+                .build();
+
+        EventDto.Response response = eventService.createEvent(principal, archiveId, request);
+        SecurityContextHolder.clearContext();
+        return eventRepository.findById(response.getId()).orElseThrow();
+    }
+
+    private void createEventDirectly(UserPrincipal principal, Long archiveId, LocalDate date) {
+        EventDto.CreateRequest req = EventDto.CreateRequest.builder()
+                .title("Boundary")
+                .date(date)
+                .color("#000")
+                .build();
+        eventService.createEvent(principal, archiveId, req);
     }
 }

@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.archive.scheduler;
+package com.depth.deokive.system.scheduler;
 
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import lombok.RequiredArgsConstructor;

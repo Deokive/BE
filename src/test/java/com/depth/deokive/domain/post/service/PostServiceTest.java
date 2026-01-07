@@ -1,328 +1,903 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.test.IntegrationTestSupport;
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.entity.enums.MediaType;
-import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
+import com.depth.deokive.domain.post.entity.PostLike;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
-import com.depth.deokive.domain.post.repository.PostQueryRepository;
+import com.depth.deokive.domain.post.repository.PostLikeRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
-import com.depth.deokive.domain.user.repository.UserRepository;
+import com.depth.deokive.domain.user.entity.enums.UserType;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class PostServiceTest {
+@DisplayName("PostService 통합 테스트")
+class PostServiceTest extends IntegrationTestSupport {
 
-    @InjectMocks private PostService postService;
+    @Autowired PostService postService;
+    @Autowired PostRepository postRepository;
+    @Autowired PostFileMapRepository postFileMapRepository;
+    @Autowired PostLikeRepository postLikeRepository;
+    @Autowired FileRepository fileRepository;
 
-    @Mock private PostRepository postRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private PostFileMapRepository postFileMapRepository;
-    @Mock private FileService fileService;
-    @Mock private PostQueryRepository postQueryRepository;
+    // Test Data
+    private User userA;
+    private User userB;
 
-    // Helper: UserPrincipal 생성
-    private UserPrincipal createUserPrincipal(Long id) {
-        return UserPrincipal.builder()
-                .userId(id)
-                .username("tester" + id)
+    private List<File> userAFiles;
+    private List<File> userBFiles;
+
+    @BeforeEach
+    void setUp() {
+        // Users Setup
+        userA = createTestUser("usera@test.com", "UserA");
+        userB = createTestUser("userb@test.com", "UserB");
+
+        // Files Setup (UserA: 20 files, UserB: 5 files)
+        setupMockUser(userA);
+        userAFiles = createFiles(userA, 20);
+
+        setupMockUser(userB);
+        userBFiles = createFiles(userB, 5);
+
+        SecurityContextHolder.clearContext();
+    }
+
+    private User createTestUser(String email, String nickname) {
+        User user = User.builder()
+                .email(email)
+                .username("user_" + UUID.randomUUID())
+                .nickname(nickname)
+                .password("password")
                 .role(Role.USER)
+                .userType(UserType.COMMON)
+                .isEmailVerified(true)
                 .build();
+        return userRepository.save(user);
     }
 
-    // --- [Scenario 1. 썸네일 선정 로직 검증 (Business Logic)] ---
-
-    @Test
-    @DisplayName("성공: 파일 중 PREVIEW 역할이 있다면 Sequence가 늦어도 썸네일로 지정된다.")
-    void createPost_Thumbnail_Priority_Preview() {
-        // given
-        Long userId = 1L;
-        UserPrincipal principal = createUserPrincipal(userId);
-        User user = User.builder().id(userId).build();
-
-        // File 1: Content 역할 (Seq 0)
-        File fileContent = File.builder().id(101L).filePath("content.jpg").mediaType(MediaType.IMAGE).createdBy(userId).build();
-        // File 2: Preview 역할 (Seq 1) -> 기대 썸네일
-        File filePreview = File.builder().id(102L).filePath("preview.jpg").mediaType(MediaType.IMAGE).createdBy(userId).build();
-
-        PostDto.Request request = PostDto.Request.builder()
-                .title("Test Post")
-                .content("Content")
-                .category(Category.IDOL)
-                .files(List.of(
-                        new PostDto.AttachedFileRequest(101L, MediaRole.CONTENT, 0),
-                        new PostDto.AttachedFileRequest(102L, MediaRole.PREVIEW, 1)
-                ))
-                .build();
-
-        given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(fileService.validateFileOwners(anyList(), any())).willReturn(List.of(fileContent, filePreview));
-
-        // Mocking: saveAll이 호출될 때 내부적으로 생성된 PostFileMap 리스트를 그대로 반환하도록 설정
-        given(postFileMapRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
-
-        // ArgumentCaptor 설정
-        ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
-        ArgumentCaptor<List<PostFileMap>> postFileMapListCaptor = ArgumentCaptor.forClass(List.class);
-
-        // when
-        postService.createPost(principal, request);
-
-        // then
-        // 1. Post 저장이 호출되었는가?
-        verify(postRepository).save(postCaptor.capture());
-        Post savedPost = postCaptor.getValue();
-        
-        // 2. [검증 핵심] PREVIEW 파일이 썸네일로 선정되었는지 확인
-        assertThat(savedPost.getThumbnailFile()).isNotNull();
-        assertThat(savedPost.getThumbnailFile().getId()).isEqualTo(102L); // filePreview가 썸네일로 선정됨
-        assertThat(savedPost.getThumbnailFile().getFilePath()).isEqualTo("preview.jpg");
-
-        // 3. PostFileMap 저장 로직이 수행되었는가?
-        verify(postFileMapRepository).saveAll(postFileMapListCaptor.capture());
-        List<PostFileMap> savedMaps = postFileMapListCaptor.getValue();
-        assertThat(savedMaps).hasSize(2);
-        
-        // PostFileMap 내용 검증
-        assertThat(savedMaps.get(0).getFile().getId()).isEqualTo(101L);
-        assertThat(savedMaps.get(0).getMediaRole()).isEqualTo(MediaRole.CONTENT);
-        assertThat(savedMaps.get(0).getSequence()).isEqualTo(0);
-        
-        assertThat(savedMaps.get(1).getFile().getId()).isEqualTo(102L);
-        assertThat(savedMaps.get(1).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
-        assertThat(savedMaps.get(1).getSequence()).isEqualTo(1);
+    private List<File> createFiles(User owner, int count) {
+        List<File> files = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            String uuid = UUID.randomUUID().toString();
+            File file = fileRepository.save(File.builder()
+                    .filename("file_" + uuid + ".jpg")
+                    .s3ObjectKey("posts/" + owner.getNickname() + "/" + uuid + ".jpg")
+                    .fileSize(100L)
+                    .mediaType(MediaType.IMAGE)
+                    .createdBy(owner.getId())
+                    .lastModifiedBy(owner.getId())
+                    .build());
+            files.add(file);
+        }
+        return files;
     }
 
-    @Test
-    @DisplayName("성공: PREVIEW 파일이 없다면 Sequence가 가장 빠른(0번) 파일이 썸네일이 된다.")
-    void createPost_Thumbnail_Fallback_Sequence() {
-        // given
-        Long userId = 1L;
-        UserPrincipal principal = createUserPrincipal(userId);
-        User user = User.builder().id(userId).build();
+    // ========================================================================================
+    // [Category 1]: Create
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 1] Create Post")
+    class Create {
 
-        // [수정] mediaType을 명시적으로 설정해야 DTO 변환 시 에러가 안 납니다.
-        File file1 = File.builder()
-                .id(101L)
-                .filePath("img1.jpg")
-                .mediaType(MediaType.IMAGE) // <--- 추가 필수
-                .createdBy(userId)
-                .build();
+        @Test
+        @DisplayName("SCENE 1: 정상 케이스 (파일 포함, PREVIEW 파일 있음)")
+        void createPost_WithPreview() {
+            // Given
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            // Sequence 0: CONTENT
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0));
+            // Sequence 1: PREVIEW (Thumbnail target)
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(1).getId(), MediaRole.PREVIEW, 1));
 
-        File file2 = File.builder()
-                .id(102L)
-                .filePath("img2.jpg")
-                .mediaType(MediaType.IMAGE) // <--- 추가 필수
-                .createdBy(userId)
-                .build();
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Title")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
 
-        PostDto.Request request = PostDto.Request.builder()
-                .title("Test")
-                .content("C")
-                .category(Category.IDOL)
-                .files(List.of(
-                        new PostDto.AttachedFileRequest(101L, MediaRole.CONTENT, 0),
-                        new PostDto.AttachedFileRequest(102L, MediaRole.CONTENT, 1)
-                ))
-                .build();
+            // When
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
 
-        given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(fileService.validateFileOwners(anyList(), any())).willReturn(List.of(file1, file2));
+            // Then
+            Post post = postRepository.findById(response.getId()).orElseThrow();
+            assertThat(post.getTitle()).isEqualTo("Title");
 
-        // Mocking: Service 로직이 saveAll에 전달한 리스트를 그대로 반환하도록 설정
-        given(postFileMapRepository.saveAll(anyList())).willAnswer(i -> i.getArgument(0));
+            // File Map check
+            List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(maps).hasSize(2);
+            assertThat(maps.get(1).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
 
-        // ArgumentCaptor 설정
-        ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
+            // Thumbnail check
+            String expectedThumb = ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(1).getS3ObjectKey());
+            assertThat(post.getThumbnailKey()).isEqualTo(expectedThumb);
+        }
 
-        // when
-        // 여기서 PostDto.Response.of(...) 가 호출되면서 file.getMediaType().name()을 실행함
-        postService.createPost(principal, request);
+        @Test
+        @DisplayName("SCENE 2: 정상 케이스 (파일 포함, PREVIEW 파일 없음)")
+        void createPost_NoPreview() {
+            // Given
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0));
 
-        // then
-        // 1. Post 저장이 호출되었는가?
-        verify(postRepository).save(postCaptor.capture());
-        Post savedPost = postCaptor.getValue();
-        
-        // 2. [검증 핵심] Sequence가 0인 file1이 썸네일로 선정되었는지 확인
-        assertThat(savedPost.getThumbnailFile()).isNotNull();
-        assertThat(savedPost.getThumbnailFile().getId()).isEqualTo(101L); // file1 (sequence=0)이 썸네일로 선정됨
-        assertThat(savedPost.getThumbnailFile().getFilePath()).isEqualTo("img1.jpg");
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Title")
+                    .content("Content")
+                    .category(Category.ACTOR)
+                    .files(files)
+                    .build();
 
-        // 3. PostFileMap 저장 확인
-        verify(postFileMapRepository).saveAll(anyList());
+            // When
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
+
+            // Then
+            Post post = postRepository.findById(response.getId()).orElseThrow();
+            String expectedThumb = ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(0).getS3ObjectKey());
+            assertThat(post.getThumbnailKey()).isEqualTo(expectedThumb);
+        }
+
+        @Test
+        @DisplayName("SCENE 3: 정상 케이스 (다양한 카테고리)")
+        void createPost_Categories() {
+            setupMockUser(userA);
+
+            for (Category category : Category.values()) {
+                PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                        .title("Post " + category)
+                        .content("Content")
+                        .category(category)
+                        .files(null)
+                        .build();
+
+                PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
+                Post post = postRepository.findById(response.getId()).orElseThrow();
+                assertThat(post.getCategory()).isEqualTo(category);
+            }
+        }
+
+        @Test
+        @DisplayName("SCENE 4: 파일 없이 생성 (files = null)")
+        void createPost_NullFiles() {
+            setupMockUser(userA);
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("No File")
+                    .content("Content")
+                    .category(Category.MUSICIAN)
+                    .files(null)
+                    .build();
+
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
+            Post post = postRepository.findById(response.getId()).orElseThrow();
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).isEmpty();
+            assertThat(post.getThumbnailKey()).isNull();
+        }
+
+        @Test
+        @DisplayName("SCENE 5: 파일 없이 생성 (files = empty)")
+        void createPost_EmptyFiles() {
+            setupMockUser(userA);
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Empty File")
+                    .content("Content")
+                    .category(Category.SPORT)
+                    .files(Collections.emptyList())
+                    .build();
+
+            PostDto.Response response = postService.createPost(UserPrincipal.from(userA), request);
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(response.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("SCENE 6: 존재하지 않는 사용자 (UserPrincipal ID가 DB에 없음)")
+        void createPost_UserNotFound() {
+            // Given: ID가 DB에 없는 Principal 생성
+            UserPrincipal invalidPrincipal = UserPrincipal.builder().userId(99999L).role(Role.USER).build();
+
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Fail").content("C").category(Category.ARTIST).build();
+
+            // When & Then (Service: userRepository.findById().orElseThrow(USER_NOT_FOUND))
+            assertThatThrownBy(() -> postService.createPost(invalidPrincipal, request))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 7: 다른 사용자의 파일 사용 시도")
+        void createPost_IDOR() {
+            setupMockUser(userA);
+            // UserA가 UserB의 파일(userBFiles)을 사용 시도 -> validateFileOwners에서 걸러짐
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userBFiles.get(0).getId(), MediaRole.CONTENT, 0)
+            );
+
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("IDOR")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
+
+            // Service: if (files.size() != fileIds.size()) throw FILE_NOT_FOUND
+            assertThatThrownBy(() -> postService.createPost(UserPrincipal.from(userA), request))
+                    .isInstanceOf(RestException.class)
+                    .extracting("errorCode")
+                    .satisfies(code -> assertThat(code).isIn(ErrorCode.FILE_NOT_FOUND, ErrorCode.AUTH_FORBIDDEN));
+        }
+
+        @Test
+        @DisplayName("SCENE 8: 중복된 파일 ID")
+        void createPost_DuplicateFileId() {
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0),
+                    new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 1) // 중복
+            );
+
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("Dup")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
+
+            assertThatThrownBy(() -> postService.createPost(UserPrincipal.from(userA), request))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FILE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 9: 존재하지 않는 파일 ID")
+        void createPost_FileNotFound() {
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(99999L, MediaRole.CONTENT, 0)
+            );
+
+            PostDto.CreateRequest request = PostDto.CreateRequest.builder()
+                    .title("No File")
+                    .content("Content")
+                    .category(Category.IDOL)
+                    .files(files)
+                    .build();
+
+            assertThatThrownBy(() -> postService.createPost(UserPrincipal.from(userA), request))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FILE_NOT_FOUND);
+        }
     }
 
-    // --- [Scenario 2. 권한 및 예외 검증 (Security & Validation)] ---
+    // ========================================================================================
+    // [Category 2]: Read
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 2] Read Post")
+    class Read {
+        private Post postWithFiles;
+        private Post postNoFiles;
 
-    @Test
-    @DisplayName("실패: 본인의 게시글이 아니면 수정할 수 없다 (AUTH_FORBIDDEN).")
-    void updatePost_Fail_Forbidden() {
-        // given
-        Long ownerId = 1L;
-        Long attackerId = 2L;
+        @BeforeEach
+        void initPosts() {
+            setupMockUser(userA);
+            // Setup Post with 3 files
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            for(int i=0; i<3; i++) {
+                files.add(new PostDto.AttachedFileRequest(userAFiles.get(i).getId(), i==0 ? MediaRole.PREVIEW : MediaRole.CONTENT, i));
+            }
+            PostDto.CreateRequest req1 = PostDto.CreateRequest.builder()
+                    .title("With Files").content("Content").category(Category.IDOL).files(files).build();
+            PostDto.Response res1 = postService.createPost(UserPrincipal.from(userA), req1);
+            postWithFiles = postRepository.findById(res1.getId()).orElseThrow();
 
-        User owner = User.builder().id(ownerId).build();
-        Post post = Post.builder().id(10L).user(owner).build(); // 주인 설정
+            // Setup Post with no files
+            PostDto.CreateRequest req2 = PostDto.CreateRequest.builder()
+                    .title("No Files").content("Content").category(Category.ACTOR).files(null).build();
+            PostDto.Response res2 = postService.createPost(UserPrincipal.from(userA), req2);
+            postNoFiles = postRepository.findById(res2.getId()).orElseThrow();
 
-        UserPrincipal attackerPrincipal = createUserPrincipal(attackerId); // 공격자
+            flushAndClear();
+        }
 
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        @Test
+        @DisplayName("SCENE 10: 정상 케이스 (파일 포함, 본인 조회)")
+        void getPost_Owner() {
+            setupMockUser(userA);
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userA), postWithFiles.getId());
+            assertThat(response.getId()).isEqualTo(postWithFiles.getId());
+            assertThat(response.getFiles()).hasSize(3);
+            assertThat(response.getFiles().get(0).getSequence()).isEqualTo(0);
+            assertThat(response.getViewCount()).isEqualTo(1); // Service increments viewCount
+            assertThat(response.isLiked()).isFalse(); // 좋아요 없음
+        }
 
-        // when & then
-        assertThatThrownBy(() -> postService.updatePost(attackerPrincipal, 10L, new PostDto.Request()))
-                .isInstanceOf(RestException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+        @Test
+        @DisplayName("SCENE 11: 정상 케이스 (파일 포함, 타인 조회)")
+        void getPost_Stranger() {
+            setupMockUser(userB);
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            assertThat(response.getId()).isEqualTo(postWithFiles.getId());
+            assertThat(response.getFiles()).hasSize(3);
+            assertThat(response.getViewCount()).isEqualTo(1);
+            assertThat(response.isLiked()).isFalse(); // 좋아요 없음
+        }
+
+        @Test
+        @DisplayName("SCENE 12: 정상 케이스 (비회원 조회)")
+        void getPost_Anonymous() {
+            // When: 비회원이 조회
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+
+            // Then: 정상 조회 가능
+            assertThat(response.getId()).isEqualTo(postWithFiles.getId());
+            assertThat(response.getTitle()).isEqualTo("With Files");
+            assertThat(response.getFiles()).hasSize(3);
+            assertThat(response.getViewCount()).isEqualTo(1);
+            assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
+        }
+
+        @Test
+        @DisplayName("SCENE 13: 정상 케이스 (파일 없음)")
+        void getPost_NoFiles() {
+            PostDto.Response response = postService.getPost(null, postNoFiles.getId());
+            assertThat(response.getId()).isEqualTo(postNoFiles.getId());
+            assertThat(response.getFiles()).isEmpty();
+            assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
+        }
+
+        @Test
+        @DisplayName("SCENE 14: 정상 케이스 (PREVIEW 파일 포함 확인)")
+        void getPost_Preview() {
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
+        }
+
+        @Test
+        @DisplayName("SCENE 15: 정상 케이스 (CONTENT 파일만)")
+        void getPost_OnlyContent() {
+            // Given: Create post with content only
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(3).getId(), MediaRole.CONTENT, 0)
+            );
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder()
+                    .title("C").content("C").category(Category.SPORT).files(files).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            flushAndClear();
+
+            // When
+            PostDto.Response response = postService.getPost(null, res.getId());
+
+            // Then
+            assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.CONTENT);
+        }
+
+        @Test
+        @DisplayName("SCENE 16: 조회수 증가 확인 (DB 반영 확인)")
+        void getPost_ViewCount() {
+            Long id = postNoFiles.getId();
+
+            // 1st
+            postService.getPost(null, id);
+            flushAndClear();
+
+            // 2nd
+            postService.getPost(null, id);
+            flushAndClear();
+
+            // 3rd
+            postService.getPost(null, id);
+            flushAndClear();
+
+            Post post = postRepository.findById(id).orElseThrow();
+            assertThat(post.getViewCount()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("SCENE 17: 존재하지 않는 Post")
+        void getPost_NotFound() {
+            assertThatThrownBy(() -> postService.getPost(null, 99999L))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 18: isLiked 필드 검증 (좋아요 있음)")
+        void getPost_IsLiked_True() {
+            // Given: UserB가 UserA의 게시글에 좋아요
+            setupMockUser(userB);
+            postLikeRepository.save(PostLike.builder()
+                    .post(postWithFiles)
+                    .user(userB)
+                    .build());
+            flushAndClear();
+
+            // When: UserB가 조회
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+
+            // Then: isLiked가 true
+            assertThat(response.isLiked()).isTrue();
+        }
+
+        @Test
+        @DisplayName("SCENE 19: isLiked 필드 검증 (좋아요 없음)")
+        void getPost_IsLiked_False() {
+            // Given: 좋아요 없음
+            setupMockUser(userB);
+
+            // When: UserB가 조회
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+
+            // Then: isLiked가 false
+            assertThat(response.isLiked()).isFalse();
+        }
+
+        @Test
+        @DisplayName("SCENE 20: isLiked 필드 검증 (비회원)")
+        void getPost_IsLiked_Anonymous() {
+            // When: 비회원이 조회
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+
+            // Then: isLiked가 false
+            assertThat(response.isLiked()).isFalse();
+        }
     }
 
-    @Test
-    @DisplayName("실패: 요청한 파일 ID 중 존재하지 않거나 본인 소유가 아닌 파일이 있으면 실패한다.")
-    void createPost_Fail_FileNotFound() {
-        // given
-        UserPrincipal principal = createUserPrincipal(1L);
-        given(userRepository.findById(1L)).willReturn(Optional.of(User.builder().id(1L).build()));
+    // ========================================================================================
+    // [Category 3]: Update
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 3] Update Post")
+    class Update {
+        private Post post;
 
-        PostDto.Request request = PostDto.Request.builder()
-                .title("Title")
-                .content("Content")
-                .category(Category.IDOL)
-                .files(List.of(new PostDto.AttachedFileRequest(999L, MediaRole.CONTENT, 0)))
-                .build();
+        @BeforeEach
+        void init() {
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.PREVIEW, 0),
+                    new PostDto.AttachedFileRequest(userAFiles.get(1).getId(), MediaRole.CONTENT, 1)
+            );
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder()
+                    .title("Old Title").content("Old Content").category(Category.IDOL).files(files).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            post = postRepository.findById(res.getId()).orElseThrow();
+            flushAndClear();
+        }
 
-        // FileService가 빈 리스트를 반환하거나 예외를 던지도록 설정 (여기선 로직상 빈 리스트 반환 시 Service에서 예외 발생)
-        given(fileService.validateFileOwners(anyList(), any())).willReturn(List.of());
+        @Test
+        @DisplayName("SCENE 17: 정상 케이스 (제목, 내용, 카테고리 수정)")
+        void updatePost_Full() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder()
+                    .title("New Title").content("New Content").category(Category.MUSICIAN).build();
 
-        // when & then
-        assertThatThrownBy(() -> postService.createPost(principal, request))
-                .isInstanceOf(RestException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FILE_NOT_FOUND);
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear(); // Dirty checking sync
+
+            Post updated = postRepository.findById(post.getId()).orElseThrow();
+            assertThat(updated.getTitle()).isEqualTo("New Title");
+            assertThat(updated.getContent()).isEqualTo("New Content");
+            assertThat(updated.getCategory()).isEqualTo(Category.MUSICIAN);
+
+            // Files preserved (files=null in request)
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("SCENE 18~20: 부분 수정 (제목만/내용만/카테고리만)")
+        void updatePost_Partial() {
+            // 18: Title only
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().title("T").build());
+            flushAndClear();
+            assertThat(postRepository.findById(post.getId()).get().getTitle()).isEqualTo("T");
+
+            // 19: Content only
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().content("C").build());
+            flushAndClear();
+            assertThat(postRepository.findById(post.getId()).get().getContent()).isEqualTo("C");
+
+            // 20: Category only
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().category(Category.ANIMATION).build());
+            flushAndClear();
+            assertThat(postRepository.findById(post.getId()).get().getCategory()).isEqualTo(Category.ANIMATION);
+        }
+
+        @Test
+        @DisplayName("SCENE 21: 파일 전체 교체 (PREVIEW 포함)")
+        void updatePost_ReplaceFiles_Preview() {
+            // Given: 기존 파일 매핑 확인
+            List<PostFileMap> originalMaps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(originalMaps).hasSize(2);
+            List<Long> originalFileIds = originalMaps.stream()
+                    .map(map -> map.getFile().getId())
+                    .toList();
+            assertThat(originalFileIds).containsExactlyInAnyOrder(
+                    userAFiles.get(0).getId(), userAFiles.get(1).getId());
+
+            // When: 파일 전체 교체
+            List<PostDto.AttachedFileRequest> newFiles = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(5).getId(), MediaRole.PREVIEW, 0)
+            );
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(newFiles).build();
+
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear(); // [중요] Bulk delete & insert sync
+
+            // Then: 기존 매핑이 삭제되고 새로운 매핑만 존재
+            List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(maps).hasSize(1);
+            assertThat(maps.get(0).getFile().getId()).isEqualTo(userAFiles.get(5).getId());
+            
+            // 기존 파일 ID가 더 이상 매핑에 없는지 확인
+            List<Long> newFileIds = maps.stream()
+                    .map(map -> map.getFile().getId())
+                    .toList();
+            assertThat(newFileIds).doesNotContainAnyElementsOf(originalFileIds);
+
+            // Thumbnail check
+            assertThat(postRepository.findById(post.getId()).get().getThumbnailKey())
+                    .isEqualTo(ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(5).getS3ObjectKey()));
+        }
+
+        @Test
+        @DisplayName("SCENE 22: 파일 전체 교체 (PREVIEW 없음)")
+        void updatePost_ReplaceFiles_NoPreview() {
+            List<PostDto.AttachedFileRequest> newFiles = List.of(
+                    new PostDto.AttachedFileRequest(userAFiles.get(5).getId(), MediaRole.CONTENT, 0)
+            );
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(newFiles).build();
+
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear();
+
+            assertThat(postRepository.findById(post.getId()).get().getThumbnailKey())
+                    .isEqualTo(ThumbnailUtils.getMediumThumbnailKey(userAFiles.get(5).getS3ObjectKey())); // First file used
+        }
+
+        @Test
+        @DisplayName("SCENE 23: 파일 삭제 (빈 리스트)")
+        void updatePost_DeleteFiles() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(Collections.emptyList()).build();
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear();
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).isEmpty();
+            assertThat(postRepository.findById(post.getId()).get().getThumbnailKey()).isNull();
+        }
+
+        @Test
+        @DisplayName("SCENE 24: 파일 유지 (null)")
+        void updatePost_KeepFiles() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().title("U").files(null).build();
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("SCENE 25: 파일 추가 (기존+신규 -> 클라이언트가 전체 리스트를 보내야 함)")
+        void updatePost_AddFiles() {
+            // Given: 기존 파일 매핑 확인
+            List<PostFileMap> originalMaps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(originalMaps).hasSize(2);
+            Long originalFile0Id = userAFiles.get(0).getId();
+            Long originalFile1Id = userAFiles.get(1).getId();
+
+            // When: 기존 파일 + 신규 파일
+            List<PostDto.AttachedFileRequest> files = new ArrayList<>();
+            // Re-send existing
+            files.add(new PostDto.AttachedFileRequest(originalFile0Id, MediaRole.PREVIEW, 0));
+            files.add(new PostDto.AttachedFileRequest(originalFile1Id, MediaRole.CONTENT, 1));
+            // Add new
+            files.add(new PostDto.AttachedFileRequest(userAFiles.get(2).getId(), MediaRole.CONTENT, 2));
+
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().files(files).build();
+            postService.updatePost(UserPrincipal.from(userA), post.getId(), req);
+            flushAndClear();
+
+            // Then: 기존 파일 ID가 유지되고 신규 파일이 추가됨
+            List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
+            assertThat(maps).hasSize(3);
+            
+            List<Long> fileIds = maps.stream()
+                    .map(map -> map.getFile().getId())
+                    .toList();
+            assertThat(fileIds).contains(originalFile0Id); // 기존 파일 유지
+            assertThat(fileIds).contains(originalFile1Id); // 기존 파일 유지
+            assertThat(fileIds).contains(userAFiles.get(2).getId()); // 신규 파일 추가
+            
+            // Sequence 검증
+            assertThat(maps.get(0).getSequence()).isEqualTo(0);
+            assertThat(maps.get(1).getSequence()).isEqualTo(1);
+            assertThat(maps.get(2).getSequence()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("SCENE 26~28: 예외 케이스")
+        void updatePost_Exceptions() {
+            PostDto.UpdateRequest req = PostDto.UpdateRequest.builder().title("Hacked").build();
+
+            // 26: Forbidden
+            assertThatThrownBy(() -> postService.updatePost(UserPrincipal.from(userB), post.getId(), req))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 27: Not Found
+            assertThatThrownBy(() -> postService.updatePost(UserPrincipal.from(userA), 99999L, req))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+
+            // 28: IDOR
+            List<PostDto.AttachedFileRequest> idorFiles = List.of(new PostDto.AttachedFileRequest(userBFiles.get(0).getId(), MediaRole.CONTENT, 0));
+            PostDto.UpdateRequest idorReq = PostDto.UpdateRequest.builder().files(idorFiles).build();
+            assertThatThrownBy(() -> postService.updatePost(UserPrincipal.from(userA), post.getId(), idorReq))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+        }
     }
 
-    @Test
-    @DisplayName("성공: 파일이 없는 경우 썸네일이 null로 설정된다.")
-    void createPost_Thumbnail_Null_When_NoFiles() {
-        // given
-        Long userId = 1L;
-        UserPrincipal principal = createUserPrincipal(userId);
-        User user = User.builder().id(userId).build();
+    // ========================================================================================
+    // [Category 4]: Delete
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 4] Delete Post")
+    class Delete {
+        @Test
+        @DisplayName("SCENE 29: 정상 케이스 (파일 포함)")
+        void deletePost_WithFiles() {
+            // Setup
+            setupMockUser(userA);
+            List<PostDto.AttachedFileRequest> files = List.of(new PostDto.AttachedFileRequest(userAFiles.get(0).getId(), MediaRole.CONTENT, 0));
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Del").content("C").category(Category.SPORT).files(files).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            Long postId = res.getId();
+            flushAndClear();
 
-        PostDto.Request request = PostDto.Request.builder()
-                .title("Test Post")
-                .content("Content")
-                .category(Category.IDOL)
-                .files(null) // 파일 없음
-                .build();
+            // When
+            postService.deletePost(UserPrincipal.from(userA), postId);
+            flushAndClear(); // Bulk delete sync
 
-        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            // Then
+            assertThat(postRepository.existsById(postId)).isFalse();
+            assertThat(postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId)).isEmpty();
+            assertThat(fileRepository.existsById(userAFiles.get(0).getId())).isTrue(); // File itself remains
+        }
 
-        // ArgumentCaptor 설정
-        ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
+        @Test
+        @DisplayName("SCENE 30: 정상 케이스 (파일 없음)")
+        void deletePost_NoFiles() {
+            setupMockUser(userA);
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Del").content("C").category(Category.SPORT).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            Long postId = res.getId();
+            flushAndClear();
 
-        // when
-        postService.createPost(principal, request);
+            postService.deletePost(UserPrincipal.from(userA), postId);
+            flushAndClear();
 
-        // then
-        // 1. Post 저장이 호출되었는가?
-        verify(postRepository).save(postCaptor.capture());
-        Post savedPost = postCaptor.getValue();
-        
-        // 2. [검증 핵심] 파일이 없으면 썸네일이 null로 설정되는지 확인
-        assertThat(savedPost.getThumbnailFile()).isNull();
+            assertThat(postRepository.existsById(postId)).isFalse();
+        }
 
-        // 3. PostFileMap 저장이 호출되지 않았는지 확인
-        verify(postFileMapRepository, never()).saveAll(anyList());
+        @Test
+        @DisplayName("SCENE 31~32: 예외 케이스")
+        void deletePost_Exceptions() {
+            setupMockUser(userA);
+            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Del").content("C").category(Category.SPORT).build();
+            PostDto.Response res = postService.createPost(UserPrincipal.from(userA), req);
+            Long postId = res.getId();
+
+            // 31: Forbidden
+            assertThatThrownBy(() -> postService.deletePost(UserPrincipal.from(userB), postId))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
+
+            // 32: Not Found
+            assertThatThrownBy(() -> postService.deletePost(UserPrincipal.from(userA), 99999L))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+        }
     }
 
-    @Test
-    @DisplayName("성공: 여러 PREVIEW 파일이 있을 때 첫 번째 PREVIEW가 선택된다.")
-    void createPost_Thumbnail_FirstPreview_When_MultiplePreviews() {
-        // given
-        Long userId = 1L;
-        UserPrincipal principal = createUserPrincipal(userId);
-        User user = User.builder().id(userId).build();
+    // ========================================================================================
+    // [Category 5]: Read-Pagination
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category 5] Pagination")
+    class Pagination {
+        @BeforeEach
+        void setUpPosts() {
+            // Create 30 posts mixed categories and scores for testing sorting
+            setupMockUser(userA);
+            for (int i = 1; i <= 30; i++) {
+                Category cat = (i % 2 == 0) ? Category.SPORT : Category.IDOL;
+                Post post = Post.builder()
+                        .user(userA)
+                        .title("Post " + i)
+                        .content("Content")
+                        .category(cat)
+                        .viewCount((long) i) // ID 비례
+                        .likeCount((long) i)
+                        .hotScore(i * 10.0) // Explicit hotScore for sorting test
+                        .build();
+                postRepository.save(post);
+            }
+            flushAndClear();
+        }
 
-        // File 1: PREVIEW 역할 (Seq 0) -> 첫 번째 PREVIEW, 기대 썸네일
-        File filePreview1 = File.builder().id(101L).filePath("preview1.jpg").mediaType(MediaType.IMAGE).createdBy(userId).build();
-        // File 2: PREVIEW 역할 (Seq 1) -> 두 번째 PREVIEW
-        File filePreview2 = File.builder().id(102L).filePath("preview2.jpg").mediaType(MediaType.IMAGE).createdBy(userId).build();
-        // File 3: CONTENT 역할 (Seq 2)
-        File fileContent = File.builder().id(103L).filePath("content.jpg").mediaType(MediaType.IMAGE).createdBy(userId).build();
+        @Test
+        @DisplayName("SCENE 33: 전체 카테고리, 기본 정렬 (최신순)")
+        void getPosts_All_Default() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setPage(0); req.setSize(10); req.setSort("createdAt"); req.setDirection("DESC");
 
-        PostDto.Request request = PostDto.Request.builder()
-                .title("Test Post")
-                .content("Content")
-                .category(Category.IDOL)
-                .files(List.of(
-                        new PostDto.AttachedFileRequest(101L, MediaRole.PREVIEW, 0),
-                        new PostDto.AttachedFileRequest(102L, MediaRole.PREVIEW, 1),
-                        new PostDto.AttachedFileRequest(103L, MediaRole.CONTENT, 2)
-                ))
-                .build();
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
 
-        given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(fileService.validateFileOwners(anyList(), any())).willReturn(List.of(filePreview1, filePreview2, fileContent));
+            assertThat(res.getContent()).hasSize(10);
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30"); // Latest
+            assertThat(res.getTitle()).contains("전체");
+            
+            // 정렬 검증: createdAt DESC (최신순)
+            List<PostDto.PostPageResponse> content = res.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getCreatedAt())
+                        .isAfterOrEqualTo(content.get(i + 1).getCreatedAt());
+            }
+        }
 
-        // Mocking: saveAll이 호출될 때 내부적으로 생성된 PostFileMap 리스트를 그대로 반환하도록 설정
-        given(postFileMapRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+        @Test
+        @DisplayName("SCENE 34: 전체 카테고리, hotScore 정렬")
+        void getPosts_All_Hot() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSort("hotScore"); req.setDirection("DESC");
 
-        // ArgumentCaptor 설정
-        ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
-        ArgumentCaptor<List<PostFileMap>> postFileMapListCaptor = ArgumentCaptor.forClass(List.class);
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
 
-        // when
-        postService.createPost(principal, request);
+            // Post 30 has highest hotScore (300.0)
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30");
+            assertThat(res.getContent().get(9).getTitle()).isEqualTo("Post 21");
+            assertThat(res.getTitle()).contains("핫한");
+            
+            // 정렬 검증: hotScore DESC
+            List<PostDto.PostPageResponse> content = res.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getHotScore())
+                        .isGreaterThanOrEqualTo(content.get(i + 1).getHotScore());
+            }
+        }
 
-        // then
-        // 1. Post 저장이 호출되었는가?
-        verify(postRepository).save(postCaptor.capture());
-        Post savedPost = postCaptor.getValue();
-        
-        // 2. [검증 핵심] 첫 번째 PREVIEW 파일(filePreview1)이 썸네일로 선정되었는지 확인
-        assertThat(savedPost.getThumbnailFile()).isNotNull();
-        assertThat(savedPost.getThumbnailFile().getId()).isEqualTo(101L); // 첫 번째 PREVIEW가 썸네일로 선정됨
-        assertThat(savedPost.getThumbnailFile().getFilePath()).isEqualTo("preview1.jpg");
+        @Test
+        @DisplayName("SCENE 35: 특정 카테고리 (SPORT), 기본 정렬")
+        void getPosts_Category_Default() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setCategory(Category.SPORT);
 
-        // 3. PostFileMap 저장 로직이 수행되었는가?
-        verify(postFileMapRepository).saveAll(postFileMapListCaptor.capture());
-        List<PostFileMap> savedMaps = postFileMapListCaptor.getValue();
-        assertThat(savedMaps).hasSize(3);
-        
-        // PostFileMap 내용 검증
-        assertThat(savedMaps.get(0).getFile().getId()).isEqualTo(101L);
-        assertThat(savedMaps.get(0).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
-        assertThat(savedMaps.get(0).getSequence()).isEqualTo(0);
-        
-        assertThat(savedMaps.get(1).getFile().getId()).isEqualTo(102L);
-        assertThat(savedMaps.get(1).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
-        assertThat(savedMaps.get(1).getSequence()).isEqualTo(1);
-        
-        assertThat(savedMaps.get(2).getFile().getId()).isEqualTo(103L);
-        assertThat(savedMaps.get(2).getMediaRole()).isEqualTo(MediaRole.CONTENT);
-        assertThat(savedMaps.get(2).getSequence()).isEqualTo(2);
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+
+            assertThat(res.getContent()).allMatch(p -> p.getCategory() == Category.SPORT);
+            assertThat(res.getContent()).hasSize(10);
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30"); // Even numbers are SPORT
+        }
+
+        @Test
+        @DisplayName("SCENE 36: 특정 카테고리 (IDOL), hotScore 정렬")
+        void getPosts_Category_Hot() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setCategory(Category.IDOL);
+            req.setSort("hotScore");
+            req.setDirection("DESC");
+
+            PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+
+            assertThat(res.getContent()).allMatch(p -> p.getCategory() == Category.IDOL);
+            assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 29"); // Odd numbers are IDOL (Highest odd is 29)
+            
+            // 정렬 검증: hotScore DESC
+            List<PostDto.PostPageResponse> content = res.getContent();
+            for (int i = 0; i < content.size() - 1; i++) {
+                assertThat(content.get(i).getHotScore())
+                        .isGreaterThanOrEqualTo(content.get(i + 1).getHotScore());
+            }
+        }
+
+        @Test
+        @DisplayName("SCENE 37: 각 카테고리별 조회")
+        void getPosts_EachCategory() {
+            for (Category cat : List.of(Category.SPORT, Category.IDOL)) {
+                PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+                req.setCategory(cat);
+
+                PageDto.PageListResponse<PostDto.PostPageResponse> res = postService.getPosts(req);
+                assertThat(res.getContent()).isNotEmpty();
+                assertThat(res.getContent()).allMatch(p -> p.getCategory() == cat);
+            }
+        }
+
+        @Test
+        @DisplayName("SCENE 38~40: HotScore 정렬 상세")
+        void getPosts_HotScore_Detail() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSort("hotScore");
+            req.setDirection("DESC");
+
+            List<PostDto.PostPageResponse> content = postService.getPosts(req).getContent();
+
+            // Check order: 30, 29, 28...
+            assertThat(content.get(0).getTitle()).isEqualTo("Post 30");
+            assertThat(content.get(1).getTitle()).isEqualTo("Post 29");
+        }
+
+        @Test
+        @DisplayName("SCENE 41~43: 페이지네이션 (첫/중간/끝)")
+        void getPosts_Pagination() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSize(10);
+
+            // 41: First Page
+            req.setPage(0);
+            assertThat(postService.getPosts(req).getContent()).hasSize(10);
+
+            // 42: Middle Page
+            req.setPage(1);
+            assertThat(postService.getPosts(req).getContent()).hasSize(10);
+
+            // 43: Last Page (Total 30 -> 3 pages. Page 2 is last)
+            req.setPage(2);
+            assertThat(postService.getPosts(req).getContent()).hasSize(10);
+
+            req.setPage(3);
+            assertThatThrownBy(() -> postService.getPosts(req))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PAGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("SCENE 44: 페이지 크기 변경")
+        void getPosts_PageSize() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+            req.setSize(20);
+            assertThat(postService.getPosts(req).getContent()).hasSize(20);
+        }
+
+        @Test
+        @DisplayName("SCENE 45~48: Edge Cases")
+        void getPosts_Edge() {
+            PostDto.PostPageRequest req = new PostDto.PostPageRequest();
+
+            // 45: Empty (Delete all first)
+            postRepository.deleteAll();
+            assertThat(postService.getPosts(req).getContent()).isEmpty();
+
+            // 46: Specific category empty
+            req.setCategory(Category.ARTIST);
+            assertThat(postService.getPosts(req).getContent()).isEmpty();
+
+            // 47: Page Out Range
+            req.setCategory(null);
+            req.setPage(100);
+            assertThatThrownBy(() -> postService.getPosts(req)).isInstanceOf(RestException.class);
+        }
     }
 }

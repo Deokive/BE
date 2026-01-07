@@ -1,7 +1,10 @@
 package com.depth.deokive.domain.post.dto;
 
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.post.entity.Repost;
 import com.depth.deokive.domain.post.entity.RepostTab;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -13,12 +16,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class RepostDto {
 
     @Data @NoArgsConstructor
-    @Schema(description = "리포스트 생성 요청")
+    @Schema(name = "RepostCreateRequest", description = "리포스트 생성 요청")
     public static class CreateRequest {
         @NotNull(message = "원본 게시글 ID는 필수입니다.")
         @Schema(description = "원본 게시글 ID", example = "1")
@@ -26,7 +30,7 @@ public class RepostDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "리포스트 제목 수정 요청")
+    @Schema(name = "RepostUpdateRequest", description = "리포스트 제목 수정 요청")
     public static class UpdateRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "변경할 리포스트 제목", example = "수정된 제목")
@@ -34,7 +38,7 @@ public class RepostDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "리포스트 응답")
+    @Schema(name = "RepostResponse", description = "리포스트 응답")
     public static class Response {
         @Schema(description = "리포스트 아이디", example = "1")
         private Long id;
@@ -56,14 +60,14 @@ public class RepostDto {
                     .id(repost.getId())
                     .postId(repost.getPostId())
                     .title(repost.getTitle())
-                    .thumbnailUrl(repost.getThumbnailUrl())
+                    .thumbnailUrl(FileUrlUtils.buildCdnUrl(repost.getThumbnailKey()))
                     .repostTabId(repost.getRepostTab().getId())
                     .build();
         }
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "리포스트 탭 제목 수정 요청")
+    @Schema(name = "RepostUpdateTabRequest", description = "리포스트 탭 제목 수정 요청")
     public static class UpdateTabRequest {
         @NotBlank(message = "탭 제목은 필수입니다.") // update만 있는 이유는 UX 상 탭추가 누르면 기본 이름(ex. 탭이름)이 먼저 생성됨
         @Schema(description = "변경할 탭 제목", example = "내가 좋아하는 게시글")
@@ -71,7 +75,7 @@ public class RepostDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "리포스트 탭 응답")
+    @Schema(name = "RepostTabResponse", description = "리포스트 탭 응답")
     public static class TabResponse {
         @Schema(description = "리포스트 탭 아이디", example = "1")
         private Long id;
@@ -121,6 +125,40 @@ public class RepostDto {
         }
     }
 
+    @Data @NoArgsConstructor
+    @Schema(description = "리포스트 목록 요소 응답 DTO")
+    public static class RepostElementResponse {
+        @Schema(description = "리포스트 아이디", example = "1")
+        private Long id;
+
+        @Schema(description = "원본 게시글 ID", example = "5")
+        private Long postId;
+
+        @Schema(description = "리포스트 제목", example = "제목")
+        private String title;
+
+        @Schema(description = "썸네일 이미지 URL")
+        private String thumbnailUrl;
+
+        @Schema(description = "소속 탭 ID")
+        private Long repostTabId;
+
+        @Schema(description = "생성 시간")
+        private LocalDateTime createdAt;
+
+        @QueryProjection
+        public RepostElementResponse(
+                Long id, Long postId, String title,
+                String thumbnailKey, Long repostTabId, LocalDateTime createdAt) {
+            this.id = id;
+            this.postId = postId;
+            this.title = title;
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
+            this.repostTabId = repostTabId;
+            this.createdAt = createdAt;
+        }
+    }
+
     @Data @Builder @AllArgsConstructor
     @Schema(description = "리포스트 응답 DTO")
     public static class RepostListResponse {
@@ -134,40 +172,20 @@ public class RepostDto {
         private List<TabResponse> tab;
 
         @Schema(description = "리포스트 데이터 목록")
-        private List<Response> content;
+        private List<RepostElementResponse> content;
 
         @Schema(description = "페이지 메타데이터")
-        private PageInfo page;
+        private PageDto.PageInfo page;
 
-        public static RepostListResponse of(String title, Long currentTabId, List<TabResponse> tabs, Page<Response> pageData) {
+        public static RepostListResponse of(
+                String title, Long currentTabId, List<TabResponse> tabs, Page<RepostElementResponse> pageData) {
             return RepostListResponse.builder()
                     .title(title)
                     .tabId(currentTabId)
                     .tab(tabs)
                     .content(pageData.getContent())
-                    .page(new PageInfo(pageData))
+                    .page(new PageDto.PageInfo(pageData))
                     .build();
-        }
-    }
-
-    @Data @AllArgsConstructor
-    public static class PageInfo {
-        private int size;
-        private int pageNumber;
-        private long totalElements;
-        private int totalPages;
-        private boolean hasPrev;
-        private boolean hasNext;
-        private boolean empty;
-
-        public PageInfo(Page<?> page) {
-            this.size = page.getSize();
-            this.pageNumber = page.getNumber();
-            this.totalElements = page.getTotalElements();
-            this.totalPages = page.getTotalPages();
-            this.hasPrev = page.hasPrevious();
-            this.hasNext = page.hasNext();
-            this.empty = page.isEmpty();
         }
     }
 }

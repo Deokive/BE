@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.archive.controller;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.service.ArchiveService;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -24,43 +25,6 @@ public class ArchiveController {
 
     private final ArchiveService archiveService;
 
-    // @GetMapping("/me")
-    // @Operation(summary = "내 아카이브 목록 조회")
-    // public ResponseEntity<ArchiveDto.PageListResponse> getMyArchives(
-    //         @AuthenticationPrincipal UserPrincipal userPrincipal, // 로그인 필수
-    //         @Valid @ModelAttribute ArchiveDto.ArchivePageRequest pageRequest
-    // ) {
-    //     ArchiveDto.PageListResponse response =
-    //             archiveService.getMyArchives(userPrincipal.getUserId(), pageRequest.toPageable());
-    //
-    //     return ResponseEntity.ok(response);
-    // }
-    //
-    // @GetMapping("/friend/{friendId}")
-    // @Operation(summary = "친구 아카이브 목록 조회")
-    // public ResponseEntity<ArchiveDto.PageListResponse> getFriendArchives(
-    //         @AuthenticationPrincipal UserPrincipal userPrincipal, // 로그인 필수
-    //         @PathVariable Long friendId,
-    //         @Valid @ModelAttribute ArchiveDto.ArchivePageRequest pageRequest
-    // ) {
-    //     ArchiveDto.PageListResponse response =
-    //             archiveService.getFriendArchives(userPrincipal.getUserId(), friendId, pageRequest.toPageable());
-    //
-    //     return ResponseEntity.ok(response);
-    // }
-    //
-    // @GetMapping("/hot")
-    // @Operation(summary = "핫피드 목록 조회", description = "핫피드 목록을 조회")
-    // public ResponseEntity<ArchiveDto.PageListResponse> getHotArchives(
-    //         // 비로그인도 가능 -> USerPrincipal 필요 X
-    //         @Valid @ModelAttribute ArchiveDto.ArchivePageRequest pageRequest
-    // ) {
-    //     ArchiveDto.PageListResponse response =
-    //             archiveService.getHotArchives(pageRequest.toPageable());
-    //
-    //     return ResponseEntity.ok(response);
-    // }
-
     @PostMapping
     @Operation(summary = "아카이브 생성", description = "새로운 아카이브를 생성하며, 내부의 하위 도메인 북(다이어리, 갤러리 등)을 자동으로 생성합니다.")
     @ApiResponse(responseCode = "201", description = "생성 성공", content = @Content(schema = @Schema(implementation = ArchiveDto.Response.class)))
@@ -74,6 +38,7 @@ public class ArchiveController {
 
     @GetMapping("/{archiveId}")
     @Operation(summary = "아카이브 상세 조회", description = "아카이브의 기본 정보(제목, 배너, 카운트 등)를 조회합니다. (공개 범위 권한 체크 포함)")
+    @ApiResponse(responseCode = "200", description = "아카이브 조회 성공")
     public ResponseEntity<ArchiveDto.Response> getArchiveDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long archiveId
@@ -83,6 +48,7 @@ public class ArchiveController {
 
     @PatchMapping("/{archiveId}")
     @Operation(summary = "아카이브 정보 수정", description = "제목, 공개 범위, 배너 이미지를 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "아카이브 수정 성공")
     public ResponseEntity<ArchiveDto.Response> updateArchive(
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long archiveId,
@@ -102,39 +68,18 @@ public class ArchiveController {
         return ResponseEntity.noContent().build();
     }
 
-    // 1. [전역] 피드 & 핫피드 조회
-    // @GetMapping
-    // @Operation(summary = "아카이브 피드 조회 (전체공개)", description = "sort=HOT이면 핫피드, sort=LATEST면 일반 피드입니다.")
-    // public ResponseEntity<ArchiveDto.PageListResponse> getGlobalFeed(
-    //         @ModelAttribute @Valid ArchiveDto.FeedRequest request
-    // ) {
-    //     return ResponseEntity.ok(archiveService.getGlobalFeed(request));
-    // }
-    //
-    // // 2. [유저] 마이/친구 아카이브 조회 (URL 패턴 변경)
-    // @GetMapping("/users/{userId}")
-    // @Operation(summary = "유저별 아카이브 조회 (마이/친구)", description = "특정 유저의 아카이브를 조회합니다. 친구 여부에 따라 비공개글 필터링이 적용됩니다.")
-    // public ResponseEntity<ArchiveDto.PageListResponse> getUserArchives(
-    //         @AuthenticationPrincipal UserPrincipal currentUser,
-    //         @PathVariable Long userId,
-    //         @ModelAttribute @Valid ArchiveDto.FeedRequest request
-    // ) {
-    //     return ResponseEntity.ok(archiveService.getUserArchives(currentUser, userId, request));
-    // }
-
     /**
      * 1. 전역 피드 조회 (메인 페이지)
      * - 용도: '지금 핫한 피드(HOT)', '최신 아카이브 피드(LATEST)' 조회
      * - 특징: 로그인 여부와 관계없이 PUBLIC 컨텐츠만 조회됨
      */
     @GetMapping("/feed")
-    @Operation(summary = "전역 아카이브 피드 조회", description = "공개 아카이브를 조회합니다. (정렬: LATEST, HOT, VIEW, LIKE)")
-    @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = ArchiveDto.PageListResponse.class)))
-    public ResponseEntity<ArchiveDto.PageListResponse> getGlobalFeed(
-            @Valid @ModelAttribute ArchiveDto.FeedRequest request
+    @Operation(summary = "전역 아카이브 피드 조회", description = "공개 아카이브를 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<ArchiveDto.ArchivePageResponse>> getGlobalFeed(
+            @Valid @ModelAttribute ArchiveDto.ArchivePageRequest request
     ) {
-        ArchiveDto.PageListResponse response = archiveService.getGlobalFeed(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(archiveService.getGlobalFeed(request));
     }
 
     /**
@@ -143,14 +88,13 @@ public class ArchiveController {
      * - 특징: PathVariable로 대상 유저를 지정하며, 로그인한 유저(UserPrincipal)와의 관계에 따라 공개 범위가 자동 필터링됨.
      */
     @GetMapping("/users/{userId}")
-    @Operation(summary = "유저별 아카이브 목록 조회", description = "특정 유저의 아카이브 목록을 조회합니다. (본인: 전체, 친구: 친구공개+전체, 타인: 전체공개)")
-    @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = ArchiveDto.PageListResponse.class)))
-    public ResponseEntity<ArchiveDto.PageListResponse> getUserArchives(
+    @Operation(summary = "유저별 아카이브 목록 조회", description = "특정 유저의 아카이브 목록을 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<ArchiveDto.ArchivePageResponse>> getUserArchives(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal currentUser,
             @Parameter(description = "조회할 대상 유저 ID", example = "1") @PathVariable Long userId,
-            @Valid @ModelAttribute ArchiveDto.FeedRequest request
+            @Valid @ModelAttribute ArchiveDto.ArchivePageRequest request
     ) {
-        ArchiveDto.PageListResponse response = archiveService.getUserArchives(currentUser, userId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(archiveService.getUserArchives(currentUser, userId, request));
     }
 }

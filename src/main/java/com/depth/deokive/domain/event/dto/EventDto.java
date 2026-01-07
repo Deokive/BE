@@ -4,6 +4,7 @@ import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.event.entity.Event;
 import com.depth.deokive.domain.event.entity.SportRecord;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -21,8 +22,8 @@ import java.util.List;
 public class EventDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "이벤트 생성/수정 요청")
-    public static class Request {
+    @Schema(name = "EventCreateRequest", description = "이벤트 생성 요청")
+    public static class CreateRequest {
         @NotBlank(message = "일정 이름은 필수입니다.")
         @Schema(description = "이벤트 제목", example = "콘서트 관람")
         private String title;
@@ -44,6 +45,7 @@ public class EventDto {
         private String color;
 
         @Builder.Default
+        @JsonProperty("isSportType")
         @Schema(description = "스포츠 타입 여부", example = "false")
         private Boolean isSportType = false;
 
@@ -66,7 +68,37 @@ public class EventDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "스포츠 경기 정보 요청 DTO")
+    @Schema(name = "EventUpdateRequest", description = "이벤트 수정 요청")
+    public static class UpdateRequest {
+        @Schema(description = "변경할 제목", example = "변경할 제목")
+        private String title;
+
+        @Schema(description = "변경할 날짜", example = "변경할 날짜")
+        private LocalDate date;
+
+        @Schema(description = "변경할 시간", example = "변경할 시간")
+        private LocalTime time;
+
+        @Schema(description = "시간 설정 여부 변경", example = "시간 설정 여부 변경")
+        private Boolean hasTime;
+
+        @Schema(description = "변경할 색상", example = "변경할 색상")
+        @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "올바른 HEX 컬러 코드가 아닙니다.")
+        private String color;
+
+        @JsonProperty("isSportType")
+        @Schema(description = "스포츠 타입 변경", example = "스포츠 타입 변경")
+        private Boolean isSportType;
+
+        @Schema(description = "스포츠 정보 변경 (isSportType이 true일 때만 유효)", example = "스포츠 정보 변경")
+        private SportRequest sportInfo;
+
+        @Schema(description = "해시태그 변경 (빈 리스트일 경우 삭제)", example = "해시태그 변경")
+        private List<String> hashtags;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "EventSportRequest", description = "스포츠 경기 정보 요청 DTO")
     public static class SportRequest {
         @Schema(description = "팀 1 이름", example = "한화 이글스")
         private String team1;
@@ -92,7 +124,7 @@ public class EventDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "이벤트 상세 응답")
+    @Schema(name = "EventResponse", description = "이벤트 상세 응답")
     public static class Response {
         @Schema(description = "이벤트 아이디", example = "1")
         private Long id;
@@ -114,6 +146,7 @@ public class EventDto {
         @Schema(description = "이벤트 색상 코드", example = "#FF5733")
         private String color;
         
+        @JsonProperty("isSportType")
         @Schema(description = "스포츠 타입 여부", example = "false")
         private boolean isSportType;
 
@@ -139,7 +172,7 @@ public class EventDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "스포츠 경기 정보 응답 DTO")
+    @Schema(name = "EventSportResponse", description = "스포츠 경기 정보 응답 DTO")
     public static class SportResponse {
         @Schema(description = "팀 1 이름", example = "한화 이글스")
         private String team1;

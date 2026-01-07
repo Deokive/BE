@@ -1,9 +1,11 @@
 package com.depth.deokive.domain.archive.service;
 
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.util.FileUrlUtils;
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.file.service.FileService;
-import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
-import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
@@ -14,27 +16,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.depth.deokive.domain.archive.entity.*;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.domain.archive.repository.*;
 import com.depth.deokive.domain.diary.entity.DiaryBook;
-import com.depth.deokive.domain.diary.repository.DiaryBookRepository;
 import com.depth.deokive.domain.diary.repository.DiaryFileMapRepository;
 import com.depth.deokive.domain.diary.repository.DiaryRepository;
 import com.depth.deokive.domain.event.repository.EventHashtagMapRepository;
 import com.depth.deokive.domain.event.repository.EventRepository;
 import com.depth.deokive.domain.event.repository.SportRecordRepository;
 import com.depth.deokive.domain.file.entity.File;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.gallery.entity.GalleryBook;
-import com.depth.deokive.domain.gallery.repository.GalleryBookRepository;
 import com.depth.deokive.domain.gallery.repository.GalleryRepository;
 import com.depth.deokive.domain.post.entity.RepostBook;
-import com.depth.deokive.domain.post.repository.RepostBookRepository;
 import com.depth.deokive.domain.post.repository.RepostRepository;
 import com.depth.deokive.domain.post.repository.RepostTabRepository;
 import com.depth.deokive.domain.sticker.repository.StickerRepository;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
-import com.depth.deokive.domain.ticket.repository.TicketBookRepository;
 import com.depth.deokive.domain.ticket.repository.TicketRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -48,21 +45,14 @@ import java.util.List;
 public class ArchiveService {
 
     private final FileService fileService;
+    private final ArchiveGuard archiveGuard;
 
     private final ArchiveQueryRepository archiveQueryRepository;
-    private final FriendMapRepository friendMapRepository;
 
     // --- Core Repositories ---
     private final ArchiveRepository archiveRepository;
     private final ArchiveLikeRepository likeRepository;
-    private final FileRepository fileRepository;
     private final UserRepository userRepository;
-
-    // --- Sub-Domain Book Repositories ---
-    private final DiaryBookRepository diaryBookRepository;
-    private final GalleryBookRepository galleryBookRepository;
-    private final TicketBookRepository ticketBookRepository;
-    private final RepostBookRepository repostBookRepository;
 
     // --- Sub-Domain Content Repositories (For Bulk Delete) ---
     private final EventRepository eventRepository;
@@ -96,7 +86,7 @@ public class ArchiveService {
         // SEQ 3. Banner 파일 연결 (기존에서 순서를 변경 -> 추후 IDOR 취약점 방지 처리 로직 넣을거임)
         if (request.getBannerImageId() != null) {
             File bannerFile = fileService.validateFileOwner(request.getBannerImageId(), foundUser.getId());
-            archive.updateBanner(bannerFile);
+            archive.updateBanner(bannerFile); // 여기서 자동으로 썸네일도 업데이트 될거임 ㅇㅇ
         }
 
         // SEQ 4. Sub Domain Books 생성 및 연결 (Cascade 준비)
@@ -108,7 +98,7 @@ public class ArchiveService {
 
         // SEQ 6. Response
         String bannerUrl = (archive.getBannerFile() != null)
-                ? archive.getBannerFile().getFilePath()
+                ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
                 : null;
 
         // p: archive, bannerUrl, viewCount, likeCount, isLiked, isOwner
@@ -121,19 +111,21 @@ public class ArchiveService {
         Archive archive = archiveRepository.findByIdWithUser(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        // SEQ 2. Viewer & Owner 판별
+        // SEQ 2. Viewer & Owner 판별 // TODO: Check Arcchive Guard Owner
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         boolean isOwner = archive.getUser().getId().equals(viewerId);
 
         // SEQ 3. 권한 체크 -> 친구면 RESTRICTED 까지, 비회원이면 PUBLIC까지
-        checkVisibility(viewerId, isOwner, archive);
+        archiveGuard.checkArchiveReadPermission(archive, userPrincipal);
 
         // SEQ 4. 조회수 증가 (Dirty Checking)
         archive.increaseViewCount();
 
         // SEQ 5. 데이터 조회 : 좋아요 수, 조회수, isLiked, isOwner, bannerUrl, archive
-        // ArchiveLikeCount likeCountEntity = likeCountRepository.findById(archiveId).orElse(null);
-        String bannerUrl = (archive.getBannerFile() != null) ? archive.getBannerFile().getFilePath() : null;
+        String bannerUrl = (archive.getBannerFile() != null)
+                ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
+                : null;
+
         boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
 
         return ArchiveDto.Response.of(
@@ -153,7 +145,7 @@ public class ArchiveService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 소유자 검증
-        validateOwner(archive, user);
+        archiveGuard.checkOwner(archive.getUser().getId(), user);
 
         // SEQ 3. 기본 정보 수정
         archive.update(request); // 여기서 bannerUrl 은 처리하지 않음
@@ -181,7 +173,7 @@ public class ArchiveService {
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
         // SEQ 2. 소유자 검증
-        validateOwner(archive, user);
+        archiveGuard.checkOwner(archive.getUser().getId(), user);
 
         // SEQ 3. 명시적 Bulk & Cascade 삭제
         // JPA Cascade는 N+1 문제가 발생하므로, JPQL Bulk Delete로 성능 최적화
@@ -223,25 +215,27 @@ public class ArchiveService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getGlobalFeed(ArchiveDto.FeedRequest request) {
+    public PageDto.PageListResponse<ArchiveDto.ArchivePageResponse> getGlobalFeed(ArchiveDto.ArchivePageRequest request) {
         // 무조건 PUBLIC & 전체 유저 대상
-        Page<ArchiveDto.FeedResponse> page = archiveQueryRepository.searchArchiveFeed(
+        Page<ArchiveDto.ArchivePageResponse> page = archiveQueryRepository.searchArchiveFeed(
                 null, // filterUserId
                 List.of(Visibility.PUBLIC),
                 request.toPageable()
         );
 
+        PageUtils.validatePageRange(page);
+
         String title = "hotScore".equals(request.getSort()) ? "지금 핫한 피드" : "최신 아카이브 피드";
 
-        return ArchiveDto.PageListResponse.of(title, page);
+        return PageDto.PageListResponse.of(title, page);
     }
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public ArchiveDto.PageListResponse getUserArchives(
+    public PageDto.PageListResponse<ArchiveDto.ArchivePageResponse> getUserArchives(
             UserPrincipal userPrincipal,
             Long targetUserId,
-            ArchiveDto.FeedRequest request
+            ArchiveDto.ArchivePageRequest request
     ) {
         List<Visibility> visibilities;
         String pageTitle;
@@ -251,9 +245,9 @@ public class ArchiveService {
             visibilities = List.of(Visibility.PUBLIC, Visibility.RESTRICTED, Visibility.PRIVATE);
             pageTitle = "마이 아카이브";
         } else {
-            // 친구 확인 (Stub: 추후 친구 로직 구현 시 대체)
+            // 친구 확인
             Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-            boolean isFriend = isFriendCheck(viewerId, targetUserId);
+            boolean isFriend = archiveGuard.isFriend(viewerId, targetUserId);
             visibilities = isFriend
                     ? List.of(Visibility.PUBLIC, Visibility.RESTRICTED)
                     : List.of(Visibility.PUBLIC);
@@ -265,13 +259,15 @@ public class ArchiveService {
             pageTitle = nickname + "님의 아카이브";
         }
 
-        Page<ArchiveDto.FeedResponse> page = archiveQueryRepository.searchArchiveFeed(
+        Page<ArchiveDto.ArchivePageResponse> page = archiveQueryRepository.searchArchiveFeed(
                 targetUserId,
                 visibilities,
                 request.toPageable()
         );
 
-        return ArchiveDto.PageListResponse.of(pageTitle, page);
+        PageUtils.validatePageRange(page);
+
+        return PageDto.PageListResponse.of(pageTitle, page);
     }
 
     // -------- Helper Methods
@@ -288,40 +284,12 @@ public class ArchiveService {
         archive.setBooks(diary, ticket, gallery, repost);
     }
 
-    private void validateOwner(Archive archive, UserPrincipal user) {
-        if (!archive.getUser().getId().equals(user.getUserId())) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-    }
-
-    // TODO: 다른 도메인과 메서드 규칙 일관성 맞춰둘 것
-    private void checkVisibility(Long viewerId, boolean isOwner, Archive archive) {
-        if (isOwner) return; // 주인은 모든 상태 볼 수 있음
-
-        if (archive.getVisibility() == Visibility.PRIVATE) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
-
-        if (archive.getVisibility() == Visibility.RESTRICTED) {
-            if (!isFriendCheck(viewerId, archive.getUser().getId())) {
-                throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-            }
-        }
-    }
-
-    private boolean isFriendCheck(Long viewerId, Long ownerId) {
-        if (viewerId == null) return false;
-
-        // JPQL 쿼리를 통해 친구 여부 확인
-        return friendMapRepository.existsByUserIdAndFriendIdAndFriendStatus(
-                viewerId,
-                ownerId,
-                FriendStatus.ACCEPTED
-        );
-    }
-
     private String updateBannerImage(Archive archive, Long newFileId, Long userId) {
-        if (newFileId == null) return null;
+        if (newFileId == null) {
+            return archive.getBannerFile() != null
+                    ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
+                    : null;
+        }
 
         if (newFileId == -1L) {
             // 삭제 요청: 기존 파일 연결 해제
@@ -332,7 +300,7 @@ public class ArchiveService {
 
             File newBanner = fileService.validateFileOwner(newFileId, userId);
             archive.updateBanner(newBanner);
-            return newBanner.getFilePath();
+            return FileUrlUtils.buildCdnUrl(newBanner.getS3ObjectKey());
         }
     }
 }

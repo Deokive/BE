@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.post.dto;
 
-import com.depth.deokive.common.util.ThumbnailUtils;
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
@@ -8,6 +9,7 @@ import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -27,8 +29,8 @@ import java.util.stream.Collectors;
 
 public class PostDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "게시글 작성 요청 DTO")
-    public static class Request {
+    @Schema(name = "PostCreateRequest", description = "게시글 작성 요청 DTO")
+    public static class CreateRequest {
         @NotBlank(message = "제목은 필수입니다.")
         @Schema(description = "게시글 제목", example = "짱구는 못말려: 어른 제국의 역습 후기")
         private String title;
@@ -44,7 +46,7 @@ public class PostDto {
         @Schema(description = "첨부된 파일 연결 정보 리스트")
         private List<AttachedFileRequest> files;
 
-        public static Post from(PostDto.Request request, User user) {
+        public static Post from(PostDto.CreateRequest request, User user) {
             return Post.builder()
                     .title(request.getTitle())
                     .content(request.getContent())
@@ -55,7 +57,23 @@ public class PostDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "게시글 정보 응답 DTO")
+    @Schema(name = "PostUpdateRequest", description = "게시글 수정 요청 DTO")
+    public static class UpdateRequest {
+        @Schema(description = "변경할 제목", example = "수정된 제목")
+        private String title;
+
+        @Schema(description = "변경할 본문", example = "수정된 본문 내용")
+        private String content;
+
+        @Schema(description = "변경할 카테고리")
+        private Category category;
+
+        @Schema(description = "변경할 첨부 파일 리스트 (null일 경우 파일 유지, 빈 리스트일 경우 모든 파일 삭제, 값이 있으면 전체 교체)")
+        private List<AttachedFileRequest> files;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "PostResponse", description = "게시글 정보 응답 DTO")
     public static class Response {
         @Schema(description = "게시글 아이디", example = "1")
         private Long id;
@@ -86,6 +104,10 @@ public class PostDto {
 
         @Schema(description = "좋아요 수", example = "25")
         private Long likeCount;
+
+        @JsonProperty("isLiked")
+        @Schema(description = "내가 좋아요 눌렀는지 여부", example = "true")
+        private boolean isLiked;
 
         @Schema(description = "핫 스코어", example = "50.5")
         private Double hotScore;
@@ -123,7 +145,7 @@ public class PostDto {
         """)
         private List<FileDto.UploadFileResponse> files;
 
-        public static Response of(Post post, List<PostFileMap> maps) {
+        public static Response of(Post post, List<PostFileMap> maps, boolean isLiked) {
             return Response.builder()
                     .id(post.getId())
                     .title(post.getTitle())
@@ -135,6 +157,7 @@ public class PostDto {
                     .lastModifiedBy(post.getLastModifiedBy())
                     .viewCount(post.getViewCount())
                     .likeCount(post.getLikeCount())
+                    .isLiked(isLiked)
                     .hotScore(post.getHotScore())
                     .files(toFileResponses(maps))
                     .build();
@@ -149,7 +172,7 @@ public class PostDto {
                     return FileDto.UploadFileResponse.builder()
                         .fileId(file.getId())
                         .filename(file.getFilename())
-                        .cdnUrl(file.getFilePath())
+                        .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
                         .fileSize(file.getFileSize())
                         .mediaType(file.getMediaType().name())
                         .mediaRole(map.getMediaRole())
@@ -176,7 +199,7 @@ public class PostDto {
     // DESCRIPTION: PAGINATION DTOS
     @Data @NoArgsConstructor
     @Schema(description = "게시글 피드 목록 조회 요청 DTO")
-    public static class FeedRequest {
+    public static class PostPageRequest {
         @Min(value = 0)
         @Schema(description = "페이지 번호 (0부터 시작)", example = "0")
         private int page = 0;
@@ -206,8 +229,8 @@ public class PostDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "게시글 피드 응답 DTO (Lightweight)")
-    public static class FeedResponse {
+    @Schema(description = "게시글 응답 DTO (Lightweight)")
+    public static class PostPageResponse {
         @Schema(description = "게시글 ID", example = "1")
         private Long postId;
 
@@ -218,7 +241,7 @@ public class PostDto {
         private Category category;
 
         @Schema(description = "썸네일 URL",
-                example = "https://cdn.example.com/files/thumbnails/thumbnail/thumbnail123.jpg")
+                example = "https://cdn.example.com/files/thumbnails/medium/thumbnail123.jpg")
         private String thumbnailUrl;
 
         @Schema(description = "작성자 닉네임", example = "홍길동")
@@ -240,75 +263,19 @@ public class PostDto {
         private LocalDateTime lastModifiedAt;
 
         @QueryProjection // Q-Class 생성용
-        public FeedResponse(Long postId, String title, Category category, String thumbnailUrl,
+        public PostPageResponse(Long postId, String title, Category category, String thumbnailKey,
                             String writerNickname, Long likeCount, Long viewCount, Double hotScore,
                             LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
             this.postId = postId;
             this.title = title;
             this.category = category;
-            this.thumbnailUrl = ThumbnailUtils.getSmallThumbnailUrl(thumbnailUrl); // TODO: Check isOrigin or realThumbnail
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
             this.writerNickname = writerNickname;
             this.likeCount = likeCount;
             this.viewCount = viewCount;
             this.hotScore = hotScore;
             this.createdAt = createdAt;
             this.lastModifiedAt = lastModifiedAt;
-        }
-    }
-
-    @Data @Builder @AllArgsConstructor
-    @Schema(description = "게시글 피드 페이징 응답 Wrapper")
-    public static class PageListResponse {
-        @Schema(description = "페이지 제목", example = "아이돌 게시판")
-        private String pageTitle;
-        
-        @Schema(description = "게시글 목록")
-        private List<FeedResponse> content;
-        
-        @Schema(description = "페이징 정보")
-        private PageInfo page;
-
-        public static PageListResponse of(String pageTitle, Page<FeedResponse> pageData) {
-            return PageListResponse.builder()
-                    .pageTitle(pageTitle)
-                    .content(pageData.getContent())
-                    .page(new PageInfo(pageData))
-                    .build();
-        }
-    }
-
-    @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "페이징 정보")
-    public static class PageInfo {
-        @Schema(description = "페이지 크기", example = "10")
-        private int size;
-        
-        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
-        private int pageNumber;
-        
-        @Schema(description = "전체 요소 개수", example = "100")
-        private long totalElements;
-        
-        @Schema(description = "전체 페이지 수", example = "10")
-        private int totalPages;
-        
-        @Schema(description = "이전 페이지 존재 여부", example = "false")
-        private boolean hasPrev;
-        
-        @Schema(description = "다음 페이지 존재 여부", example = "true")
-        private boolean hasNext;
-        
-        @Schema(description = "빈 페이지 여부", example = "false")
-        private boolean empty;
-
-        public PageInfo(Page<?> page) {
-            this.size = page.getSize();
-            this.pageNumber = page.getNumber();
-            this.totalElements = page.getTotalElements();
-            this.totalPages = page.getTotalPages();
-            this.hasPrev = page.hasPrevious();
-            this.hasNext = page.hasNext();
-            this.empty = page.isEmpty();
         }
     }
 }

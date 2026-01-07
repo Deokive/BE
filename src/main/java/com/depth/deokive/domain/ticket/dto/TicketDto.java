@@ -1,10 +1,13 @@
 package com.depth.deokive.domain.ticket.dto;
 
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.ticket.entity.Ticket;
 import com.depth.deokive.domain.ticket.entity.TicketBook;
+import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -22,14 +25,14 @@ import java.util.List;
 public class TicketDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 생성/수정 요청 DTO")
-    public static class Request {
+    @Schema(name = "TicketCreateRequest", description = "티켓 생성 요청 DTO")
+    public static class CreateRequest {
         @NotBlank(message = "공연명은 필수입니다.")
         @Schema(description = "공연명", example = "BTS 월드투어 2024")
         private String title;
 
         @NotNull(message = "날짜는 필수입니다.")
-        @Schema(description = "공연 날짜 및 시간", example = "2024-12-25T19:00:00")
+        @Schema(description = "공연 날짜 및 시간", example = "KST DateTime")
         private LocalDateTime date;
 
         @Size(max = 20)
@@ -65,12 +68,48 @@ public class TicketDto {
                     .review(review)
                     .ticketBook(ticketBook)
                     .file(file)
+                    .originalKey(file != null ? file.getS3ObjectKey() : null)
                     .build();
         }
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 상세 응답 DTO")
+    @Schema(name = "TicketUpdateRequest", description = "티켓 수정 요청 DTO (변경할 필드만 전송)")
+    public static class UpdateRequest {
+        @Schema(description = "변경할 공연명", example = "수정된 공연명")
+        private String title;
+
+        @Schema(description = "변경할 공연 날짜")
+        private LocalDateTime date;
+
+        @Size(max = 20)
+        @Schema(description = "변경할 공연 장소")
+        private String location;
+
+        @Size(max = 20)
+        @Schema(description = "변경할 좌석 정보")
+        private String seat;
+
+        @Schema(description = "변경할 출연진 정보")
+        private String casting;
+
+        @Min(0) @Max(5)
+        @Schema(description = "변경할 평점")
+        private Integer score;
+
+        @Size(max = 100)
+        @Schema(description = "변경할 후기")
+        private String review;
+
+        @Schema(description = "변경할 이미지 파일 ID (null이면 기존 유지, 값 있으면 교체)")
+        private Long fileId;
+
+        @Schema(description = "기존 이미지 삭제 여부 (true일 경우 fileId가 null이어도 이미지 삭제)", defaultValue = "false")
+        private Boolean deleteFile;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "TicketResponse", description = "티켓 상세 응답 DTO")
     public static class Response {
         @Schema(description = "티켓 아이디", example = "1")
         private Long id;
@@ -78,7 +117,7 @@ public class TicketDto {
         @Schema(description = "공연명", example = "BTS 월드투어 2024")
         private String title;
         
-        @Schema(description = "공연 날짜 및 시간", example = "2024-12-25T19:00:00")
+        @Schema(description = "공연 날짜 및 시간", example = "KST DateTime")
         private LocalDateTime date;
         
         @Schema(description = "공연 장소", example = "올림픽공원")
@@ -121,14 +160,17 @@ public class TicketDto {
             return FileDto.UploadFileResponse.builder()
                     .fileId(file.getId())
                     .filename(file.getFilename())
-                    .cdnUrl(file.getFilePath())
+                    .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
+                    .fileSize(file.getFileSize())
                     .mediaType(file.getMediaType().name())
+                    .mediaRole(com.depth.deokive.domain.file.entity.enums.MediaRole.PREVIEW)
+                    .sequence(0)
                     .build();
         }
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓북 제목 수정 요청 DTO")
+    @Schema(name = "TicketUpdateBookTitleRequest", description = "티켓북 제목 수정 요청 DTO")
     public static class UpdateBookTitleRequest {
         @NotBlank @Size(max = 50)
         @Schema(description = "변경할 티켓북 제목", example = "2024년 콘서트 티켓 모음")
@@ -136,7 +178,7 @@ public class TicketDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "티켓북 제목 수정 성공 응답 DTO")
+    @Schema(name = "TicketUpdateBookTitleResponse", description = "티켓북 제목 수정 성공 응답 DTO")
     public static class UpdateBookTitleResponse {
         @Schema(description = "수정된 티켓북 ID", example = "1")
         private Long ticketBookId;
@@ -146,15 +188,15 @@ public class TicketDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "티켓 목록 요소 응답 DTO", name = "TicketElementResponse")
-    public static class TicketElementResponse {
+    @Schema(description = "티켓 목록 요소 응답 DTO", name = "TicketPageResponse")
+    public static class TicketPageResponse {
         @Schema(description = "티켓 아이디", example = "10")
         private Long id;
 
         @Schema(description = "티켓 타이틀", example = "티켓 타이틀입니다.")
         private String title;
 
-        @Schema(description = "썸네일 URL (동적 생성됨)", example = "https://cdn.../thumbnails/small/...")
+        @Schema(description = "썸네일 URL (동적 생성됨)", example = "https://cdn.../thumbnails/medium/...")
         private String thumbnail;
 
         @Schema(description = "공연 날짜", example = "2024-12-25T19:00:00")
@@ -175,48 +217,26 @@ public class TicketDto {
         @Schema(description = "수정 시간")
         private LocalDateTime lastModifiedAt;
 
-        @Builder
-        public TicketElementResponse(Ticket ticket) {
-            this.id = ticket.getId();
-            this.title = ticket.getTitle();
-            this.date = ticket.getDate();
-            this.seat = ticket.getSeat();
-            this.location = ticket.getLocation();
-            this.createdAt = ticket.getCreatedAt();
-            this.lastModifiedAt = ticket.getLastModifiedAt();
-
-            if (ticket.getFile() != null) {
-                this.thumbnail = ThumbnailUtils.getSmallThumbnailUrl(ticket.getFile().getFilePath());
-            }
-
-            this.casting = truncateCasting(ticket.getCasting());
+        @QueryProjection
+        public TicketPageResponse(Long id, String title, LocalDateTime date,
+                                  String seat, String location, String casting,
+                                  LocalDateTime createdAt, LocalDateTime lastModifiedAt,
+                                  String originalKey) {
+            this.id = id;
+            this.title = title;
+            this.date = date;
+            this.seat = seat;
+            this.location = location;
+            this.casting = truncateCasting(casting);
+            this.createdAt = createdAt;
+            this.lastModifiedAt = lastModifiedAt;
+            this.thumbnail = FileUrlUtils.buildCdnUrl(ThumbnailUtils.getMediumThumbnailKey(originalKey));
         }
 
         private String truncateCasting(String original) {
             if (original == null) return null;
             if (original.length() <= 10) return original;
             return original.substring(0, 10) + "...";
-        }
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "티켓 목록 페이징 응답 DTO", name = "TicketPageListResponse")
-    public static class PageListResponse {
-        @Schema(description = "티켓북 타이틀", example = "티켓북 타이틀입니다")
-        private String title;
-
-        @Schema(description = "티켓 목록", type = "array", implementation = TicketElementResponse.class)
-        private List<TicketElementResponse> content;
-
-        @Schema(description = "페이지 메타데이터")
-        private PageInfo page;
-
-        public static PageListResponse of(String title, Page<TicketElementResponse> pageData) {
-            return PageListResponse.builder()
-                    .title(title)
-                    .content(pageData.getContent())
-                    .page(new PageInfo(pageData))
-                    .build();
         }
     }
 
@@ -243,61 +263,6 @@ public class TicketDto {
         public Pageable toPageable() {
             Sort.Direction sortDirection = Sort.Direction.fromString(direction.toUpperCase());
             return PageRequest.of(page, size, sortDirection, sort);
-        }
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Schema(description = "페이지 정보 메타데이터 DTO")
-    public static class PageInfo {
-        @Schema(description = "페이지 크기", example = "10")
-        private int size;
-
-        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
-        private int pageNumber;
-
-        @Schema(description = "전체 요소 개수", example = "100")
-        private long totalElements;
-
-        @Schema(description = "전체 페이지 수", example = "10")
-        private int totalPages;
-
-        @Schema(description = "이전 페이지 존재 여부", example = "false")
-        private boolean hasPrev;
-
-        @Schema(description = "다음 페이지 존재 여부", example = "true")
-        private boolean hasNext;
-
-        @Schema(description = "빈 페이지 여부", example = "false")
-        private boolean empty;
-
-        @Schema(description = "정렬 기준 여부", example = "createdAt")
-        private String sort;
-
-        @Schema(description = "정렬 순서 여부", example = "DESC")
-        private String direction;
-
-        public PageInfo(Page<?> page) {
-            this.size = page.getSize();
-            this.pageNumber = page.getNumber();
-            this.totalElements = page.getTotalElements();
-            this.totalPages = page.getTotalPages();
-            this.hasPrev = page.hasPrevious();
-            this.hasNext = page.hasNext();
-            this.empty = page.isEmpty();
-
-            // Sort 정보 추출 (첫 번째 정렬 기준만 사용)
-            if (page.getSort().isSorted()) {
-                Sort.Order order = page.getSort().stream().findFirst().orElse(null);
-                if (order != null) {
-                    this.sort = order.getProperty();
-                    this.direction = order.getDirection().name().toLowerCase();
-                }
-            } else {
-                this.sort = "createdAt";
-                this.direction = "desc";
-            }
         }
     }
 }

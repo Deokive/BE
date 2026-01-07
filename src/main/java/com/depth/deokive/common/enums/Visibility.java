@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.archive.entity.enums;
+package com.depth.deokive.common.enums;
 
 public enum Visibility {
     PUBLIC, // 공개

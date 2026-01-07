@@ -1,13 +1,16 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.util.PageUtils;
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
+import com.depth.deokive.domain.post.repository.PostLikeRepository;
 import com.depth.deokive.domain.post.repository.PostQueryRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.user.entity.User;
@@ -36,28 +39,29 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final PostFileMapRepository postFileMapRepository;
+    private final PostLikeRepository postLikeRepository;
     private final FileService fileService;
     private final PostQueryRepository postQueryRepository;
 
     @Transactional
-    public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.Request request) {
+    public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
         // SEQ 1. 작성자 조회
         User foundUser = userRepository.findById(userPrincipal.getUserId())
                 .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
 
         // SEQ 2. 게시글 저장
-        Post post = PostDto.Request.from(request, foundUser);
+        Post post = PostDto.CreateRequest.from(request, foundUser);
         postRepository.save(post);
 
         // SEQ 3. 파일 연결
         List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 4. Response
-        return PostDto.Response.of(post, maps);
+        // SEQ 4. Response (생성 시점에는 좋아요 없음)
+        return PostDto.Response.of(post, maps, false);
     }
 
-    @Transactional(readOnly=true)
-    public PostDto.Response getPost(Long postId) {
+    @Transactional
+    public PostDto.Response getPost(UserPrincipal userPrincipal, Long postId) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
@@ -65,15 +69,19 @@ public class PostService {
         // SEQ 2. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
 
-        // SEQ 4. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
+        // SEQ 3. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
         post.increaseViewCount();
 
+        // SEQ 4. 좋아요 여부 조회
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        boolean isLiked = (viewerId != null) && postLikeRepository.existsByPostIdAndUserId(postId, viewerId);
+
         // SEQ 5. Return
-        return PostDto.Response.of(post, maps);
+        return PostDto.Response.of(post, maps, isLiked);
     }
 
     @Transactional
-    public PostDto.Response updatePost(UserPrincipal userPrincipal, Long postId, PostDto.Request request) {
+    public PostDto.Response updatePost(UserPrincipal userPrincipal, Long postId, PostDto.UpdateRequest request) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
@@ -85,11 +93,23 @@ public class PostService {
         post.update(request);
 
         // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
-        postFileMapRepository.deleteAllByPostId(post.getId());
-        List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
+        List<PostFileMap> maps;
+
+        // request.getFiles()가 null이면 파일 변경 없음.
+        // 빈 리스트([])가 오면 모든 파일 삭제, 값이 있으면 교체.
+        if (request.getFiles() != null) {
+            postFileMapRepository.deleteAllByPostId(post.getId());
+            maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
+        } else {
+            // 변경사항 없으면 기존 매핑 조회하여 반환
+            maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
+        }
+
+        // SEQ 5. 좋아요 여부 조회
+        boolean isLiked = postLikeRepository.existsByPostIdAndUserId(postId, userPrincipal.getUserId());
 
         // SEQ 6. Return
-        return PostDto.Response.of(post, maps);
+        return PostDto.Response.of(post, maps, isLiked);
     }
 
     @Transactional
@@ -105,24 +125,29 @@ public class PostService {
         // SEQ 3. 파일 매핑 해제: Cascade.REMOVE 의 N+1 문제 및 성능 이슈 -> 명시적 삭제: Bulk 처리 (Using JPQL)
         postFileMapRepository.deleteAllByPostId(postId);
 
-        // SEQ 4. 게시글 삭제
+        // SEQ 4. 좋아요 삭제
+        postLikeRepository.deleteByPostId(postId);
+
+        // SEQ 5. 게시글 삭제
         postRepository.delete(post);
     }
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public PostDto.PageListResponse getPosts(PostDto.FeedRequest request) {
-        // TODO: Check -> QueryDSL을 사용한 No-Offset Optimization (Category Filter 적용)
-        Page<PostDto.FeedResponse> page = postQueryRepository.searchPostFeed(
+    public PageDto.PageListResponse<PostDto.PostPageResponse> getPosts(PostDto.PostPageRequest request) {
+        Page<PostDto.PostPageResponse> page = postQueryRepository.searchPostFeed(
                 request.getCategory(),
                 request.toPageable()
         );
 
-        String title = (request.getCategory() != null)
-                ? request.getCategory().name() + " 게시판"
-                : "전체 게시판";
+        PageUtils.validatePageRange(page);
 
-        return PostDto.PageListResponse.of(title, page);
+        String title;
+        if ("hotScore".equals(request.getSort())) { title = "핫한 게시판"; }
+        else if (request.getCategory() == null) { title = "전체 게시판"; }
+        else { title = request.getCategory().name() + " 게시판"; }
+
+        return PageDto.PageListResponse.of(title, page);
     }
 
     // ------ Helper Methods -------
@@ -143,6 +168,11 @@ public class PostService {
         List<Long> fileIds = fileRequests.stream()
                 .map(PostDto.AttachedFileRequest::getFileId)
                 .collect(Collectors.toList());
+
+        long uniqueCount = fileIds.stream().distinct().count();
+        if (fileIds.size() != uniqueCount) {
+            throw new RestException(ErrorCode.FILE_NOT_FOUND);
+        }
 
         // SEQ 3. File Entity Bulk Fetch
         List<File> files = fileService.validateFileOwners(fileIds, userId);
@@ -175,16 +205,17 @@ public class PostService {
         // SEQ 8. 대표 썸네일 선정 로직
         // 1순위: MediaRole.PREVIEW
         // 2순위: Sequence (0번)
-        File thumbnailCandidate = savedMaps.stream()
+        String originalKey = savedMaps.stream()
                 .filter(map -> map.getMediaRole() == MediaRole.PREVIEW)
                 .findFirst()
-                .map(PostFileMap::getFile)
+                .map(map -> map.getFile().getS3ObjectKey())
                 .orElseGet(() -> savedMaps.stream()
                         .min(Comparator.comparingInt(PostFileMap::getSequence))
-                        .map(PostFileMap::getFile)
+                        .map(map -> map.getFile().getS3ObjectKey())
                         .orElse(null));
 
-        post.updateThumbnail(thumbnailCandidate); // Post 엔티티에 역정규화 저장
+        // 2. 썸네일 Key로 변환 후 저장
+        post.updateThumbnail(ThumbnailUtils.getMediumThumbnailKey(originalKey));
 
         return savedMaps;
     }

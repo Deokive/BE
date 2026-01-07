@@ -15,7 +15,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e " +
             "LEFT JOIN FETCH e.sportRecord " +
             "WHERE e.archive.id = :archiveId " +
-            "AND e.date BETWEEN :start AND :end " +
+            "AND e.date >= :start AND e.date < :end " +
             "ORDER BY e.date ASC")
     List<Event> findAllByArchiveAndDateRange(
             @Param("archiveId") Long archiveId,

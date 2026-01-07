@@ -1,9 +1,11 @@
 package com.depth.deokive.domain.gallery.service;
 
+import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.file.entity.File;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.entity.Gallery;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GalleryService {
 
+    private final ArchiveGuard archiveGuard;
     private final GalleryQueryRepository galleryQueryRepository;
     private final GalleryBookRepository galleryBookRepository;
     private final ArchiveRepository archiveRepository;
@@ -36,14 +39,18 @@ public class GalleryService {
 
     @ExecutionTime
     @Transactional(readOnly = true)
-    public GalleryDto.PageListResponse getGalleries(Long archiveId, Pageable pageable) {
+    public PageDto.PageListResponse<GalleryDto.Response> getGalleries(UserPrincipal userPrincipal, Long archiveId, Pageable pageable) {
 
-        String galleryBookTitle = galleryBookRepository.findTitleByArchiveId(archiveId)
+        GalleryBook galleryBook = galleryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+
+        archiveGuard.checkArchiveReadPermission(galleryBook.getArchive(), userPrincipal);
 
         Page<GalleryDto.Response> page = galleryQueryRepository.searchGalleriesByArchive(archiveId, pageable);
 
-        return GalleryDto.PageListResponse.of(galleryBookTitle, page);
+        PageUtils.validatePageRange(page);
+
+        return PageDto.PageListResponse.of(galleryBook.getTitle(), page);
     }
 
     @Transactional
@@ -55,7 +62,7 @@ public class GalleryService {
         GalleryBook galleryBook = galleryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        validateOwner(galleryBook.getArchive().getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(galleryBook.getArchive().getUser().getId(), userPrincipal);
 
         List<File> files = fileService.validateFileOwners(request.getFileIds(), userPrincipal.getUserId());
 
@@ -68,6 +75,7 @@ public class GalleryService {
                         .archiveId(archiveId)
                         .galleryBook(galleryBook)
                         .file(file)
+                        .originalKey(file.getS3ObjectKey())
                         .build())
                 .collect(Collectors.toList());
 
@@ -88,7 +96,7 @@ public class GalleryService {
         GalleryBook galleryBook = galleryBookRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        validateOwner(galleryBook.getArchive().getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(galleryBook.getArchive().getUser().getId(), userPrincipal);
 
         galleryBook.updateTitle(request.getTitle());
 
@@ -103,14 +111,7 @@ public class GalleryService {
         Archive archive = archiveRepository.findById(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        validateOwner(archive.getUser().getId(), userPrincipal);
+        archiveGuard.checkOwner(archive.getUser().getId(), userPrincipal);
         galleryRepository.deleteByIdsAndArchiveId(request.getGalleryIds(), archiveId);
-    }
-
-    // Helper Methods
-    private void validateOwner(Long ownerId, UserPrincipal userPrincipal) {
-        if (!ownerId.equals(userPrincipal.getUserId())) {
-            throw new RestException(ErrorCode.AUTH_FORBIDDEN);
-        }
     }
 }

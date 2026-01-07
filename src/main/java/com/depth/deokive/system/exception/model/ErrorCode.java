@@ -41,8 +41,8 @@ public enum ErrorCode {
     // USER
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER NOT FOUND", "존재하지 않는 사용자입니다."),
     USER_USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER USERNAME ALREADY EXISTS", "중복되는 아이디입니다."),
-    // USER_NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER NICKNAME ALREADY EXISTS", "중복되는 닉네임입니다."),
     USER_EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER EMAIL ALREADY EXISTS", "중복되는 이메일입니다."),
+    USER_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "USER UNAUTHORIZED", "인증되지 않은 유저입니다."),
 
     // REDIS Errors
     REDIS_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "REDIS_CONNECTION_FAILED", "Redis 서버에 연결할 수 없습니다."),
@@ -81,6 +81,9 @@ public enum ErrorCode {
     REPOST_TAB_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB DELETE FAILED", "리포스트 탭 삭제에 실패했습니다."),
     REPOST_TAB_LIMIT_EXCEED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB LIMIT EXCEED", "가능한 리포스트 탭 갯수를 초과했습니다."),
     REPOST_TAB_AND_POST_DUPLICATED(HttpStatus.CONFLICT, "REPOST_TAB_AND_POST_DUPLICATED", "중복된 리포스트입니다."),
+
+    // PAGE Errors
+    PAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "PAGE NOT FOUND", "존재하지 않는 페이지입니다."),
 
     // ARCHIVE Errors
     ARCHIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "ARCHIVE_NOT_FOUND", "존재하지 않는 아카이브입니다."),

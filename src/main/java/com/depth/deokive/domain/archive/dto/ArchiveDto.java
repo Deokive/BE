@@ -1,8 +1,9 @@
 package com.depth.deokive.domain.archive.dto;
 
-import com.depth.deokive.common.util.ThumbnailUtils;
+import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.common.enums.Visibility;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -15,18 +16,16 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 public class ArchiveDto {
 
     @Data @NoArgsConstructor
-    @Schema(description = "아카이브 생성 요청")
+    @Schema(name = "ArchiveCreateRequest", description = "아카이브 생성 요청")
     public static class CreateRequest {
         @NotBlank(message = "아카이브 제목은 필수입니다.")
         @Schema(description = "아카이브 제목", example = "나의 첫 아카이브")
@@ -41,7 +40,7 @@ public class ArchiveDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "아카이브 수정 요청")
+    @Schema(name = "ArchiveUpdateRequest", description = "아카이브 수정 요청")
     public static class UpdateRequest {
         @Schema(description = "아카이브 제목", example = "수정된 아카이브 제목")
         private String title;
@@ -54,7 +53,7 @@ public class ArchiveDto {
     }
 
     @Data @Builder @AllArgsConstructor
-    @Schema(description = "아카이브 응답 (피드/상세 공용)")
+    @Schema(name = "ArchiveResponse", description = "아카이브 응답 (피드/상세 공용)")
     public static class Response {
         @Schema(description = "아카이브 아이디", example = "1")
         private Long id;
@@ -83,9 +82,11 @@ public class ArchiveDto {
         @Schema(description = "생성 시간", example = "KST Datetime")
         private LocalDateTime createdAt; // 이게 day-N 데이터가 될거임
 
+        @JsonProperty("isLiked")
         @Schema(description = "내가 좋아요 눌렀는지 여부", example = "true")
         private boolean isLiked;
 
+        @JsonProperty("isOwner")
         @Schema(description = "내가 주인인지 여부", example = "true")
         private boolean isOwner;
 
@@ -108,7 +109,7 @@ public class ArchiveDto {
 
     @Data @NoArgsConstructor
     @Schema(description = "아카이브 피드 목록 조회 요청 DTO")
-    public static class FeedRequest { // TODO: 나중에 FeedPageRequest 로 바꾸자
+    public static class ArchivePageRequest {
         @Min(value = 0, message = "페이지 번호는 0 이상이어야 합니다.")
         @Schema(description = "페이지 번호 (0부터 시작)", example = "0", defaultValue = "0")
         private int page = 0;
@@ -134,16 +135,16 @@ public class ArchiveDto {
     }
 
     @Data @NoArgsConstructor
-    @Schema(description = "아카이브 피드 목록 조회용 경량 DTO") // ✅ 최적화된 DTO
-    public static class FeedResponse { // TODO: 나중에 FeedResponse 로 바꾸자
+    @Schema(description = "아카이브 피드 목록 조회용 경량 DTO")
+    public static class ArchivePageResponse {
         @Schema(description = "아카이브 아이디", example = "1")
         private Long archiveId;
         
         @Schema(description = "아카이브 제목", example = "나의 첫 아카이브")
         private String title;
         
-        @Schema(description = "배너 이미지 URL", example = "https://cdn.example.com/files/banner.jpg")
-        private String bannerUrl;
+        @Schema(description = "배너 썸네일 이미지 URL", example = "https://cdn.example.com/files/thumbnails/medium/banner.jpg")
+        private String thumbnailUrl;
         
         @Schema(description = "조회수", example = "150")
         private Long viewCount;
@@ -167,12 +168,12 @@ public class ArchiveDto {
         private String ownerNickname;
 
         @QueryProjection // Q-Class 재생성 필요
-        public FeedResponse(Long archiveId, String title, String bannerUrl,
-                            Long viewCount, Long likeCount, Double hotScore, Visibility visibility,
-                            LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
+        public ArchivePageResponse(Long archiveId, String title, String thumbnailKey,
+                                   Long viewCount, Long likeCount, Double hotScore, Visibility visibility,
+                                   LocalDateTime createdAt, LocalDateTime lastModifiedAt, String ownerNickname) {
             this.archiveId = archiveId;
             this.title = title;
-            this.bannerUrl = ThumbnailUtils.getSmallThumbnailUrl(bannerUrl); // 동적 변환
+            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
             this.viewCount = viewCount;
             this.likeCount = likeCount;
             this.hotScore = hotScore;
@@ -180,62 +181,6 @@ public class ArchiveDto {
             this.createdAt = createdAt;
             this.lastModifiedAt = lastModifiedAt;
             this.ownerNickname = ownerNickname;
-        }
-    }
-
-    @Data @Builder @AllArgsConstructor
-    @Schema(description = "아카이브 피드 목록 페이징 응답 DTO")
-    public static class PageListResponse {
-        @Schema(description = "페이지 제목", example = "전체 피드")
-        private String pageTitle;
-
-        @Schema(description = "아카이브 피드 목록")
-        private List<FeedResponse> content;
-        
-        @Schema(description = "페이지 메타데이터")
-        private PageInfo page;
-
-        public static PageListResponse of(String pageTitle, Page<FeedResponse> pageData) {
-            return PageListResponse.builder()
-                    .pageTitle(pageTitle)
-                    .content(pageData.getContent())
-                    .page(new PageInfo(pageData))
-                    .build();
-        }
-    }
-
-    @Data @NoArgsConstructor @AllArgsConstructor
-    @Schema(description = "페이지 정보 메타데이터 DTO")
-    public static class PageInfo {
-        @Schema(description = "페이지 크기", example = "10")
-        private int size;
-        
-        @Schema(description = "현재 페이지 번호 (0부터 시작)", example = "0")
-        private int pageNumber;
-        
-        @Schema(description = "전체 요소 개수", example = "150")
-        private long totalElements;
-        
-        @Schema(description = "전체 페이지 수", example = "15")
-        private int totalPages;
-        
-        @Schema(description = "이전 페이지 존재 여부", example = "false")
-        private boolean hasPrev;
-        
-        @Schema(description = "다음 페이지 존재 여부", example = "true")
-        private boolean hasNext;
-        
-        @Schema(description = "빈 페이지 여부", example = "false")
-        private boolean empty;
-
-        public PageInfo(Page<?> page) {
-            this.size = page.getSize();
-            this.pageNumber = page.getNumber();
-            this.totalElements = page.getTotalElements();
-            this.totalPages = page.getTotalPages();
-            this.hasPrev = page.hasPrevious();
-            this.hasNext = page.hasNext();
-            this.empty = page.isEmpty();
         }
     }
 }

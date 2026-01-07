@@ -38,20 +38,13 @@ public class FileService {
     private final S3Service s3Service;
     private final FileRepository fileRepository;
 
-    @Value("${cdn.base-url:#{null}}")
-    private String cdnBaseUrl;
+    @Value("${cdn.base-url:#{null}}") private String cdnBaseUrl;
 
-    @Value("${spring.cloud.aws.s3.bucket}")
-    private String bucketName;
-
-    /**
-     * 멀티파트 업로드 초기화 (모든 파일 타입: 이미지, 동영상 등)
-     * PresignedUrl 방식으로 통일
-     */
+    /** 멀티파트 업로드 초기화 (모든 파일 타입: 이미지, 동영상 등) */
     public FileDto.MultipartUploadInitiateResponse initiateMultipartUpload(
             FileDto.MultipartUploadInitiateRequest request
     ) {
-        log.info("🚀 [FileService] 멀티파트 업로드 초기화 시작 - filename: {}, size: {} bytes",
+        log.info("1️⃣[FileService] 멀티파트 업로드 초기화 시작 - filename: {}, size: {} bytes",
                 request.getOriginalFileName(), request.getFileSize());
 
         // S3 멀티파트 업로드 초기화
@@ -62,12 +55,12 @@ public class FileService {
                 .build();
 
         S3ServiceDto.UploadInitiateResponse s3Response = s3Service.initiateUpload(s3Request);
-        log.info("✅ [FileService] S3 멀티파트 업로드 초기화 완료 - key: {}, uploadId: {}",
+        log.info("2️⃣ [FileService] S3 멀티파트 업로드 초기화 완료 - key: {}, uploadId: {}",
                 s3Response.getKey(), s3Response.getUploadId());
 
         // Part 개수 계산
         Integer partCount = s3Service.calculatePartCount(request.getFileSize());
-        log.info("📊 [FileService] Part 개수 계산 완료 - partCount: {}", partCount);
+        log.info("3️⃣ [FileService] Part 개수 계산 완료 - partCount: {}", partCount);
 
         // 각 Part에 대한 Presigned URL 생성
         S3ServiceDto.PartPresignedUrlRequest partRequest = S3ServiceDto.PartPresignedUrlRequest.builder()
@@ -77,7 +70,7 @@ public class FileService {
                 .build();
 
         List<S3ServiceDto.PartPresignedUrlResponse> partPresignedUrls = s3Service.generatePartPresignedUrls(partRequest);
-        log.info("🔑 [FileService] Presigned URL 생성 완료 - 총 {}개", partPresignedUrls.size());
+        log.info("4️⃣ [FileService] Presigned URL 생성 완료 - 총 {}개", partPresignedUrls.size());
 
         // DTO 변환
         List<FileDto.PartPresignedUrl> partPresignedUrlList = partPresignedUrls.stream()
@@ -88,7 +81,7 @@ public class FileService {
                         .build())
                 .collect(Collectors.toList());
 
-        log.info("🎯 [FileService] 멀티파트 업로드 초기화 응답 준비 완료 - key: {}, uploadId: {}, partCount: {}",
+        log.info("🟢 [FileService] 멀티파트 업로드 초기화 응답 준비 완료 - key: {}, uploadId: {}, partCount: {}",
                 s3Response.getKey(), s3Response.getUploadId(), partCount);
 
         return FileDto.MultipartUploadInitiateResponse.builder()
@@ -132,12 +125,8 @@ public class FileService {
                 .build();
 
         CompleteMultipartUploadResponse s3Response = s3Service.completeUpload(s3Request);
-        log.info("✅ [FileService] S3 멀티파트 업로드 완료 - location: {}, etag: {}",
+        log.info("1️⃣ [FileService] S3 멀티파트 업로드 완료 - location: {}, etag: {}",
                 s3Response.location(), s3Response.eTag());
-
-        // 업로드된 파일의 URL 가져오기
-        String s3Url = s3Response.location();
-        String cdnUrl = generateCdnUrl(s3Url);
 
         // MediaType 결정
         MediaType mediaType = determineMediaType(request.getMimeType(), request.getOriginalFileName());
@@ -150,19 +139,16 @@ public class FileService {
         File fileEntity = File.builder()
                 .s3ObjectKey(request.getKey())
                 .filename(request.getOriginalFileName())
-                .filePath(cdnUrl)
                 .fileSize(request.getFileSize())
                 .mediaType(mediaType)
                 .isThumbnail(isThumbnail)
                 .build();
 
         fileEntity = fileRepository.save(fileEntity);
-        log.info("💾 [FileService] File 엔티티 저장 완료 - fileId: {}, filename: {}",
+        log.info("2️⃣ [FileService] File 엔티티 저장 완료 - fileId: {}, filename: {}",
                 fileEntity.getId(), fileEntity.getFilename());
 
-        // 참고: 썸네일은 DB에 저장하지 않고, 조회 시 getThumbnailUrl()로 동적 생성 (패턴 4)
-
-        log.info("🎉 [FileService] 멀티파트 업로드 완료 - fileId: {}", fileEntity.getId());
+        log.info("🟢 [FileService] 멀티파트 업로드 완료 - fileId: {}", fileEntity.getId());
 
         return fileEntity;
     }
@@ -175,7 +161,7 @@ public class FileService {
                 .uploadId(uploadId)
                 .build();
         s3Service.abortUpload(request);
-        log.info("✅ [FileService] 멀티파트 업로드 취소 완료 - key: {}, uploadId: {}", key, uploadId);
+        log.info("🟢 [FileService] 멀티파트 업로드 취소 완료 - key: {}, uploadId: {}", key, uploadId);
     }
 
     @Transactional(readOnly = true)
@@ -237,108 +223,5 @@ public class FileService {
         } else {
             return MediaType.UNKNOWN;
         }
-    }
-
-    /**
-     * CDN URL 생성
-     * CDN base URL이 필수로 설정되어 있어야 함 (보안: 버킷명 노출 방지)
-     *
-     * @param s3Url S3 URL
-     * @return CDN URL
-     * @throws IllegalStateException CDN base URL이 설정되지 않은 경우
-     */
-    private String generateCdnUrl(String s3Url) {
-        if (cdnBaseUrl == null || cdnBaseUrl.isBlank()) {
-            throw new IllegalStateException(
-                    "CDN base URL이 설정되지 않았습니다. " + "보안을 위해 CDN 설정이 필수입니다. "
-            );
-        }
-
-        // S3 URL에서 key 추출하여 CDN URL로 변환
-        // 예: https://bucket.s3.region.amazonaws.com/key -> https://cdn.example.com/key
-        String key = extractKeyFromS3Url(s3Url);
-        return buildCdnUrl(key);
-    }
-
-    /** S3 URL에서 key 추출 */
-    private String extractKeyFromS3Url(String s3Url) {
-        try {
-            java.net.URI uri = java.net.URI.create(s3Url);
-            String path = uri.getPath();
-            // 첫 번째 '/' 제거
-            return path.startsWith("/") ? path.substring(1) : path;
-        } catch (Exception e) {
-            return s3Url;
-        }
-    }
-
-    /**
-     * CDN URL 생성 헬퍼 메서드
-     * cdnBaseUrl의 마지막 '/' 제거 후 경로와 결합하여 올바른 URL 생성
-     *
-     * @param path 경로 (예: "files/..." 또는 "files/thumbnails/...")
-     * @return 완성된 CDN URL
-     */
-    private String buildCdnUrl(String path) {
-        // CDN base URL 정리 (마지막 '/' 제거)
-        String baseUrl = cdnBaseUrl.endsWith("/")
-                ? cdnBaseUrl.substring(0, cdnBaseUrl.length() - 1)
-                : cdnBaseUrl;
-
-        // 경로 정리 (앞의 '/' 제거)
-        String cleanPath = path.startsWith("/")
-                ? path.substring(1)
-                : path;
-
-        // URL 결합
-        return baseUrl + "/" + cleanPath;
-    }
-
-    /**
-     * 썸네일 URL 생성 (리사이징 버킷 → CDN)
-     * 원본 File에서 썸네일 URL을 동적으로 생성 (패턴 4)
-     *
-     * CDN base URL이 필수로 설정되어 있어야 함 (보안: 버킷명 노출 방지)
-     *
-     * @param file 원본 File 엔티티
-     * @param size 썸네일 크기 ("thumbnail" 또는 "medium")
-     * @return 썸네일 CDN URL
-     * @throws IllegalStateException CDN base URL이 설정되지 않은 경우
-     */
-    public String getThumbnailUrl(File file, String size) {
-        if (file.getMediaType() != MediaType.IMAGE) {
-            return null; // 이미지가 아니면 썸네일 없음
-        }
-
-        // 원본 키에서 썸네일 키 생성
-        String originalKey = file.getS3ObjectKey();
-        String thumbnailKey = generateThumbnailKey(originalKey, size);
-
-        // CDN URL 생성 (CloudFront의 /files/thumbnails/* 패턴 사용)
-        // CDN이 필수이므로 설정되지 않으면 예외 발생
-        if (cdnBaseUrl == null || cdnBaseUrl.isBlank()) {
-            throw new IllegalStateException(
-                    "CDN base URL이 설정되지 않았습니다. " +
-                            "보안을 위해 CDN 설정이 필수입니다. " +
-                            "application.yml에 cdn.base-url을 설정해주세요."
-            );
-        }
-
-        // CDN base URL에 썸네일 키를 직접 추가
-        // 예: https://cdn.example.com/files/thumbnails/thumbnail/{UUID}__{filename}.jpg
-        return buildCdnUrl(thumbnailKey);
-    }
-
-    /**
-     * 썸네일 키 생성
-     * 원본: files/{UUID}__{filename}
-     * 결과: files/thumbnails/{size}/{UUID}__{filename}
-     */
-    private String generateThumbnailKey(String originalKey, String size) {
-        // files/{UUID}__{filename}에서 파일명 추출
-        String fileName = originalKey.substring(originalKey.lastIndexOf("/") + 1);
-
-        // files/thumbnails/{size}/{UUID}__{filename} 생성
-        return "files/thumbnails/" + size + "/" + fileName;
     }
 }

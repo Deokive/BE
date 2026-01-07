@@ -1,7 +1,8 @@
 package com.depth.deokive.domain.post.repository;
 
 import com.depth.deokive.domain.post.dto.PostDto;
-import com.depth.deokive.domain.post.dto.QPostDto_FeedResponse; // Q-Class 생성 필요 (Build -> Rebuild Project)
+
+import com.depth.deokive.domain.post.dto.QPostDto_PostPageResponse;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.depth.deokive.domain.file.entity.QFile.file;
 import static com.depth.deokive.domain.post.entity.QPost.post;
 
 @Repository
@@ -27,7 +27,7 @@ public class PostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<PostDto.FeedResponse> searchPostFeed(Category category, Pageable pageable) {
+    public Page<PostDto.PostPageResponse> searchPostFeed(Category category, Pageable pageable) {
 
         // STEP 1. 커버링 인덱스 활용 (ID 조회)
         List<Long> ids = queryFactory
@@ -40,15 +40,15 @@ public class PostQueryRepository {
                 .fetch();
 
         // STEP 2. 데이터 조회 (User, Thumbnail Fetch Join)
-        List<PostDto.FeedResponse> content = new ArrayList<>();
+        List<PostDto.PostPageResponse> content = new ArrayList<>();
 
         if (!ids.isEmpty()) {
             content = queryFactory
-                .select(new QPostDto_FeedResponse(
+                .select(new QPostDto_PostPageResponse(
                         post.id,
                         post.title,
                         post.category,
-                        post.thumbnailFile.filePath, // Post 테이블에 역정규화된 FK 사용 (1:1 조인)
+                        post.thumbnailKey,
                         post.user.nickname,
                         post.likeCount,
                         post.viewCount,
@@ -58,7 +58,6 @@ public class PostQueryRepository {
                 ))
                 .from(post)
                 .join(post.user) // 작성자 Fetch Join
-                .leftJoin(post.thumbnailFile, file) // 썸네일 파일 Fetch Join
                 .where(post.id.in(ids))
                 .orderBy(getOrderSpecifiers(pageable)) // ID 순서 보장을 위해 재정렬
                 .fetch();
@@ -98,7 +97,14 @@ public class PostQueryRepository {
 
         // 정렬 기준이 없거나 값이 같을 경우를 대비해 ID 역순 추가 (Pagination 안정성)
         if (orders.isEmpty()) {
-            orders.add(new OrderSpecifier<>(Order.DESC, post.id));
+            orders.add(new OrderSpecifier<>(Order.DESC, post.createdAt));
+        }
+
+        boolean hasIdSort = orders.stream().anyMatch(o -> o.getTarget().equals(post.id));
+
+        if (!hasIdSort) {
+            Order lastDirection = orders.isEmpty() ? Order.DESC : orders.get(orders.size() - 1).getOrder();
+            orders.add(new OrderSpecifier<>(lastDirection, post.id));
         }
 
         return orders.toArray(new OrderSpecifier[0]);

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.depth.deokive.domain.archive.entity.QArchive.archive;
 import static com.depth.deokive.domain.file.entity.QFile.file;
 import static com.depth.deokive.domain.gallery.entity.QGallery.gallery;
 
@@ -46,12 +47,11 @@ public class GalleryQueryRepository {
             content = queryFactory
                     .select(Projections.constructor(GalleryDto.Response.class,
                             gallery.id,
-                            file.filePath,
+                            gallery.originalKey,
                             gallery.createdAt,
                             gallery.lastModifiedAt
                     ))
                     .from(gallery)
-                    .join(gallery.file, file) // N+1 방지
                     .where(gallery.id.in(ids))
                     .orderBy(getOrderSpecifiers(pageable)) // IN절 순서 보장을 위해 재정렬
                     .fetch();
@@ -86,6 +86,15 @@ public class GalleryQueryRepository {
         if (orders.isEmpty()) {
             orders.add(new OrderSpecifier<>(Order.DESC, gallery.createdAt));
         }
+
+        boolean hasIdSort = orders.stream().anyMatch(o -> o.getTarget().equals(gallery.id));
+        if (!hasIdSort) {
+            Order lastDirection = orders.get(orders.size() - 1).getOrder();
+            orders.add(new OrderSpecifier<>(lastDirection, gallery.id));
+        }
+
+        // Tie-Breaker -> for Integrity
+        orders.add(new OrderSpecifier<>(Order.DESC, gallery.id));
 
         return orders.toArray(new OrderSpecifier[0]);
     }

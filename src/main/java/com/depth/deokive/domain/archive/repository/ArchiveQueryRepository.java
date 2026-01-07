@@ -1,8 +1,8 @@
 package com.depth.deokive.domain.archive.repository;
 
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
-import com.depth.deokive.domain.archive.dto.QArchiveDto_FeedResponse;
-import com.depth.deokive.domain.archive.entity.enums.Visibility;
+import com.depth.deokive.domain.archive.dto.QArchiveDto_ArchivePageResponse;
+import com.depth.deokive.common.enums.Visibility;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.depth.deokive.domain.archive.entity.QArchive.archive;
-import static com.depth.deokive.domain.file.entity.QFile.file;
 
 @Repository
 @RequiredArgsConstructor
@@ -27,13 +26,12 @@ public class ArchiveQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<ArchiveDto.FeedResponse> searchArchiveFeed(
+    public Page<ArchiveDto.ArchivePageResponse> searchArchiveFeed(
             Long filterUserId,
             List<Visibility> allowedVisibilities,
             Pageable pageable
     ) {
         // STEP 1. 커버링 인덱스 활용 (ID만 조회)
-        // 인덱스만 태워서 정렬된 ID 리스트를 빠르게 가져옵니다. (데이터 블록 접근 X)
         List<Long> ids = queryFactory
                 .select(archive.id)
                 .from(archive)
@@ -47,15 +45,14 @@ public class ArchiveQueryRepository {
                 .fetch();
 
         // STEP 2. 데이터 조회 (WHERE IN)
-        // 찾아낸 소수의 ID에 대해서만 Banner File 및 User 조인을 수행합니다.
-        List<ArchiveDto.FeedResponse> content = new ArrayList<>();
+        List<ArchiveDto.ArchivePageResponse> content = new ArrayList<>();
 
         if (!ids.isEmpty()) {
             content = queryFactory
-                    .select(new QArchiveDto_FeedResponse(
+                    .select(new QArchiveDto_ArchivePageResponse(
                             archive.id,
                             archive.title,
-                            archive.bannerFile.filePath, // 1:1 Banner Join
+                            archive.thumbnailKey,
                             archive.viewCount,
                             archive.likeCount,
                             archive.hotScore,
@@ -65,7 +62,6 @@ public class ArchiveQueryRepository {
                             archive.user.nickname
                     ))
                     .from(archive)
-                    .leftJoin(archive.bannerFile, file) // 배너 이미지 조인
                     .join(archive.user) // 작성자 조인
                     .where(archive.id.in(ids))
                     .orderBy(getOrderSpecifiers(pageable)) // ID IN 순서 보장을 위해 재정렬
@@ -121,6 +117,15 @@ public class ArchiveQueryRepository {
         if (orders.isEmpty()) {
             orders.add(new OrderSpecifier<>(Order.DESC, archive.createdAt));
         }
+
+        boolean hasIdSort = orders.stream().anyMatch(o -> o.getTarget().equals(archive.id));
+        if (!hasIdSort) {
+            Order lastDirection = orders.get(orders.size() - 1).getOrder();
+            orders.add(new OrderSpecifier<>(lastDirection, archive.id));
+        }
+
+        // Tie-Breaker -> for Integrity
+        orders.add(new OrderSpecifier<>(Order.DESC, archive.id));
 
         return orders.toArray(new OrderSpecifier[0]);
     }

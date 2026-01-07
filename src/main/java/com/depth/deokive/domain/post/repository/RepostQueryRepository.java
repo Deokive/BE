@@ -25,39 +25,36 @@ public class RepostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    /**
-     * 특정 탭의 리포스트 목록 페이지네이션
-     */
-    public Page<RepostDto.Response> findByTabId(Long tabId, Pageable pageable) {
+    public Page<RepostDto.RepostElementResponse> findByTabId(Long tabId, Pageable pageable) {
 
         // SEQ 1. ID로 조회
         List<Long> ids = queryFactory
                 .select(repost.id)
                 .from(repost)
                 .where(repost.repostTab.id.eq(tabId))
-                .orderBy(getOrderSpecifier(pageable))
+                .orderBy(repost.createdAt.desc(), repost.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        // SEQ 2. ID 없으면 빈 페이지
-        if(ids.isEmpty()) {
-            return Page.empty(pageable);
-        }
+        List<RepostDto.RepostElementResponse> content = new ArrayList<>();
 
-        // SEQ 3. 데이터 조회
-        List<RepostDto.Response> content = queryFactory
-                .select(Projections.constructor(RepostDto.Response.class,
-                        repost.id,
-                        repost.postId,
-                        repost.title,
-                        repost.thumbnailUrl,
-                        repost.repostTab.id
-                ))
-                .from(repost)
-                .where(repost.id.in(ids))
-                .orderBy(getOrderSpecifier(pageable))
-                .fetch();
+        // SEQ 2. 데이터 조회
+        if (!ids.isEmpty()) {
+            content = queryFactory
+                    .select(Projections.constructor(RepostDto.RepostElementResponse.class,
+                            repost.id,
+                            repost.postId,
+                            repost.title,
+                            repost.thumbnailKey,
+                            repost.repostTab.id,
+                            repost.createdAt
+                    ))
+                    .from(repost)
+                    .where(repost.id.in(ids))
+                    .orderBy(repost.createdAt.desc(), repost.id.desc())
+                    .fetch();
+        }
 
         // SEQ 4. Count Query
         JPAQuery<Long> countQuery = queryFactory
@@ -66,28 +63,5 @@ public class RepostQueryRepository {
                 .where(repost.repostTab.id.eq(tabId));
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
-    }
-
-    // Helper Method
-    private OrderSpecifier[] getOrderSpecifier(Pageable pageable) {
-        List<OrderSpecifier<?>> orders = new ArrayList<>();
-
-        if (pageable.getSort().isEmpty()) {
-            return new OrderSpecifier<?>[]{new OrderSpecifier<>(Order.DESC, repost.createdAt)};
-        }
-        for (Sort.Order order : pageable.getSort()) {
-            Order direction = order.getDirection().isAscending() ? Order.ASC : Order.DESC;
-            OrderSpecifier<?> orderSpecifier = switch (order.getProperty()) {
-                case "title" -> new OrderSpecifier<>(direction, repost.title);
-                case "createdAt" -> new OrderSpecifier<>(direction, repost.createdAt);
-                default -> null;
-            };
-            if (orderSpecifier != null) orders.add(orderSpecifier);
-        }
-
-        if (orders.isEmpty()) {
-            orders.add(new OrderSpecifier<>(Order.DESC, repost.createdAt));
-        }
-        return orders.toArray(new OrderSpecifier[0]);
     }
 }

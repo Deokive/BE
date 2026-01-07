@@ -17,9 +17,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Getter
 @Table(name = "ticket", indexes = {
-        @Index(name = "idx_ticket_book_created", columnList = "ticket_book_id, created_at DESC"),
-        @Index(name = "idx_ticket_book_date", columnList = "ticket_book_id, date DESC"),
-        @Index(name = "idx_ticket_book_visibility_date", columnList = "ticket_book_id, visibility, date DESC")
+        @Index(name = "idx_ticket_book_created", columnList = "ticket_book_id, created_at DESC, id DESC"),
+        @Index(name = "idx_ticket_book_date", columnList = "ticket_book_id, date DESC, id DESC"),
 })
 public class Ticket extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,7 +35,6 @@ public class Ticket extends TimeBaseEntity {
     @Column(length = 20)
     private String seat; // 티켓 좌석 정보
 
-    @Lob
     private String casting;
 
     private Integer score; // 티켓 관련 평점
@@ -52,20 +50,29 @@ public class Ticket extends TimeBaseEntity {
     @JoinColumn(name = "file_id")
     private File file;
 
-    public void update(TicketDto.Request request, File newFile) {
+    @Column(name = "original_key")
+    private String originalKey;
+
+    public void update(TicketDto.UpdateRequest request, File resolvedFile) {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
         this.date = nonBlankOrDefault(request.getDate(), this.date);
         this.location = nonBlankOrDefault(request.getLocation(), this.location);
         this.seat = nonBlankOrDefault(request.getSeat(), this.seat);
-        this.casting = nonBlankOrDefault(request.getCasting(), this.casting); // getSeat() -> getCasting() 수정
+        this.casting = nonBlankOrDefault(request.getCasting(), this.casting);
         this.score = nonBlankOrDefault(request.getScore(), this.score);
         this.review = nonBlankOrDefault(request.getReview(), this.review);
-        this.file = nonBlankOrDefault(newFile, this.file);
+
+        updateFile(resolvedFile);
     }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;
+    }
+
+    private void updateFile(File file) {
+        this.file = file; // Service Layer에서 철저한 검증 거침
+        this.originalKey = (file != null) ? file.getS3ObjectKey() : null;
     }
 }

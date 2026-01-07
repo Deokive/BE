@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.controller;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.service.PostService;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -26,9 +27,10 @@ public class PostController {
 
     @PostMapping
     @Operation(summary = "게시글 생성", description = "파일 선업로드 후 받은 fileId들을 포함하여 게시글을 생성합니다.")
+    @ApiResponse(responseCode = "201", description = "게시글 생성 성공")
     public ResponseEntity<PostDto.Response> createPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Valid @RequestBody PostDto.Request request
+            @Valid @RequestBody PostDto.CreateRequest request
     ) {
         PostDto.Response response = postService.createPost(userPrincipal, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -36,20 +38,22 @@ public class PostController {
 
     @GetMapping("/{postId}")
     @Operation(summary = "게시글 상세 조회", description = "게시글 ID로 상세 정보를 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "게시글 조회 성공")
     public ResponseEntity<PostDto.Response> getPost(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId
     ) {
-        PostDto.Response response = postService.getPost(postId);
+        PostDto.Response response = postService.getPost(userPrincipal, postId);
         return ResponseEntity.ok(response);
     }
 
-    // DESIGN: PATCH를 고려했는데, 파일 처리의 복잡성을 완화하기 위해 연결을 갈아끼는 방식을 썼음 -> 이때는 PUT이 더 적절하다.
-    @PutMapping("/{postId}")
+    @PatchMapping("/{postId}")
     @Operation(summary = "게시글 수정", description = "게시글 제목, 내용, 카테고리 및 첨부파일 목록을 수정합니다.")
+    @ApiResponse(responseCode = "200", description = "게시글 수정 성공")
     public ResponseEntity<PostDto.Response> updatePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId,
-            @Valid @RequestBody PostDto.Request request
+            @Valid @RequestBody PostDto.UpdateRequest request
     ) {
         PostDto.Response response = postService.updatePost(userPrincipal, postId, request);
         return ResponseEntity.ok(response);
@@ -57,6 +61,7 @@ public class PostController {
 
     @DeleteMapping("/{postId}")
     @Operation(summary = "게시글 삭제", description = "게시글을 삭제합니다.")
+    @ApiResponse(responseCode = "204", description = "게시글 삭제 성공")
     public ResponseEntity<Void> deletePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId
@@ -69,14 +74,10 @@ public class PostController {
     @Operation(
             summary = "게시글 피드 목록 조회",
             description = "카테고리별 게시글을 페이징하여 조회합니다. (정렬: createdAt, viewCount, likeCount, hotScore)")
-    @ApiResponse(
-            responseCode = "200",
-            description = "조회 성공",
-            content = @Content(schema = @Schema(implementation = PostDto.PageListResponse.class)))
-    public ResponseEntity<PostDto.PageListResponse> getPosts(
-            @Valid @ModelAttribute PostDto.FeedRequest request
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<PostDto.PostPageResponse>> getPosts(
+            @Valid @ModelAttribute PostDto.PostPageRequest request
     ) {
-        PostDto.PageListResponse response = postService.getPosts(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(postService.getPosts(request));
     }
 }

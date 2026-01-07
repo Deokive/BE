@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.gallery.controller;
 
+import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.service.GalleryService;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -26,20 +27,18 @@ public class GalleryController {
 
     @GetMapping("/{archiveId}")
     @Operation(summary = "갤러리 목록 조회", description = "특정 아카이브의 갤러리 이미지들을 페이징하여 조회합니다.")
-    @ApiResponse(responseCode = "200", description = "갤러리 목록 조회 성공", content = @Content(
-         mediaType = "application/json",
-         schema = @Schema(implementation = GalleryDto.PageListResponse.class)))
-    public ResponseEntity<GalleryDto.PageListResponse> getGalleries(
+    @ApiResponse(responseCode = "200", description = "갤러리 목록 조회 성공")
+    public ResponseEntity<PageDto.PageListResponse<GalleryDto.Response>> getGalleries(
             @PathVariable Long archiveId,
-            // @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @ModelAttribute GalleryDto.GalleryPageRequest pageRequest
     ) {
-        GalleryDto.PageListResponse response = galleryService.getGalleries(archiveId, pageRequest.toPageable());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(galleryService.getGalleries(userPrincipal, archiveId, pageRequest.toPageable()));
     }
 
     @PostMapping("/{archiveId}")
     @Operation(summary = "갤러리 이미지 등록")
+    @ApiResponse(responseCode = "201", description = "갤러리 이미지 등록 성공")
     public ResponseEntity<GalleryDto.CreateResponse> createGalleries(
           @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
           @PathVariable Long archiveId,
@@ -51,6 +50,7 @@ public class GalleryController {
 
     @PatchMapping("/{archiveId}")
     @Operation(summary = "갤러리북 제목 수정")
+    @ApiResponse(responseCode = "200", description = "갤러리북 제목 수정 성공")
     public ResponseEntity<GalleryDto.UpdateTitleResponse> updateGalleryBookTitle(
           @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
           @PathVariable Long archiveId,
@@ -62,6 +62,7 @@ public class GalleryController {
 
     @DeleteMapping("/{archiveId}")
     @Operation(summary = "갤러리 이미지 삭제", description = "선택한 갤러리 이미지들을 삭제합니다.")
+    @ApiResponse(responseCode = "204", description = "갤러리 이미지 삭제 성공")
     public ResponseEntity<Void> deleteGalleries(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,

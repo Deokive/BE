@@ -1,7 +1,9 @@
 package com.depth.deokive.system.controller;
 
-import com.depth.deokive.domain.archive.scheduler.ArchiveBadgeScheduler;
-import com.depth.deokive.domain.archive.scheduler.ArchiveHotFeedScheduler;
+import com.depth.deokive.system.config.aop.ExecutionTime;
+import com.depth.deokive.system.scheduler.ArchiveBadgeScheduler;
+import com.depth.deokive.system.scheduler.ArchiveHotFeedScheduler;
+import com.depth.deokive.system.scheduler.PostHotScoreScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -26,22 +28,24 @@ public class SystemSchedulerController {
 
     private final ArchiveHotFeedScheduler hotFeedScheduler;
     private final ArchiveBadgeScheduler badgeScheduler;
+    private final PostHotScoreScheduler postHotScoreScheduler;
 
     private final JobLauncher jobLauncher;
     private final Job fileCleanupJob; // Bean 이름(FileCleanupBatchConfig의 메서드명)과 일치해야 자동 주입됨
 
+    @ExecutionTime
     @PostMapping("/hot-score")
     @Operation(summary = "🔥 핫 스코어 갱신 강제 실행", description = "100만 건 기준 약 1~3초 소요 예상")
     public ResponseEntity<String> triggerHotScore() {
-        log.info("Manual Trigger: Hot Score Update");
         long start = System.currentTimeMillis();
 
         hotFeedScheduler.updateHotScores();
+        postHotScoreScheduler.updatePostHotScores();
 
-        long end = System.currentTimeMillis();
-        return ResponseEntity.ok("Hot Score Updated! (Time: " + (end - start) + "ms)");
+        return ResponseEntity.ok("🟢 Hot Score Update Completed! (Archive & Post)");
     }
 
+    @ExecutionTime
     @PostMapping("/badge")
     @Operation(summary = "🏅 뱃지 승급 강제 실행", description = "생성일 기준으로 뱃지 등급 재산정")
     public ResponseEntity<String> triggerBadge() {
@@ -54,6 +58,7 @@ public class SystemSchedulerController {
         return ResponseEntity.ok("Badge Update Completed! (Time: " + (end - start) + "ms)");
     }
 
+    @ExecutionTime
     @PostMapping("/batch/file-cleanup")
     @Operation(summary = "🧹 고아 파일 정리 배치 강제 실행", description = "S3 및 DB에서 연결되지 않은(24시간 경과) 파일 삭제")
     public ResponseEntity<String> triggerFileCleanupBatch() {
