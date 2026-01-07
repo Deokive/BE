@@ -126,4 +126,14 @@ public class FriendController {
 
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "특정 유저와 관계 조회", description = "특정 유저와의 친구 상태(PENDING, ACCEPTED, REJECTED, CANCELED)를 조회합니다. 관계가 없으면 404를 반환합니다.")
+    @GetMapping("/{friendId}/status")
+    public ResponseEntity<FriendDto.FriendStatusResponse> getFriendStatus(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long friendId
+    ) {
+        FriendDto.FriendStatusResponse response = friendService.getFriendStatus(userPrincipal, friendId);
+        return ResponseEntity.ok(response);
+    }
 }
