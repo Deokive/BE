@@ -132,7 +132,8 @@ public enum ErrorCode {
     FRIEND_SEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND,"FRIEND_REQUEST_NOT_FOUND", "보낸 친구 요청이 존재하지 않습니다."),
     FRIEND_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "FRIEND_REQUEST_NOT_PENDING", "대기 상태의 친구 요청이 아닙니다."),
     FRIEND_RECOVER_BAD_REQUEST(HttpStatus.BAD_REQUEST, "FRIEND_CANNOT_RECOVER", "친구 관계를 복구할 수 없는 상태입니다."),
-    FRIEND_CANCELED_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIEND_CANCELED_NOT_FOUND", "끊은 친구가 존재하지 않습니다.");
+    FRIEND_CANCELED_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIEND_CANCELED_NOT_FOUND", "끊은 친구가 존재하지 않습니다."),
+    FRIEND_INVALID_TYPE(HttpStatus.BAD_REQUEST, "FRIEND_INVALID_TYPE", "유효하지 않은 친구 요청 타입입니다.");
 
     private final HttpStatus status;
     private final String error;
