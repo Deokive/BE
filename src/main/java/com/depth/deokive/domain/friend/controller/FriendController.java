@@ -87,7 +87,7 @@ public class FriendController {
 
     @Operation(summary = "내 친구 목록 조회", description = "현재 사용자와 친구(ACCEPTED)인 목록을 조회합니다.")
     @GetMapping
-    public ResponseEntity<FriendDto.FriendListResponse> getMyFriends(
+    public ResponseEntity<FriendDto.FriendListResponse<FriendDto.Response>> getMyFriends(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(required = false) Long lastFriendId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime lastAcceptedAt,
@@ -95,12 +95,35 @@ public class FriendController {
     ) {
 
         Pageable pageable = PageRequest.of(0, size);
-        FriendDto.FriendListResponse response = friendService.getMyFriends(
+        var response = friendService.getMyFriends(
                 userPrincipal,
                 lastFriendId,
                 lastAcceptedAt,
                 pageable
         );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "친구 요청 목록 조회", description = "보낸/받은 요청 목록을 조회합니다.")
+    @GetMapping("/requests")
+    public ResponseEntity<FriendDto.FriendListResponse<FriendDto.RequestResponse>> getFriendRequests(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam String type,
+            @RequestParam(required = false) Long lastId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime lastCreatedAt,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Pageable pageable = PageRequest.of(0, size);
+
+        var response = friendService.getFriendRequests(
+                userPrincipal,
+                type,
+                lastId,
+                lastCreatedAt,
+                pageable
+        );
+
         return ResponseEntity.ok(response);
     }
 }
