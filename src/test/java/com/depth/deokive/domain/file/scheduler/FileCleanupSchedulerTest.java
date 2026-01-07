@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.file.scheduler;
 
+import com.depth.deokive.system.scheduler.FileCleanupScheduler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,7 +1,7 @@
 package com.depth.deokive.system.controller;
 
-import com.depth.deokive.domain.archive.scheduler.ArchiveBadgeScheduler;
-import com.depth.deokive.domain.archive.scheduler.ArchiveHotFeedScheduler;
+import com.depth.deokive.system.scheduler.ArchiveBadgeScheduler;
+import com.depth.deokive.system.scheduler.ArchiveHotFeedScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

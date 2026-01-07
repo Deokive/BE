@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.file.scheduler;
+package com.depth.deokive.system.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
