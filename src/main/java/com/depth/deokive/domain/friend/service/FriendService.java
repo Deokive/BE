@@ -2,6 +2,7 @@ package com.depth.deokive.domain.friend.service;
 
 import com.depth.deokive.domain.friend.dto.FriendDto;
 import com.depth.deokive.domain.friend.entity.FriendMap;
+import com.depth.deokive.domain.friend.entity.enums.FriendRequestType;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.friend.repository.FriendQueryRepository;
@@ -274,7 +275,7 @@ public class FriendService {
      * 친구 목록 조회
      */
     @Transactional
-    public FriendDto.FriendListResponse getMyFriends(UserPrincipal userPrincipal,
+    public FriendDto.FriendListResponse<FriendDto.Response> getMyFriends(UserPrincipal userPrincipal,
                                                      Long lastFriendId,
                                                      LocalDateTime lastAcceptedAt,
                                                      Pageable pageable) {
@@ -284,6 +285,38 @@ public class FriendService {
                 lastAcceptedAt,
                 pageable
         );
+        return FriendDto.FriendListResponse.of(slice);
+    }
+
+    /**
+     * 보낸/받은 친구 요청 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public FriendDto.FriendListResponse<FriendDto.RequestResponse> getFriendRequests(
+            UserPrincipal userPrincipal,
+            String type,
+            Long lastId,
+            LocalDateTime lastCreatedAt,
+            Pageable pageable
+    ) {
+        // SEQ 1. ENUM 검증
+        FriendRequestType requestType;
+        try {
+            requestType = FriendRequestType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new RestException(ErrorCode.FRIEND_INVALID_TYPE);
+        }
+
+        // SEQ 2. Repository 조회
+        Slice<FriendDto.RequestResponse> slice = friendQueryRepository.findFriendRequests(
+                userPrincipal.getUserId(),
+                requestType,
+                lastId,
+                lastCreatedAt,
+                pageable
+        );
+
+        // SEQ 3. 응답 변환
         return FriendDto.FriendListResponse.of(slice);
     }
 }
