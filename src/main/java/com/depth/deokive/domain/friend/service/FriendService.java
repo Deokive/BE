@@ -319,4 +319,24 @@ public class FriendService {
         // SEQ 3. 응답 변환
         return FriendDto.FriendListResponse.of(slice);
     }
+
+    /**
+     * 특정 유저와의 관계 조회
+     */
+    @Transactional(readOnly = true)
+    public FriendDto.FriendStatusResponse getFriendStatus(UserPrincipal userPrincipal, Long friendId) {
+        Long userId = userPrincipal.getUserId();
+
+        // SEQ 1. 자기 자신 조회 시 404
+        if (userId.equals(friendId)) {
+            throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
+        }
+
+        // SEQ 2. 관계 데이터 조회 (나 -> 친구)
+        FriendMap friendMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
+                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_NOT_FOUND)); // 404 에러
+
+        // SEQ 3. 상태 반환
+        return new FriendDto.FriendStatusResponse(friendMap.getFriendStatus());
+    }
 }
