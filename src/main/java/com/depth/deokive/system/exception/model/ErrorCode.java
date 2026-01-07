@@ -120,7 +120,20 @@ public enum ErrorCode {
     DB_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "DB DATA NOT FOUND", "존재하지 않는 데이터입니다."),
     DB_DATA_TOO_LONG(HttpStatus.BAD_REQUEST, "DB DATA TOO LONG", "데이터 길이가 허용된 한도를 초과했습니다."),
     DB_NOT_NULL_VIOLATION(HttpStatus.BAD_REQUEST, "DB NOT NULL VIOLATION", "필수 필드가 누락되었습니다."),
-    DB_FOREIGN_KEY_VIOLATION(HttpStatus.BAD_REQUEST, "DB FOREIGN KEY VIOLATION", "참조 무결성 제약 조건을 위반했습니다.");
+    DB_FOREIGN_KEY_VIOLATION(HttpStatus.BAD_REQUEST, "DB FOREIGN KEY VIOLATION", "참조 무결성 제약 조건을 위반했습니다."),
+
+    // FRIEND Error
+    FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIEND_NOT_FOUND", "존재하지 않는 친구입니다."),
+    FRIEND_SELF_BAD_REQUEST(HttpStatus.BAD_REQUEST, "FRIEND_SELF_BAD_REQUEST", "자기 자신에게 친구 요청을 보낼 수 없습니다."),
+    FRIEND_REQUEST_CONFLICT(HttpStatus.CONFLICT, "FRIEND_REQUEST_CONFLICT", "상대방이 이미 친구 요청을 한 상태입니다."), // 409에러
+    FRIEND_ALREADY_REQUESTED(HttpStatus.BAD_REQUEST, "FRIEND_ALREADY_REQUESTED", "이미 친구 요청을 보냈습니다."),
+    FRIEND_ALREADY_EXISTS(HttpStatus.CONFLICT, "FRIEND_ALREADY_EXISTS", "이미 친구 관계입니다."), // 409 에러
+    FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND,"FRIEND_REQUEST_NOT_FOUND", "받은 친구 요청이 존재하지 않습니다."),
+    FRIEND_SEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND,"FRIEND_REQUEST_NOT_FOUND", "보낸 친구 요청이 존재하지 않습니다."),
+    FRIEND_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "FRIEND_REQUEST_NOT_PENDING", "대기 상태의 친구 요청이 아닙니다."),
+    FRIEND_RECOVER_BAD_REQUEST(HttpStatus.BAD_REQUEST, "FRIEND_CANNOT_RECOVER", "친구 관계를 복구할 수 없는 상태입니다."),
+    FRIEND_CANCELED_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIEND_CANCELED_NOT_FOUND", "끊은 친구가 존재하지 않습니다."),
+    FRIEND_INVALID_TYPE(HttpStatus.BAD_REQUEST, "FRIEND_INVALID_TYPE", "유효하지 않은 친구 요청 타입입니다.");
 
     private final HttpStatus status;
     private final String error;

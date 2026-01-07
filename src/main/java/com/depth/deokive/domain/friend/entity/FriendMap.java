@@ -25,7 +25,9 @@ import java.time.LocalDateTime;
         )
     },
     indexes = {
-        @Index(name = "idx_friend_map_user", columnList = "user_id")
+            @Index(name = "idx_user_status_time", columnList = "user_id, friend_status, accepted_at, friend_id"), // 친구 목록 조회
+            @Index(name = "idx_friend_status_created", columnList = "friend_id, friend_status, created_at"), // 받은 친구 요청 목록 조회
+            @Index(name = "idx_user_status_created", columnList = "user_id, friend_status, created_at") // 보낸 요청 목록 조회
     }
 )
 public class FriendMap extends TimeBaseEntity {
@@ -47,7 +49,19 @@ public class FriendMap extends TimeBaseEntity {
     @JoinColumn(name = "friend_id", nullable = false)
     private User friend;
 
+    @Column(name = "friend_id", insertable = false, updatable = false)
+    private Long friendId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requested_by", nullable = false)
     private User requestedBy;
+
+    public void updateStatus(FriendStatus friendStatus) {
+        this.friendStatus = friendStatus;
+    }
+
+    public void updateRequestedBy(User requestedBy) {
+        this.requestedBy = requestedBy;
+    }
 }
+
