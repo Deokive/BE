@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -144,6 +145,31 @@ class EventServiceTest extends IntegrationTestSupport {
 
             List<String> tags = eventHashtagMapRepository.findHashtagNamesByEventId(savedEvent.getId());
             assertThat(tags).containsExactlyInAnyOrder("tag1", "tag2");
+        }
+
+        @Test
+        @DisplayName("SCENE (Additional): 윤년(Leap Year) 생성 확인 (2024-02-29)")
+        void createEvent_LeapYear() {
+            // Given
+            setupMockUser(userA);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // 2024년은 윤년입니다.
+            LocalDate leapDate = LocalDate.of(2024, 2, 29);
+
+            EventDto.CreateRequest request = EventDto.CreateRequest.builder()
+                    .title("Leap Year Event")
+                    .date(leapDate)
+                    .color("#FF5733")
+                    .hasTime(false)
+                    .build();
+
+            // When
+            EventDto.Response response = eventService.createEvent(principal, archiveAPublic.getId(), request);
+
+            // Then
+            Event savedEvent = eventRepository.findById(response.getId()).orElseThrow();
+            assertThat(savedEvent.getDate().toLocalDate()).isEqualTo(leapDate);
         }
 
         @Test
@@ -767,6 +793,192 @@ class EventServiceTest extends IntegrationTestSupport {
             EventDto.Response noTimeEvent = results.stream().filter(e -> e.getTitle().equals("Event 2")).findFirst().orElseThrow();
             assertThat(noTimeEvent.isHasTime()).isFalse();
             assertThat(noTimeEvent.getTime()).isNull();
+        }
+    }
+
+    // ========================================================================================
+    // [Category Limit 1]: Create Limit (SCENE Limit-1 ~ Limit-3)
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category Limit 1] 이벤트 생성 제한 (Max 4)")
+    class CreateLimit {
+
+        @Test
+        @DisplayName("SCENE Limit-1: 하루 4개까지 정상 등록")
+        void create_BoundarySuccess() {
+            // Given
+            LocalDate date = LocalDate.of(2024, 12, 25);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // When: 4개 생성
+            for(int i=0; i<4; i++) {
+                createEventDirectly(principal, archiveAPublic.getId(), date);
+            }
+
+            // Then
+            long count = eventRepository.countByArchiveIdAndDate(
+                    archiveAPublic.getId(),
+                    date.atStartOfDay(),
+                    date.plusDays(1).atStartOfDay()
+            );
+            assertThat(count).isEqualTo(4);
+        }
+
+        @Test
+        @DisplayName("SCENE Limit-2: 5번째 등록 시 예외 발생 (EVENT_LIMIT_EXCEEDED)")
+        void create_LimitExceeded() {
+            // Given: 4개 미리 생성
+            LocalDate date = LocalDate.of(2024, 12, 25);
+            UserPrincipal principal = UserPrincipal.from(userA);
+            for(int i=0; i<4; i++) createEventDirectly(principal, archiveAPublic.getId(), date);
+
+            // When & Then: 5번째 시도
+            EventDto.CreateRequest req = EventDto.CreateRequest.builder()
+                    .title("5th").date(date).color("#000").build();
+
+            assertThatThrownBy(() -> eventService.createEvent(principal, archiveAPublic.getId(), req))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_LIMIT_EXCEEDED);
+        }
+
+        @Test
+        @DisplayName("SCENE Limit-3: 다른 날짜에는 영향 없음")
+        void create_DifferentDay() {
+            // Given: 25일에 4개 생성
+            LocalDate date1 = LocalDate.of(2024, 12, 25);
+            LocalDate date2 = LocalDate.of(2024, 12, 26);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            for(int i=0; i<4; i++) createEventDirectly(principal, archiveAPublic.getId(), date1);
+
+            // When: 26일에 생성 -> 성공해야 함
+            EventDto.CreateRequest req = EventDto.CreateRequest.builder()
+                    .title("Other Day").date(date2).color("#000").build();
+
+            EventDto.Response res = eventService.createEvent(principal, archiveAPublic.getId(), req);
+            assertThat(res.getId()).isNotNull();
+        }
+    }
+
+    // ========================================================================================
+    // [Category Limit 2]: Update Limit (SCENE Limit-4 ~ Limit-6)
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category Limit 2] 이벤트 수정 제한")
+    class UpdateLimit {
+        @Test
+        @DisplayName("SCENE Limit-4: 날짜 변경 시, 대상 날짜가 꽉 차있으면 예외 발생")
+        void update_DateConflict() {
+            // Given
+            LocalDate fullDate = LocalDate.of(2024, 1, 1);
+            LocalDate sourceDate = LocalDate.of(2024, 1, 2);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // 1일: 4개 (Full)
+            for(int i=0; i<4; i++) createEventDirectly(principal, archiveAPublic.getId(), fullDate);
+
+            // 2일: 1개 (Source - 이동시킬 대상)
+            // createEventDirectly는 void이므로, 생성 후 조회 필요
+            createEventDirectly(principal, archiveAPublic.getId(), sourceDate);
+            Event source = eventRepository.findAllByArchiveAndDateRange(
+                    archiveAPublic.getId(), sourceDate.atStartOfDay(), sourceDate.plusDays(1).atStartOfDay()
+            ).get(0);
+
+            flushAndClear();
+
+            // When: sourceEvent의 날짜를 fullDate로 변경 시도
+            EventDto.UpdateRequest req = EventDto.UpdateRequest.builder()
+                    .date(fullDate)
+                    .build();
+
+            // Then: 예외 발생
+            assertThatThrownBy(() -> eventService.updateEvent(principal, source.getId(), req))
+                    .isInstanceOf(RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_LIMIT_EXCEEDED);
+        }
+
+        @Test
+        @DisplayName("SCENE Limit-5: 같은 날짜 내에서 시간/내용 변경은 제한 체크 패스")
+        void update_SameDate_NoCheck() {
+            // Given
+            LocalDate date = LocalDate.of(2024, 1, 1);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // 4개 채움
+            for(int i=0; i<4; i++) createEventDirectly(principal, archiveAPublic.getId(), date);
+
+            // 4번째 이벤트 가져오기
+            List<Event> events = eventRepository.findAllByArchiveAndDateRange(
+                    archiveAPublic.getId(), date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+            Event target = events.get(3);
+
+            // When: 4번째 이벤트의 제목만 변경 (날짜 동일)
+            EventDto.UpdateRequest req = EventDto.UpdateRequest.builder().date(date).title("Updated").build();
+
+            // Then: 성공 (Limit Exception 안 남)
+            EventDto.Response res = eventService.updateEvent(principal, target.getId(), req);
+            assertThat(res.getTitle()).isEqualTo("Updated");
+            assertThat(res.getDate()).isEqualTo(date);
+        }
+
+        @Test
+        @DisplayName("SCENE Limit-6: 날짜 변경 시, 대상 날짜에 여유가 있으면 성공")
+        void update_DateMove_Success() {
+            // Given
+            LocalDate sourceDate = LocalDate.of(2024, 1, 1);
+            LocalDate targetDate = LocalDate.of(2024, 1, 2); // 0개
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            createEventDirectly(principal, archiveAPublic.getId(), sourceDate);
+            Event event = eventRepository.findAllByArchiveAndDateRange(
+                    archiveAPublic.getId(), sourceDate.atStartOfDay(), sourceDate.plusDays(1).atStartOfDay()
+            ).get(0);
+
+            // When
+            EventDto.UpdateRequest req = EventDto.UpdateRequest.builder().date(targetDate).build();
+            EventDto.Response res = eventService.updateEvent(principal, event.getId(), req);
+
+            // Then
+            assertThat(res.getDate()).isEqualTo(targetDate);
+        }
+    }
+
+    // ========================================================================================
+    // [Category Query]: Query Consistency (SCENE Query-1)
+    // ========================================================================================
+    @Nested
+    @DisplayName("[Category Query] 쿼리 정합성 (< vs <=)")
+    class QueryConsistency {
+
+        @Test
+        @DisplayName("SCENE Query-1: 다음날 00:00 데이터가 현재 날짜 개수에 포함되지 않는지 확인")
+        void check_NextDayMidnight() {
+            // Given
+            LocalDate may5 = LocalDate.of(2024, 5, 5);
+            UserPrincipal principal = UserPrincipal.from(userA);
+
+            // 1. 5월 5일 23:59:00 생성 (포함되어야 함)
+            // -> 여기서는 직접 DTO 만들어서 호출
+            EventDto.CreateRequest req1 = EventDto.CreateRequest.builder()
+                    .title("Late").date(may5).hasTime(true).time(LocalTime.of(23, 59)).color("#000").build();
+            eventService.createEvent(principal, archiveAPublic.getId(), req1);
+
+            // 2. 5월 6일 00:00:00 생성 (제외되어야 함)
+            EventDto.CreateRequest req2 = EventDto.CreateRequest.builder()
+                    .title("Midnight").date(may5.plusDays(1)).hasTime(true).time(LocalTime.MIDNIGHT).color("#000").build();
+            eventService.createEvent(principal, archiveAPublic.getId(), req2);
+
+            flushAndClear();
+
+            // Service 로직: start = 5/5 00:00, end = 5/6 00:00
+
+            LocalDateTime start = may5.atStartOfDay();
+            LocalDateTime end = start.plusDays(1); // 5/6 00:00
+
+            long count = eventRepository.countByArchiveIdAndDate(archiveAPublic.getId(), start, end);
+
+            // Then: 5월 5일 데이터만 카운트되어야 하므로 1개
+            assertThat(count).isEqualTo(1);
         }
     }
 

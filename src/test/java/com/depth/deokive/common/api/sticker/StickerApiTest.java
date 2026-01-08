@@ -278,7 +278,6 @@ class StickerApiTest extends ApiTestSupport {
         }
     }
 
-    // [수정된 AuthSteps] - 이메일 존재 여부 확인 로직 추가
     static class AuthSteps {
         static Map<String, Object> registerAndLogin(String e, String n, String p) {
             // 1. 이메일 중복 확인
