@@ -6,6 +6,7 @@ import com.depth.deokive.domain.archive.service.ArchiveService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,9 +42,10 @@ public class ArchiveController {
     @ApiResponse(responseCode = "200", description = "아카이브 조회 성공")
     public ResponseEntity<ArchiveDto.Response> getArchiveDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
-            @PathVariable Long archiveId
+            @PathVariable Long archiveId,
+            HttpServletRequest request
     ) {
-        return ResponseEntity.ok(archiveService.getArchiveDetail(user, archiveId));
+        return ResponseEntity.ok(archiveService.getArchiveDetail(user, archiveId, request));
     }
 
     @PatchMapping("/{archiveId}")
