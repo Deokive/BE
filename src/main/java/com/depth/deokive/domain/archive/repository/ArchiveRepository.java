@@ -42,4 +42,8 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long> {
         @Param("cutOffDate") LocalDateTime cutOffDate,
         @Param("targetBadges") List<Badge> targetBadges
     );
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Archive a SET a.viewCount = a.viewCount + :count WHERE a.id = :id")
+    void incrementViewCount(@Param("id") Long id, @Param("count") Long count);
 }
