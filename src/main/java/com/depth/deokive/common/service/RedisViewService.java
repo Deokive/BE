@@ -49,7 +49,7 @@ public class RedisViewService {
     }
 
     /** 특정 도메인의 조회수 데이터를 모두 스캔하여 반환 */
-    public Map<Long, Long> getAndFlushViewCounts(ViewDomain domain) {
+    public Map<Long, Long> getAndFlushViewCounts(ViewDomain domain, int limit) {
         Map<Long, Long> viewCounts = new HashMap<>();
         String pattern = String.format("view:count:%s:*", domain.getPrefix()); // Ex. view:count:archive:*
 
@@ -57,6 +57,11 @@ public class RedisViewService {
 
         try (Cursor<byte[]> cursor = redisTemplate.getConnectionFactory().getConnection().scan(options)) {
             while (cursor.hasNext()) {
+                if (viewCounts.size() >= limit) {
+                    log.info("🟡 [Redis] Batch limit reached ({}), stopping scan for this cycle.", limit);
+                    break;
+                }
+
                 String key = new String(cursor.next());
                 String value = redisTemplate.opsForValue().get(key);
 

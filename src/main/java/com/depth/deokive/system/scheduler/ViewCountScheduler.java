@@ -20,6 +20,8 @@ public class ViewCountScheduler {
     private final PostRepository postRepository;
     private final ArchiveRepository archiveRepository;
 
+    private static final int BATCH_SIZE = 5000;
+
     @Scheduled(fixedRateString = "${scheduler.view-interval:300000}") // Default : 5분
     public void syncAllViewCounts() {
         log.info("🔥 [Scheduler] Starting View Count Sync...");
@@ -29,7 +31,7 @@ public class ViewCountScheduler {
     }
 
     private void syncPostViews() {
-        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(ViewDomain.POST);
+        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(ViewDomain.POST, BATCH_SIZE);
         if (counts.isEmpty()) return;
 
         counts.forEach((id, count) -> {
@@ -46,7 +48,7 @@ public class ViewCountScheduler {
     }
 
     private void syncArchiveViews() {
-        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(ViewDomain.ARCHIVE);
+        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(ViewDomain.ARCHIVE, BATCH_SIZE);
         if (counts.isEmpty()) return;
 
         counts.forEach((id, count) -> {
