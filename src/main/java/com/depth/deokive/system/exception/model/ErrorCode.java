@@ -108,8 +108,11 @@ public enum ErrorCode {
     EVENT_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_CREATION_FAILED", "이벤트 생성에 실패했습니다."),
     EVENT_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_UPDATE_FAILED", "이벤트 수정에 실패했습니다."),
     EVENT_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVENT_DELETE_FAILED", "이벤트 삭제에 실패했습니다."),
+    EVENT_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "EVENT_LIMIT_EXCEEDED", "이벤트는 일정 당 최대 4개까지만 등록할 수 있습니다."),
 
-
+    // STICKER Errors
+    STICKER_ALREADY_EXISTS(HttpStatus.CONFLICT, "STICKER_ALREADY_EXISTS", "이미 해당 일정에 스티커가 존재합니다."),
+    STICKER_NOT_FOUND(HttpStatus.NOT_FOUND, "STICKER_NOT_FOUND", "존재하지 않는 스티커입니다."),
 
     // DB Errors
     DB_CONNECTION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "DB CONNECTION FAILED", "데이터베이스 연결에 실패했습니다."),

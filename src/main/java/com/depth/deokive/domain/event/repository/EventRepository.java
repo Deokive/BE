@@ -26,5 +26,14 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Modifying
     @Query("DELETE FROM Event e WHERE e.archive.id = :archiveId")
     void deleteByArchiveId(@Param("archiveId") Long archiveId);
+
+    @Query("SELECT COUNT(e) FROM Event e " +
+            "WHERE e.archive.id = :archiveId " +
+            "AND e.date >= :start AND e.date < :end")
+    long countByArchiveIdAndDate(
+            @Param("archiveId") Long archiveId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
 }
 

@@ -73,6 +73,10 @@ class EventApiTest extends ApiTestSupport {
     void setUp() {
         RestAssured.port = port;
 
+        eventHashtagMapRepository.deleteAll();
+        sportRecordRepository.deleteAll();
+        eventRepository.deleteAll();
+
         // [S3 Mocking] - Event 도메인에선 S3를 직접 쓰진 않지만, Archive 생성 시 내부적으로 사용될 수 있으므로 설정
         when(s3Service.initiateUpload(any())).thenAnswer(invocation -> S3ServiceDto.UploadInitiateResponse.builder().build());
         when(s3Service.calculatePartCount(any())).thenReturn(1);
@@ -352,6 +356,51 @@ class EventApiTest extends ApiTestSupport {
                     .then()
                     .statusCode(HttpStatus.NOT_FOUND.value())
                     .body("error", notNullValue());
+        }
+
+        @Test
+        @DisplayName("SCENE Limit-1: 하루 최대 개수(4개)까지 생성 성공 (201)")
+        void createEvent_LimitBoundary() {
+            // Given: 2024-12-25에 4개 생성 시도
+            for (int i = 1; i <= 4; i++) {
+                Map<String, Object> req = Map.of(
+                        "title", "Event " + i,
+                        "date", "2024-12-25",
+                        "color", "#000000"
+                );
+
+                given().cookie("ATK", tokenUserA)
+                        .contentType(ContentType.JSON)
+                        .body(req)
+                        .post("/api/v1/events/{archiveId}", publicArchiveId)
+                        .then()
+                        .statusCode(HttpStatus.CREATED.value());
+            }
+        }
+
+        @Test
+        @DisplayName("SCENE Limit-2: 5번째 생성 시도 시 실패 (409 Conflict)")
+        void createEvent_LimitExceeded() {
+            // Given: 이미 4개가 생성된 상태
+            // (DB 초기화 후 빠르게 4개 생성)
+            for (int i = 0; i < 4; i++) {
+                EventSteps.create(tokenUserA, publicArchiveId, "E", false, false);
+            }
+
+            // When: 5번째 생성 시도 (2024-01-01, EventSteps 기본 날짜와 동일)
+            Map<String, Object> req = Map.of(
+                    "title", "Overflow",
+                    "date", "2024-01-01",
+                    "color", "#000000"
+            );
+
+            given().cookie("ATK", tokenUserA)
+                    .contentType(ContentType.JSON)
+                    .body(req)
+                    .post("/api/v1/events/{archiveId}", publicArchiveId)
+                    .then()
+                    .statusCode(HttpStatus.CONFLICT.value()) // 409
+                    .body("error", equalTo("EVENT_LIMIT_EXCEEDED"));
         }
     }
 

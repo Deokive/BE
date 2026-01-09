@@ -32,6 +32,8 @@ public class EventService {
     private final EventHashtagMapRepository eventHashtagMapRepository;
     private final ArchiveRepository archiveRepository;
 
+    private static final int MAX_EVENT_COUNT_PER_DAY = 4;
+
     @Transactional
     public EventDto.Response createEvent(UserPrincipal user, Long archiveId, EventDto.CreateRequest request) {
         // SEQ 1. 아카이브 조회
@@ -41,21 +43,24 @@ public class EventService {
         // SEQ 2. 소유권 검증
         archiveGuard.checkOwner(archive.getUser().getId(), user);
 
-        // SEQ 3. 날짜/시간 병합 로직
+        // SEQ 3. 개수 제한 검증
+        validateEventCount(archiveId, request.getDate());
+
+        // SEQ 4. 날짜/시간 병합 로직
         LocalDateTime recordAt = getRecordAt(request);
 
-        // SEQ 4. Event 저장
+        // SEQ 5. Event 저장
         Event event = request.toEntity(archive, recordAt);
         eventRepository.save(event);
 
-        // SEQ 5. 스포츠 기록 저장 (필요 시)
+        // SEQ 6. 스포츠 기록 저장 (필요 시)
         SportRecord sportRecord = null;
         if (request.getIsSportType() && request.getSportInfo() != null) {
             sportRecord = request.getSportInfo().toEntity(event);
             sportRecordRepository.save(sportRecord);
         }
 
-        // SEQ 6. 해시태그 저장
+        // SEQ 7. 해시태그 저장
         saveHashtags(event, request.getHashtags());
 
         return EventDto.Response.of(event, sportRecord, request.getHashtags());
@@ -91,19 +96,24 @@ public class EventService {
         // SEQ 2. 소유권 검증
         archiveGuard.checkOwner(event.getArchive().getUser().getId(), user);
 
-        // SEQ 3. 업데이트
+        // SEQ 3. 날짜가 변경되는 경우에만 개수 제한 검증
+        if (request.getDate() != null && !request.getDate().equals(event.getDate().toLocalDate())) {
+            validateEventCount(event.getArchive().getId(), request.getDate());
+        }
+
+        // SEQ 4. 업데이트
         event.update(request, getRecordAt(request, event)); // Dirty Checking
 
-        // SEQ 4. 스포츠 기록 처리
+        // SEQ 5. 스포츠 기록 처리
         SportRecord sportRecord = handleSportRecordUpdate(event, request);
 
-        // SEQ 5. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
+        // SEQ 6. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
         if (request.getHashtags() != null) {
             eventHashtagMapRepository.deleteByEventId(eventId);
             saveHashtags(event, request.getHashtags());
         }
 
-        // SEQ 6. 현재 해시태그 조회 (업데이트 안하는 경우 고려)
+        // SEQ 7. 현재 해시태그 조회 (업데이트 안하는 경우 고려)
         List<String> currentHashtags = (request.getHashtags() != null)
                 ? request.getHashtags()
                 : eventHashtagMapRepository.findHashtagNamesByEventId(eventId);
@@ -165,6 +175,16 @@ public class EventService {
     }
 
     // --- Helper Methods ---
+
+    private void validateEventCount(Long archiveId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = start.plusDays(1);
+
+        long count = eventRepository.countByArchiveIdAndDate(archiveId, start, end);
+        if (count >= MAX_EVENT_COUNT_PER_DAY) {
+            throw new RestException(ErrorCode.EVENT_LIMIT_EXCEEDED);
+        }
+    }
 
     private LocalDateTime getRecordAt(EventDto.CreateRequest r) {
         LocalTime time = (Boolean.TRUE.equals(r.getHasTime()) && r.getTime() != null) ? r.getTime() : LocalTime.MIDNIGHT;
