@@ -15,6 +15,10 @@ java {
     }
 }
 
+jacoco {
+    toolVersion = "0.8.11"
+}
+
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
@@ -104,4 +108,82 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy 'jacocoTestReport'
 }
+
+// 리포트 생성 설정
+tasks.named('jacocoTestReport') {
+    dependsOn test // 리포트 생성 전 테스트 필수
+
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
+
+    // 제외할 클래스 패턴 정의
+    def Qdomains = []
+    for (qPattern in '**/QA'..'**/QZ') {
+        Qdomains.add(qPattern + '*')
+    }
+
+    def myExcludes = [
+            // 1. 애플리케이션 메인 클래스
+            "**/*Application*",
+
+            // 2. QueryDSL Q-Class 제외
+            "**/Q*.*",
+
+            // 3. 설정 파일, 예외, DTO, 모델 등 로직이 없는 클래스 제외
+            "**/config/**",
+            "**/dto/**",
+            "**/exception/**",
+            "**/model/**",
+
+            // 4. 기타 인프라성 코드
+            "**/common/**"
+    ] + Qdomains
+
+    classDirectories.setFrom(
+            sourceSets.main.output.classesDirs.collect {
+                fileTree(dir: it, exclude: myExcludes)
+            }
+    )
+}
+
+// 커버리지 검증 설정 (CI 빌드 실패 기준) -> 추후 다룰 예정
+//tasks.named('jacocoTestCoverageVerification') {
+//    // 리포트 생성 후 검증 실행
+//    dependsOn 'jacocoTestReport'
+//
+//    violationRules {
+//        rule {
+//            // 룰을 체크할 단위 (CLASS, BUNDLE, PACKAGE 등)
+//            element = 'CLASS'
+//
+//            // 제외할 클래스
+//            excludes = [
+//                    "**.*Application*",
+//                    "**.Q*",
+//                    "**.dto.**",
+//                    "**.config.**",
+//                    "**.exception.**",
+//                    "**.common.**"
+//            ]
+//
+//            // 조건 1: 브랜치 커버리지 (if/else 등 분기) 50% 이상
+//            limit {
+//                counter = 'BRANCH'
+//                value = 'COVEREDRATIO'
+//                minimum = 0.50
+//            }
+//
+//            // 조건 2: 라인 커버리지 70% 이상
+//            limit {
+//                counter = 'LINE'
+//                value = 'COVEREDRATIO'
+//                minimum = 0.70
+//            }
+//        }
+//    }
+//}
