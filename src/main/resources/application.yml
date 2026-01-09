@@ -114,6 +114,7 @@ app:
   allowed-origins: "${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}"
 
 
+
 hmac:
   secret: ${HMAC_SECRET_KEY} # at least 32 characters long
 
@@ -130,3 +131,6 @@ scheduler:
     retry:
       max-attempts: 3                # S3 삭제 재시도 최대 횟수
       delay-ms: 1000                 # 재시도 간 지연 시간 (밀리초)
+
+  view-interval: 300000 # 5 min (5*60*1000ms)
+  view-cooldown-minutes: 10
