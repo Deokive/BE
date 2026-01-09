@@ -1,7 +1,10 @@
 package com.depth.deokive.domain.archive.service;
 
 import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.enums.ViewDomain;
 import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.service.RedisViewService;
+import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
@@ -10,6 +13,7 @@ import com.depth.deokive.domain.user.repository.UserRepository;
 import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -46,6 +50,7 @@ public class ArchiveService {
 
     private final FileService fileService;
     private final ArchiveGuard archiveGuard;
+    private final RedisViewService redisViewService;
 
     private final ArchiveQueryRepository archiveQueryRepository;
 
@@ -106,12 +111,16 @@ public class ArchiveService {
     }
 
     @Transactional // viewCount 바꿔서 readOnly가 아닌거임
-    public ArchiveDto.Response getArchiveDetail(UserPrincipal userPrincipal, Long archiveId) {
+    public ArchiveDto.Response getArchiveDetail(
+            UserPrincipal userPrincipal,
+            Long archiveId,
+            HttpServletRequest request
+    ) {
         // SEQ 1. Fetch Join을 사용하여 Archive + User 조회 (N+1 방지)
         Archive archive = archiveRepository.findByIdWithUser(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        // SEQ 2. Viewer & Owner 판별 // TODO: Check Arcchive Guard Owner
+        // SEQ 2. Viewer & Owner 판별
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         boolean isOwner = archive.getUser().getId().equals(viewerId);
 
@@ -119,7 +128,7 @@ public class ArchiveService {
         archiveGuard.checkArchiveReadPermission(archive, userPrincipal);
 
         // SEQ 4. 조회수 증가 (Dirty Checking)
-        archive.increaseViewCount();
+        increaseViewCount(userPrincipal, archiveId, request);
 
         // SEQ 5. 데이터 조회 : 좋아요 수, 조회수, isLiked, isOwner, bannerUrl, archive
         String bannerUrl = (archive.getBannerFile() != null)
@@ -302,5 +311,12 @@ public class ArchiveService {
             archive.updateBanner(newBanner);
             return FileUrlUtils.buildCdnUrl(newBanner.getS3ObjectKey());
         }
+    }
+
+    private void increaseViewCount(UserPrincipal userPrincipal, Long archiveId, HttpServletRequest request) {
+        Long userId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        String clientIp = ClientUtils.getClientIp(request);
+
+        redisViewService.incrementViewCount(ViewDomain.ARCHIVE, archiveId, userId, clientIp);
     }
 }

@@ -1,6 +1,9 @@
 package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.service.RedisViewService;
+import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
@@ -19,6 +22,7 @@ import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,6 +46,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final FileService fileService;
     private final PostQueryRepository postQueryRepository;
+    private final RedisViewService redisViewService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -61,7 +66,7 @@ public class PostService {
     }
 
     @Transactional
-    public PostDto.Response getPost(UserPrincipal userPrincipal, Long postId) {
+    public PostDto.Response getPost(UserPrincipal userPrincipal, Long postId, HttpServletRequest request) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
@@ -69,8 +74,8 @@ public class PostService {
         // SEQ 2. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
 
-        // SEQ 3. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
-        post.increaseViewCount();
+        // SEQ 3. 상세 조회 시 조회수 증가
+        increaseViewCount(userPrincipal, postId, request);
 
         // SEQ 4. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
@@ -224,6 +229,13 @@ public class PostService {
         if (!post.getUser().getId().equals(userPrincipal.getUserId())) {
             throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 권한 없음 예외
         }
+    }
+
+    private void increaseViewCount(UserPrincipal userPrincipal, Long postId, HttpServletRequest request) {
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        String clientIp = ClientUtils.getClientIp(request);
+
+        redisViewService.incrementViewCount(ViewDomain.POST, postId, viewerId, clientIp);
     }
 }
 
