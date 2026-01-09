@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.post.repository;
 
 import com.depth.deokive.domain.post.entity.Post;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -23,6 +24,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     );
 
     // 조회수 증가 (Bulk Update)
+    @Transactional
     @Modifying(clearAutomatically = true) // 영속성 컨텍스트 초기화
     @Query("UPDATE Post p SET p.viewCount = p.viewCount + :count WHERE p.id = :postId")
     void incrementViewCount(@Param("postId") Long postId, @Param("count") Long count);

@@ -2,6 +2,7 @@ package com.depth.deokive.domain.archive.repository;
 
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -43,6 +44,7 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long> {
         @Param("targetBadges") List<Badge> targetBadges
     );
 
+    @Transactional
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Archive a SET a.viewCount = a.viewCount + :count WHERE a.id = :id")
     void incrementViewCount(@Param("id") Long id, @Param("count") Long count);
