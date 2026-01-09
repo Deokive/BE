@@ -21,5 +21,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             @Param("w2") int w2,
             @Param("lambda") double lambda
     );
-}
 
+    // 조회수 증가 (Bulk Update)
+    @Modifying(clearAutomatically = true) // 영속성 컨텍스트 초기화
+    @Query("UPDATE Post p SET p.viewCount = p.viewCount + :count WHERE p.id = :postId")
+    void incrementViewCount(@Param("postId") Long postId, @Param("count") Long count);
+}
