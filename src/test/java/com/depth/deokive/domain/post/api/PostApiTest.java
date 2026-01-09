@@ -1,17 +1,14 @@
-package com.depth.deokive.common.api.post;
+package com.depth.deokive.domain.post.api;
 
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
-import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.repository.FileRepository;
-import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
-import com.depth.deokive.domain.s3.service.S3Service;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;

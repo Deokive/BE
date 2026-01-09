@@ -1,4 +1,4 @@
-package com.depth.deokive.common.api.gallery;
+package com.depth.deokive.domain.gallery.api;
 
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
@@ -6,13 +6,11 @@ import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
-import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.entity.Gallery;
 import com.depth.deokive.domain.gallery.entity.GalleryBook;
 import com.depth.deokive.domain.gallery.repository.GalleryBookRepository;
 import com.depth.deokive.domain.gallery.repository.GalleryRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
-import com.depth.deokive.domain.s3.service.S3Service;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import io.restassured.RestAssured;

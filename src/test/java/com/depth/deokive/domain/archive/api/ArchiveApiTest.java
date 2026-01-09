@@ -1,6 +1,5 @@
-package com.depth.deokive.common.api.archive;
+package com.depth.deokive.domain.archive.api;
 
-import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
