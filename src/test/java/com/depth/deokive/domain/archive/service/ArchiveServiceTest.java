@@ -24,6 +24,7 @@ import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
+import com.depth.deokive.system.scheduler.ViewCountScheduler;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -57,6 +60,9 @@ class ArchiveServiceTest extends IntegrationTestSupport {
     @Autowired TicketBookRepository ticketBookRepository;
     @Autowired RepostBookRepository repostBookRepository;
 
+    @Autowired private ViewCountScheduler viewCountScheduler;
+    @Autowired private StringRedisTemplate redisTemplate;
+
     // Test Data
     private User userA; // Me
     private User userB; // Friend
@@ -64,6 +70,8 @@ class ArchiveServiceTest extends IntegrationTestSupport {
 
     private File bannerFileA; // Owned by A
     private File bannerFileC; // Owned by C
+
+    private MockHttpServletRequest mockRequest;
 
     @BeforeEach
     void setUp() {
@@ -85,6 +93,9 @@ class ArchiveServiceTest extends IntegrationTestSupport {
 
         // Context Clear
         SecurityContextHolder.clearContext();
+
+        mockRequest = new MockHttpServletRequest();
+        mockRequest.setRemoteAddr("127.0.0.1");
     }
 
     private User createTestUser(String email, String nickname) {
@@ -242,17 +253,17 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             UserPrincipal principal = UserPrincipal.from(userA);
 
             // Scene 10: Public + Banner
-            ArchiveDto.Response resPub = archiveService.getArchiveDetail(principal, archivePublic.getId());
+            ArchiveDto.Response resPub = archiveService.getArchiveDetail(principal, archivePublic.getId(), mockRequest);
             assertThat(resPub.isOwner()).isTrue();
             assertThat(resPub.getBannerUrl()).contains("bannerA");
-            assertThat(resPub.getViewCount()).isEqualTo(1); // Read increases view count
+            // assertThat(resPub.getViewCount()).isEqualTo(1); // Read increases view count
 
             // Scene 11: Restricted
-            ArchiveDto.Response resRes = archiveService.getArchiveDetail(principal, archiveRestricted.getId());
+            ArchiveDto.Response resRes = archiveService.getArchiveDetail(principal, archiveRestricted.getId(), mockRequest);
             assertThat(resRes.isOwner()).isTrue();
 
             // Scene 12: Private
-            ArchiveDto.Response resPri = archiveService.getArchiveDetail(principal, archivePrivate.getId());
+            ArchiveDto.Response resPri = archiveService.getArchiveDetail(principal, archivePrivate.getId(), mockRequest);
             assertThat(resPri.isOwner()).isTrue();
 
             // Scene 13: No Banner Check
@@ -263,16 +274,16 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 14~16: PUBLIC Archive (타인, 친구, 비회원)")
         void getArchiveDetail_Public() {
             // Scene 14: Stranger (UserC)
-            ArchiveDto.Response resStranger = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId());
+            ArchiveDto.Response resStranger = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId(), mockRequest);
             assertThat(resStranger.isOwner()).isFalse();
             assertThat(resStranger.getBannerUrl()).isNotNull();
 
             // Scene 15: Friend (UserB)
-            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId());
+            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId(), mockRequest);
             assertThat(resFriend.isOwner()).isFalse();
 
             // Scene 16: Anonymous
-            ArchiveDto.Response resAnon = archiveService.getArchiveDetail(null, archivePublic.getId());
+            ArchiveDto.Response resAnon = archiveService.getArchiveDetail(null, archivePublic.getId(), mockRequest);
             assertThat(resAnon.isOwner()).isFalse();
         }
 
@@ -280,15 +291,15 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 17~19: RESTRICTED Archive (친구O, 타인X, 비회원X)")
         void getArchiveDetail_Restricted() {
             // Scene 17: Friend (UserB) -> OK
-            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archiveRestricted.getId());
+            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archiveRestricted.getId(), mockRequest);
             assertThat(resFriend).isNotNull();
 
             // Scene 18: Stranger (UserC) -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archiveRestricted.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archiveRestricted.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // Scene 19: Anonymous -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archiveRestricted.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archiveRestricted.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
         }
 
@@ -296,22 +307,22 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 20~22: PRIVATE Archive (타인X, 친구X, 비회원X)")
         void getArchiveDetail_Private() {
             // Scene 20: Stranger -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePrivate.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePrivate.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // Scene 21: Friend -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePrivate.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePrivate.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // Scene 22: Anonymous -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archivePrivate.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archivePrivate.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
         }
 
         @Test
         @DisplayName("SCENE 23: 존재하지 않는 Archive")
         void getArchiveDetail_NotFound() {
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userA), 99999L))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userA), 99999L, mockRequest))
                     .isInstanceOf(RestException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ARCHIVE_NOT_FOUND);
         }
@@ -323,11 +334,11 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             archiveLikeRepository.save(ArchiveLike.builder().archive(archivePublic).user(userB).build());
 
             // Scene 24: UserB (Liked)
-            ArchiveDto.Response resLiked = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId());
+            ArchiveDto.Response resLiked = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId(), mockRequest);
             assertThat(resLiked.isLiked()).isTrue();
 
             // Scene 25: UserC (Not Liked)
-            ArchiveDto.Response resNotLiked = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId());
+            ArchiveDto.Response resNotLiked = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId(), mockRequest);
             assertThat(resNotLiked.isLiked()).isFalse();
         }
 
@@ -335,13 +346,31 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 26: 조회수 증가 확인")
         void getArchiveDetail_ViewCount() {
             long initialView = archivePublic.getViewCount(); // 0
+            Long archiveId = archivePublic.getId();
+            String countKey = "view:count:archive:" + archiveId;
 
-            archiveService.getArchiveDetail(UserPrincipal.from(userA), archivePublic.getId());
-            archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId());
-            archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId());
+            // 1. 서로 다른 유저(UserA, UserB, UserC)가 조회 -> IP가 같아도 UserID가 다르면 카운트 됨
+            mockRequest.setRemoteAddr("127.0.0.1"); // IP는 고정이어도 무관 (로그인 유저니까)
 
-            Archive updated = archiveRepository.findById(archivePublic.getId()).orElseThrow();
+            archiveService.getArchiveDetail(UserPrincipal.from(userA), archivePublic.getId(), mockRequest);
+            archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId(), mockRequest);
+            archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId(), mockRequest);
+
+            // 2. Redis 확인
+            String redisValue = redisTemplate.opsForValue().get(countKey);
+            assertThat(redisValue).isNotNull();
+            assertThat(Long.parseLong(redisValue)).isEqualTo(3L);
+
+            // 3. 스케줄러 강제 실행
+            viewCountScheduler.syncAllViewCounts();
+            flushAndClear();
+
+            // 4. DB 검증
+            Archive updated = archiveRepository.findById(archiveId).orElseThrow();
             assertThat(updated.getViewCount()).isEqualTo(initialView + 3);
+
+            // 5. Redis 키 삭제 확인
+            assertThat(redisTemplate.hasKey(countKey)).isFalse();
         }
     }
 

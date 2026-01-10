@@ -20,12 +20,15 @@ import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
+import com.depth.deokive.system.scheduler.ViewCountScheduler;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
@@ -44,6 +47,8 @@ class PostServiceTest extends IntegrationTestSupport {
     @Autowired PostFileMapRepository postFileMapRepository;
     @Autowired PostLikeRepository postLikeRepository;
     @Autowired FileRepository fileRepository;
+    @Autowired private ViewCountScheduler viewCountScheduler;
+    @Autowired private StringRedisTemplate redisTemplate;
 
     // Test Data
     private User userA;
@@ -51,6 +56,8 @@ class PostServiceTest extends IntegrationTestSupport {
 
     private List<File> userAFiles;
     private List<File> userBFiles;
+
+    private MockHttpServletRequest mockRequest;
 
     @BeforeEach
     void setUp() {
@@ -66,6 +73,9 @@ class PostServiceTest extends IntegrationTestSupport {
         userBFiles = createFiles(userB, 5);
 
         SecurityContextHolder.clearContext();
+
+        mockRequest = new MockHttpServletRequest();
+        mockRequest.setRemoteAddr("127.0.0.1");
     }
 
     private User createTestUser(String email, String nickname) {
@@ -331,11 +341,10 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 10: 정상 케이스 (파일 포함, 본인 조회)")
         void getPost_Owner() {
             setupMockUser(userA);
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userA), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userA), postWithFiles.getId(), mockRequest);
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getFiles()).hasSize(3);
             assertThat(response.getFiles().get(0).getSequence()).isEqualTo(0);
-            assertThat(response.getViewCount()).isEqualTo(1); // Service increments viewCount
             assertThat(response.isLiked()).isFalse(); // 좋아요 없음
         }
 
@@ -343,10 +352,9 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 11: 정상 케이스 (파일 포함, 타인 조회)")
         void getPost_Stranger() {
             setupMockUser(userB);
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId(), mockRequest);
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getFiles()).hasSize(3);
-            assertThat(response.getViewCount()).isEqualTo(1);
             assertThat(response.isLiked()).isFalse(); // 좋아요 없음
         }
 
@@ -354,20 +362,19 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 12: 정상 케이스 (비회원 조회)")
         void getPost_Anonymous() {
             // When: 비회원이 조회
-            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId(), mockRequest);
 
             // Then: 정상 조회 가능
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getTitle()).isEqualTo("With Files");
             assertThat(response.getFiles()).hasSize(3);
-            assertThat(response.getViewCount()).isEqualTo(1);
             assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
         }
 
         @Test
         @DisplayName("SCENE 13: 정상 케이스 (파일 없음)")
         void getPost_NoFiles() {
-            PostDto.Response response = postService.getPost(null, postNoFiles.getId());
+            PostDto.Response response = postService.getPost(null, postNoFiles.getId(), mockRequest);
             assertThat(response.getId()).isEqualTo(postNoFiles.getId());
             assertThat(response.getFiles()).isEmpty();
             assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
@@ -376,7 +383,7 @@ class PostServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 14: 정상 케이스 (PREVIEW 파일 포함 확인)")
         void getPost_Preview() {
-            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId(), mockRequest);
             assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
         }
 
@@ -393,7 +400,7 @@ class PostServiceTest extends IntegrationTestSupport {
             flushAndClear();
 
             // When
-            PostDto.Response response = postService.getPost(null, res.getId());
+            PostDto.Response response = postService.getPost(null, res.getId(), mockRequest);
 
             // Then
             assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.CONTENT);
@@ -403,27 +410,44 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 16: 조회수 증가 확인 (DB 반영 확인)")
         void getPost_ViewCount() {
             Long id = postNoFiles.getId();
+            String countKey = "view:count:post:" + id;
 
             // 1st
-            postService.getPost(null, id);
+            mockRequest.setRemoteAddr("1.1.1.1");
+            postService.getPost(null, id, mockRequest);
             flushAndClear();
 
             // 2nd
-            postService.getPost(null, id);
+            mockRequest.setRemoteAddr("1.1.1.2");
+            postService.getPost(null, id, mockRequest);
             flushAndClear();
 
             // 3rd
-            postService.getPost(null, id);
+            mockRequest.setRemoteAddr("1.1.1.3");
+            postService.getPost(null, id, mockRequest);
             flushAndClear();
 
+            // 2. Redis에 쌓였는지 확인 (아직 DB 반영 전)
+            String redisValue = redisTemplate.opsForValue().get(countKey);
+            assertThat(redisValue).isNotNull();
+            assertThat(Long.parseLong(redisValue)).isEqualTo(3L);
+
+            // 3. 스케줄러 강제 실행 (DB 반영)
+            viewCountScheduler.syncAllViewCounts();
+            flushAndClear();
+
+            // 4. DB 검증
             Post post = postRepository.findById(id).orElseThrow();
             assertThat(post.getViewCount()).isEqualTo(3);
+
+            // 5. Redis 키 삭제 확인
+            assertThat(redisTemplate.hasKey(countKey)).isFalse();
         }
 
         @Test
         @DisplayName("SCENE 17: 존재하지 않는 Post")
         void getPost_NotFound() {
-            assertThatThrownBy(() -> postService.getPost(null, 99999L))
+            assertThatThrownBy(() -> postService.getPost(null, 99999L, mockRequest))
                     .isInstanceOf(RestException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
         }
@@ -440,7 +464,7 @@ class PostServiceTest extends IntegrationTestSupport {
             flushAndClear();
 
             // When: UserB가 조회
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId(), mockRequest);
 
             // Then: isLiked가 true
             assertThat(response.isLiked()).isTrue();
@@ -453,7 +477,7 @@ class PostServiceTest extends IntegrationTestSupport {
             setupMockUser(userB);
 
             // When: UserB가 조회
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId(), mockRequest);
 
             // Then: isLiked가 false
             assertThat(response.isLiked()).isFalse();
@@ -463,7 +487,7 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 20: isLiked 필드 검증 (비회원)")
         void getPost_IsLiked_Anonymous() {
             // When: 비회원이 조회
-            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId(), mockRequest);
 
             // Then: isLiked가 false
             assertThat(response.isLiked()).isFalse();
