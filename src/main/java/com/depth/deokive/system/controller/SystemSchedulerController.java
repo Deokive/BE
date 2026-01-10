@@ -4,6 +4,7 @@ import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.scheduler.ArchiveBadgeScheduler;
 import com.depth.deokive.system.scheduler.ArchiveHotFeedScheduler;
 import com.depth.deokive.system.scheduler.PostHotScoreScheduler;
+import com.depth.deokive.system.scheduler.ViewCountScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,8 @@ public class SystemSchedulerController {
     private final ArchiveHotFeedScheduler hotFeedScheduler;
     private final ArchiveBadgeScheduler badgeScheduler;
     private final PostHotScoreScheduler postHotScoreScheduler;
+    private final ViewCountScheduler viewCountScheduler;
+
 
     private final JobLauncher jobLauncher;
     private final Job fileCleanupJob; // Bean 이름(FileCleanupBatchConfig의 메서드명)과 일치해야 자동 주입됨
@@ -82,5 +85,16 @@ public class SystemSchedulerController {
 
         long end = System.currentTimeMillis();
         return ResponseEntity.ok("File Cleanup Batch Completed! (Time: " + (end - start) + "ms)");
+    }
+
+    @ExecutionTime
+    @PostMapping("/view-count")
+    @Operation(summary = "👁️ 조회수 동기화 강제 실행 (Redis -> DB)", description = "Redis에 캐싱된 조회수를 DB에 일괄 반영하고 Redis에서 차감합니다.")
+    public ResponseEntity<String> triggerViewCountSync() {
+        log.info("Manual Trigger: View Count Sync");
+
+        viewCountScheduler.syncAllViewCounts();
+
+        return ResponseEntity.ok("🟢 View Count Sync Completed! (Redis -> DB)");
     }
 }
