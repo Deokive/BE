@@ -42,6 +42,9 @@ public class ViewCountScheduler {
                 } catch (Exception e) {
                     log.error("🔴 Post View Sync Failed ID: {}", id, e);
                 }
+            } else {
+                // 조회수가 0 이하인 경우 DB 업데이트 없이 Redis 키만 삭제 (Zombie Key 정리)
+                redisViewService.deleteViewCountKey(ViewDomain.POST, id);
             }
         });
         log.info("✅ Synced Post Views: {} items", counts.size());
@@ -59,6 +62,9 @@ public class ViewCountScheduler {
                 } catch (Exception e) {
                     log.error("🔴 Archive View Sync Failed ID: {}", id, e);
                 }
+            } else {
+                // 조회수가 0 이하인 경우 DB 업데이트 없이 Redis 키만 삭제 (Zombie Key 정리)
+                redisViewService.deleteViewCountKey(ViewDomain.POST, id);
             }
         });
         log.info("✅ Synced Archive Views: {} items", counts.size());

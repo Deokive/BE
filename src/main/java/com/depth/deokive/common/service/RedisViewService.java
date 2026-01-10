@@ -66,8 +66,12 @@ public class RedisViewService {
                 String value = redisTemplate.opsForValue().get(key);
 
                 if (value != null) {
-                    Long id = Long.parseLong(key.split(":")[3]); // Key 파싱: view:count:{domain}:{id}
-                    viewCounts.put(id, Long.parseLong(value));
+                    try {
+                        Long id = Long.parseLong(key.split(":")[3]); // Key 파싱: view:count:{domain}:{id}
+                        viewCounts.put(id, Long.parseLong(value));
+                    } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+                        log.warn("⚠️ [Redis] Malformed data ignored. Key: {}, Value: {}", key, value);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -85,5 +89,11 @@ public class RedisViewService {
         if (value != null && Long.parseLong(value) <= 0) {
             redisTemplate.delete(key);
         }
+    }
+
+    /** 키 삭제 */
+    public void deleteViewCountKey(ViewDomain domain, Long id) {
+        String key = String.format(COUNT_KEY_FORMAT, domain.getPrefix(), id);
+        redisTemplate.delete(key);
     }
 }
