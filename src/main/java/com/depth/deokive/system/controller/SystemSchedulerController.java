@@ -23,7 +23,7 @@ import org.springframework.batch.core.Job;
 @RestController
 @RequestMapping("/api/system/test/scheduler")
 @RequiredArgsConstructor
-@Profile("dev") // ⚠️ 로컬 환경에서만 빈 등록 (운영 배포 시 404)
+@Profile({"dev", "test"}) // ⚠️ 로컬 환경에서만 빈 등록 (운영 배포 시 404)
 @Tag(name = "[TEST] Scheduler Trigger", description = "스케줄러 강제 실행 API")
 public class SystemSchedulerController {
 
