@@ -4,6 +4,7 @@ import com.depth.deokive.common.enums.ViewDomain;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.common.service.RedisViewService;
+import com.depth.deokive.domain.post.repository.PostStatsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,7 +18,7 @@ import java.util.Map;
 public class ViewCountScheduler {
 
     private final RedisViewService redisViewService;
-    private final PostRepository postRepository;
+    private final PostStatsRepository postStatsRepository;
     private final ArchiveRepository archiveRepository;
 
     private static final int BATCH_SIZE = 5000;
@@ -37,7 +38,7 @@ public class ViewCountScheduler {
         counts.forEach((id, count) -> {
             if (count > 0) {
                 try {
-                    postRepository.incrementViewCount(id, count);
+                    postStatsRepository.incrementViewCount(id, count);
                     redisViewService.decrementCount(ViewDomain.POST, id, count);
                 } catch (Exception e) {
                     log.error("🔴 Post View Sync Failed ID: {}", id, e);

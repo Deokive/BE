@@ -23,9 +23,12 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             @Param("lambda") double lambda
     );
 
-    // 조회수 증가 (Bulk Update)
-    @Transactional
-    @Modifying(clearAutomatically = true) // 영속성 컨텍스트 초기화
-    @Query("UPDATE Post p SET p.viewCount = p.viewCount + :count WHERE p.id = :postId")
-    void incrementViewCount(@Param("postId") Long postId, @Param("count") Long count);
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        UPDATE post_stats ps
+        JOIN post_like_count plc ON ps.post_id = plc.post_id
+        SET ps.like_count = plc.count
+        WHERE ps.like_count != plc.count
+    """, nativeQuery = true)
+    int syncLikeCountsFromTable();
 }

@@ -12,10 +12,9 @@ import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
-import com.depth.deokive.domain.post.repository.PostFileMapRepository;
-import com.depth.deokive.domain.post.repository.PostLikeRepository;
-import com.depth.deokive.domain.post.repository.PostQueryRepository;
-import com.depth.deokive.domain.post.repository.PostRepository;
+import com.depth.deokive.domain.post.entity.PostLikeCount;
+import com.depth.deokive.domain.post.entity.PostStats;
+import com.depth.deokive.domain.post.repository.*;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import com.depth.deokive.system.config.aop.ExecutionTime;
@@ -47,6 +46,8 @@ public class PostService {
     private final FileService fileService;
     private final PostQueryRepository postQueryRepository;
     private final RedisViewService redisViewService;
+    private final PostStatsRepository postStatsRepository;
+    private final PostLikeCountRepository postLikeCountRepository;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -58,11 +59,15 @@ public class PostService {
         Post post = PostDto.CreateRequest.from(request, foundUser);
         postRepository.save(post);
 
-        // SEQ 3. 파일 연결
+        // SEQ 3. 통계 엔티티 생성 및 저장
+        PostStats stats = PostStats.create(post);
+        postStatsRepository.save(stats);
+
+        // SEQ 4. 파일 연결
         List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 4. Response (생성 시점에는 좋아요 없음)
-        return PostDto.Response.of(post, maps, false);
+        // SEQ 5. Response (생성 시점에는 좋아요 없음)
+        return PostDto.Response.of(post, stats, maps, false);
     }
 
     @Transactional
@@ -71,18 +76,29 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
 
-        // SEQ 2. 해당 게시글의 파일 매핑 조회
+        // SEQ 2. 통계 정보 조회 - ViewCount, HotScore용
+        PostStats stats = postStatsRepository.findById(postId)
+                .orElseGet(() -> {
+                    PostStats newStats = PostStats.create(post);
+                    postStatsRepository.save(newStats);
+                    return newStats;
+                });
+
+        // SEQ 3. 실시간 좋아요 수 조회
+        long realTimeLikeCount = postLikeCountRepository.findById(postId).map(PostLikeCount::getCount).orElse(0L);
+
+        // SEQ 4. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
 
-        // SEQ 3. 상세 조회 시 조회수 증가
+        // SEQ 5. Redis 조회수 증가 (Write Back)
         increaseViewCount(userPrincipal, postId, request);
 
-        // SEQ 4. 좋아요 여부 조회
+        // SEQ 6. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         boolean isLiked = (viewerId != null) && postLikeRepository.existsByPostIdAndUserId(postId, viewerId);
 
-        // SEQ 5. Return
-        return PostDto.Response.of(post, maps, isLiked);
+        // SEQ 7. Return
+        return PostDto.Response.of(post, stats.getViewCount(), realTimeLikeCount, stats.getHotScore(), maps, isLiked);
     }
 
     @Transactional
@@ -97,6 +113,13 @@ public class PostService {
         // SEQ 3. 게시글 정보 업데이트 (Dirty Checking)
         post.update(request);
 
+        // SEQ 4. 카테고리가 변경되었다면 PostStats도 동기화 (커버링 인덱스용)
+        if (request.getCategory() != null) {
+            postStatsRepository.findById(postId).ifPresent(stats ->
+                    stats.syncCategory(request.getCategory())
+            );
+        }
+
         // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
         List<PostFileMap> maps;
 
@@ -110,11 +133,12 @@ public class PostService {
             maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
         }
 
-        // SEQ 5. 좋아요 여부 조회
+        // SEQ 5. 통계 조회, 좋아요 여부 조회
+        PostStats stats = postStatsRepository.findById(postId).orElse(PostStats.create(post));
         boolean isLiked = postLikeRepository.existsByPostIdAndUserId(postId, userPrincipal.getUserId());
 
         // SEQ 6. Return
-        return PostDto.Response.of(post, maps, isLiked);
+        return PostDto.Response.of(post, stats, maps, isLiked);
     }
 
     @Transactional
@@ -133,7 +157,11 @@ public class PostService {
         // SEQ 4. 좋아요 삭제
         postLikeRepository.deleteByPostId(postId);
 
-        // SEQ 5. 게시글 삭제
+        // SEQ 5. 통계 테이블 삭제
+        postLikeCountRepository.deleteById(postId); // 좋아요 갯수 테이블
+        postStatsRepository.deleteById(postId);     // 통계 테이블 삭제
+
+        // SEQ 6. 게시글 삭제
         postRepository.delete(post);
     }
 
@@ -238,5 +266,3 @@ public class PostService {
         redisViewService.incrementViewCount(ViewDomain.POST, postId, viewerId, clientIp);
     }
 }
-
-

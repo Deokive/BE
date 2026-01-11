@@ -1,10 +1,7 @@
 package com.depth.deokive.system.controller;
 
 import com.depth.deokive.system.config.aop.ExecutionTime;
-import com.depth.deokive.system.scheduler.ArchiveBadgeScheduler;
-import com.depth.deokive.system.scheduler.ArchiveHotFeedScheduler;
-import com.depth.deokive.system.scheduler.PostHotScoreScheduler;
-import com.depth.deokive.system.scheduler.ViewCountScheduler;
+import com.depth.deokive.system.scheduler.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +28,7 @@ public class SystemSchedulerController {
     private final ArchiveBadgeScheduler badgeScheduler;
     private final PostHotScoreScheduler postHotScoreScheduler;
     private final ViewCountScheduler viewCountScheduler;
+    private final LikeCountScheduler likeCountScheduler;
 
 
     private final JobLauncher jobLauncher;
@@ -96,5 +94,14 @@ public class SystemSchedulerController {
         viewCountScheduler.syncAllViewCounts();
 
         return ResponseEntity.ok("🟢 View Count Sync Completed! (Redis -> DB)");
+    }
+
+    @ExecutionTime
+    @PostMapping("/like-count")
+    @Operation(summary = "❤️ 좋아요 동기화 (LikeCount -> PostStats)", description = "좋아요: 실시간 테이블 값을 검색용 통계 테이블로 동기화")
+    public ResponseEntity<String> triggerLikeCountSync() {
+        log.info("Manual Trigger: Like Count Sync");
+        likeCountScheduler.syncLikeCounts();
+        return ResponseEntity.ok("🟢 Like Count Sync Completed! (PostLikeCount -> PostStats)");
     }
 }
