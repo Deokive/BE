@@ -7,6 +7,7 @@ import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
+import com.depth.deokive.domain.post.entity.PostStats;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.User;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -145,7 +146,7 @@ public class PostDto {
         """)
         private List<FileDto.UploadFileResponse> files;
 
-        public static Response of(Post post, List<PostFileMap> maps, boolean isLiked) {
+        public static Response of(Post post, PostStats stats, List<PostFileMap> maps, boolean isLiked) {
             return Response.builder()
                     .id(post.getId())
                     .title(post.getTitle())
@@ -155,10 +156,29 @@ public class PostDto {
                     .lastModifiedAt(post.getLastModifiedAt())
                     .createdBy(post.getCreatedBy())
                     .lastModifiedBy(post.getLastModifiedBy())
-                    .viewCount(post.getViewCount())
-                    .likeCount(post.getLikeCount())
+                    .viewCount(stats != null ? stats.getViewCount() : 0L)
+                    .likeCount(stats != null ? stats.getLikeCount() : 0L)
+                    .hotScore(stats != null ? stats.getHotScore() : 0.0)
                     .isLiked(isLiked)
-                    .hotScore(post.getHotScore())
+                    .files(toFileResponses(maps))
+                    .build();
+        }
+
+        public static Response of(Post post, long viewCount, long likeCount, double hotScore,
+                                  List<PostFileMap> maps, boolean isLiked) {
+            return Response.builder()
+                    .id(post.getId())
+                    .title(post.getTitle())
+                    .content(post.getContent())
+                    .category(post.getCategory())
+                    .createdAt(post.getCreatedAt())
+                    .lastModifiedAt(post.getLastModifiedAt())
+                    .createdBy(post.getCreatedBy())
+                    .lastModifiedBy(post.getLastModifiedBy())
+                    .viewCount(viewCount)
+                    .likeCount(likeCount)
+                    .hotScore(hotScore)
+                    .isLiked(isLiked)
                     .files(toFileResponses(maps))
                     .build();
         }
