@@ -20,12 +20,7 @@ public class PostHotScoreScheduler {
     @Transactional
     public void updatePostHotScores() {
         log.info("🔥 [Scheduler] Starting Post Hot Score Update...");
-        int updatedRows = postRepository.updateHotScoreBulk(4, 6, 0.05);
+        int updatedRows = postRepository.updateHotScoreBulkInStats(4, 6, 0.05);
         log.info("✅ [Scheduler] Post Hot Score Update Completed. (Rows: {})", updatedRows);
-
-        // PostHotScoreScheduler.java (간략 예시)
-            // 1. PostStatsRepository에서 대상 조회
-            // 2. 점수 계산
-            // 3. PostStatsRepository.updateHotScore() 호출 (Atomic Update)
     }
 }

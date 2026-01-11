@@ -59,7 +59,7 @@ public class PostService {
         Post post = PostDto.CreateRequest.from(request, foundUser);
         postRepository.save(post);
 
-        // SEQ 3. 통계 엔티티 생성 및 저장
+        // SEQ 3. 통계 엔티티 생성 및 저장 (Sync OK)
         PostStats stats = PostStats.create(post);
         postStatsRepository.save(stats);
 
@@ -115,12 +115,10 @@ public class PostService {
 
         // SEQ 4. 카테고리가 변경되었다면 PostStats도 동기화 (커버링 인덱스용)
         if (request.getCategory() != null) {
-            postStatsRepository.findById(postId).ifPresent(stats ->
-                    stats.syncCategory(request.getCategory())
-            );
+            postStatsRepository.syncUpdateCategory(postId, request.getCategory());
         }
 
-        // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
+        // SEQ 5. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
         List<PostFileMap> maps;
 
         // request.getFiles()가 null이면 파일 변경 없음.
@@ -133,11 +131,11 @@ public class PostService {
             maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
         }
 
-        // SEQ 5. 통계 조회, 좋아요 여부 조회
+        // SEQ 6. 통계 조회, 좋아요 여부 조회
         PostStats stats = postStatsRepository.findById(postId).orElse(PostStats.create(post));
         boolean isLiked = postLikeRepository.existsByPostIdAndUserId(postId, userPrincipal.getUserId());
 
-        // SEQ 6. Return
+        // SEQ 7. Return
         return PostDto.Response.of(post, stats, maps, isLiked);
     }
 

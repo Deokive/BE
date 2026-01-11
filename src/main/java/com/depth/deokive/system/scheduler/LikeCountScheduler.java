@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class LikeCountScheduler {
 
-    private final PostRepository postRepository; // Native Query용 (Join Update가 필요한 경우)
+    private final PostRepository postRepository;
     private final ArchiveRepository archiveRepository;
 
-    // 10초마다 실행 (실시간성과 정합성 사이의 타협점)
+    // 10초마다 실행
     @Scheduled(fixedRateString = "${scheduler.like-interval:10000}")
     public void syncLikeCounts() {
         // Post Sync
