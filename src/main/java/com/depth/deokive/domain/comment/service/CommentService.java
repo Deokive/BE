@@ -13,6 +13,9 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,39 +76,20 @@ public class CommentService {
     /**
      * 댓글 조회
      */
-    @Transactional(readOnly = true)
-    public List<CommentDto.Response> getComments(Long postId) {
+    @Transactional
+    public Slice<CommentDto.Response> getComments(Long postId, Long lastCommentId, Pageable pageable) {
         if (!postRepository.existsById(postId)) {
             throw new RestException(ErrorCode.POST_NOT_FOUND);
         }
 
-        List<Comment> comments = commentQueryRepository.findAllByPostId(postId);
+        // SEQ 1. Repository에서 Slice<Entity> 조회
+        Slice<Comment> commentSlice = commentQueryRepository.findAllByPostId(postId, lastCommentId, pageable);
 
-        List<CommentDto.Response> result = new ArrayList<>();
-        Map<Long, CommentDto.Response> map = new HashMap<>();
+        // SEQ 2. 조회된 Entity 리스트를 계층형 DTO 구조로 변환
+        List<CommentDto.Response> responseList = convertToHierarchy(commentSlice.getContent());
 
-        // SEQ 1. 모든 댓글을 DTO로 변환하여 Map에 저장
-        comments.forEach(c -> {
-            CommentDto.Response dto = CommentDto.Response.from(c);
-            map.put(dto.getCommentId(), dto);
-        });
-
-        // SQE 2. 부모-자식 관계 연결
-        comments.forEach(c -> {
-            CommentDto.Response dto = map.get(c.getId());
-            if (c.getParent() != null) {
-                CommentDto.Response parentDto = map.get(c.getParent().getId());
-                // 부모가 Map에 존재할 때만 자식으로 추가
-                if (parentDto != null) {
-                    parentDto.getChildren().add(dto);
-                }
-            } else {
-                // 최상위 댓글
-                result.add(dto);
-            }
-        });
-
-        return result;
+        // 3. 변환된 DTO 리스트와 Slice 정보를 합쳐서 반환
+        return new SliceImpl<>(responseList, pageable, commentSlice.hasNext());
     }
 
     /**
@@ -133,11 +117,38 @@ public class CommentService {
         }
     }
 
+    // --- Helper Methods ---
     private Comment getDeletableAncestorComment(Comment comment) {
         Comment parent = comment.getParent();
         if (parent != null && parent.isDeleted() && parent.getChildren().size() == 1) {
             return getDeletableAncestorComment(parent);
         }
         return comment;
+    }
+
+    private List<CommentDto.Response> convertToHierarchy(List<Comment> comments) {
+        List<CommentDto.Response> result = new ArrayList<>();
+        Map<Long, CommentDto.Response> map = new HashMap<>();
+
+        // SEQ 1. DTO 변환 및 Map 저장
+        comments.forEach(c -> {
+            CommentDto.Response dto = CommentDto.Response.from(c);
+            map.put(dto.getCommentId(), dto);
+        });
+
+        // SEQ 2. 부모-자식 연결
+        comments.forEach(c -> {
+            CommentDto.Response dto = map.get(c.getId());
+            if (c.getParent() != null) {
+                CommentDto.Response parentDto = map.get(c.getParent().getId());
+                if (parentDto != null) {
+                    parentDto.getChildren().add(dto);
+                }
+            } else {
+                result.add(dto);
+            }
+        });
+
+        return result;
     }
 }
