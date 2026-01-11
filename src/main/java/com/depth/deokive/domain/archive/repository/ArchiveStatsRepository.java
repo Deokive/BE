@@ -1,0 +1,52 @@
+package com.depth.deokive.domain.archive.repository;
+
+import com.depth.deokive.common.enums.Visibility;
+import com.depth.deokive.domain.archive.entity.ArchiveStats;
+import com.depth.deokive.domain.archive.entity.enums.Badge;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long> {
+
+    // 1. 조회수 증가 (Atomic Update)
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.viewCount = s.viewCount + :count WHERE s.id = :id")
+    void incrementViewCount(@Param("id") Long id, @Param("count") Long count);
+
+    // 2. 핫스코어 업데이트 (Atomic)
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.hotScore = :score WHERE s.id = :id")
+    void updateHotScore(@Param("id") Long id, @Param("score") Double score);
+
+    // 3. 좋아요 수 동기화 (LikeCount -> Stats)
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.likeCount = :count WHERE s.id = :id")
+    void syncLikeCount(@Param("id") Long id, @Param("count") Long count);
+
+    // 4. 반정규화 필드 동기화 (Visibility)
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.visibility = :visibility WHERE s.id = :id")
+    void syncVisibility(@Param("id") Long id, @Param("visibility") Visibility visibility);
+
+    // 5. 반정규화 필드 동기화 (Badge)
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.badge = :badge WHERE s.id = :id")
+    void syncBadge(@Param("id") Long id, @Param("badge") Badge badge);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.badge = :targetBadge " +
+            "WHERE s.createdAt <= :cutOffDate " +
+            "AND s.badge IN :targetBadges")
+    int updateBadgesBulkInStats(
+            @Param("targetBadge") Badge targetBadge,
+            @Param("cutOffDate") LocalDateTime cutOffDate,
+            @Param("targetBadges") List<Badge> targetBadges
+    );
+}
