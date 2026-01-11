@@ -2,6 +2,7 @@ package com.depth.deokive.system.scheduler;
 
 import com.depth.deokive.common.enums.ViewDomain;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.archive.repository.ArchiveStatsRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.domain.post.repository.PostStatsRepository;
@@ -19,7 +20,7 @@ public class ViewCountScheduler {
 
     private final RedisViewService redisViewService;
     private final PostStatsRepository postStatsRepository;
-    private final ArchiveRepository archiveRepository;
+    private final ArchiveStatsRepository archiveStatsRepository;
 
     private static final int BATCH_SIZE = 5000;
 
@@ -58,7 +59,7 @@ public class ViewCountScheduler {
         counts.forEach((id, count) -> {
             if (count > 0) {
                 try {
-                    archiveRepository.incrementViewCount(id, count);
+                    archiveStatsRepository.incrementViewCount(id, count);
                     redisViewService.decrementCount(ViewDomain.ARCHIVE, id, count);
                 } catch (Exception e) {
                     log.error("🔴 Archive View Sync Failed ID: {}", id, e);

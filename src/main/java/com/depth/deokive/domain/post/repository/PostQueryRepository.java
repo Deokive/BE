@@ -114,7 +114,7 @@ public class PostQueryRepository {
 
         if (!hasIdSort) {
             Order lastDirection = orders.isEmpty() ? Order.DESC : orders.get(orders.size() - 1).getOrder();
-            orders.add(new OrderSpecifier<>(lastDirection, post.id));
+            orders.add(new OrderSpecifier<>(lastDirection, postStats.id));
         }
 
         return orders.toArray(new OrderSpecifier[0]);

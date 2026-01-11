@@ -1,6 +1,7 @@
 package com.depth.deokive.system.scheduler;
 
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.system.config.aop.ExecutionTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,12 +15,13 @@ public class ArchiveHotFeedScheduler {
 
     private final ArchiveRepository archiveRepository;
 
+    @ExecutionTime
     @Scheduled(cron = "${scheduler.hot-score-cron}") // 매시 정각 (ex: 13:00, 14:00)
     @Transactional
     public void updateHotScores() {
         log.info("🔥 [Scheduler] Starting Hot Score Update...");
 
-        int updatedRows = archiveRepository.updateHotScoreBulk(
+        int updatedRows = archiveRepository.updateHotScoreBulkInStats(
             4,    // w1 (좋아요 가중치)
             6,    // w2 (조회수 가중치)
             0.05  // L (시간 감쇠 계수)

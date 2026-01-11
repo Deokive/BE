@@ -52,12 +52,13 @@ public class ArchiveService {
     private final ArchiveGuard archiveGuard;
     private final RedisViewService redisViewService;
 
-    private final ArchiveQueryRepository archiveQueryRepository;
-
     // --- Core Repositories ---
     private final ArchiveRepository archiveRepository;
     private final ArchiveLikeRepository likeRepository;
     private final UserRepository userRepository;
+    private final ArchiveStatsRepository archiveStatsRepository;
+    private final ArchiveQueryRepository archiveQueryRepository;
+    private final ArchiveLikeCountRepository archiveLikeCountRepository;
 
     // --- Sub-Domain Content Repositories (For Bulk Delete) ---
     private final EventRepository eventRepository;
@@ -100,8 +101,15 @@ public class ArchiveService {
         // SEQ 5. 저장 (Archive + Books Cascade)
         archiveRepository.save(archive);
 
+        // SEQ 6. ArchiveStats 생성 및 저장 (Sync OK)
+        ArchiveStats stats = ArchiveStats.create(archive);
+        archiveStatsRepository.save(stats);
 
-        // SEQ 6. Response
+        // SEQ 7. ArchiveLikeCount 생성 및 저장
+        ArchiveLikeCount likeCount = ArchiveLikeCount.create(archive.getId());
+        archiveLikeCountRepository.save(likeCount);
+
+        // SEQ 8. Response
         String bannerUrl = (archive.getBannerFile() != null)
                 ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
                 : null;
@@ -127,23 +135,32 @@ public class ArchiveService {
         // SEQ 3. 권한 체크 -> 친구면 RESTRICTED 까지, 비회원이면 PUBLIC까지
         archiveGuard.checkArchiveReadPermission(archive, userPrincipal);
 
-        // SEQ 4. 조회수 증가 (Dirty Checking)
+        // SEQ 4. 통계 정보 -> Stats 테이블에서 조회 (없으면 뭔가 문제있는거니까 생성->방ㅇ로직)
+        ArchiveStats stats = archiveStatsRepository.findById(archiveId)
+                .orElseGet(() -> {
+                    ArchiveStats newStats = ArchiveStats.create(archive);
+                    archiveStatsRepository.save(newStats);
+                    return newStats;
+                });
+
+        // SEQ 5. 실시간 좋아요 수 조회
+        long realTimeLikeCount = archiveLikeCountRepository.findById(archiveId)
+                .map(ArchiveLikeCount::getCount).orElse(0L);
+
+        // SEQ 6. 조회수 증가 (Redis Write Back Pattern)
         increaseViewCount(userPrincipal, archiveId, request);
 
-        // SEQ 5. 데이터 조회 : 좋아요 수, 조회수, isLiked, isOwner, bannerUrl, archive
+        // SEQ 7. 배너 데이터 조회
         String bannerUrl = (archive.getBannerFile() != null)
                 ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
                 : null;
 
+        // SEQ 8. 좋아요 여부 조회
         boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
 
+        // Response: viewCount는 Stats에서, likeCount는 RealTime Table에서
         return ArchiveDto.Response.of(
-                archive,
-                bannerUrl,
-                archive.getViewCount(),
-                archive.getLikeCount(),
-                isLiked,
-                isOwner
+                archive, bannerUrl, stats.getViewCount(), realTimeLikeCount, isLiked, isOwner
         );
     }
 
@@ -162,16 +179,17 @@ public class ArchiveService {
         // SEQ 4. 배너 수정
         String bannerUrl = updateBannerImage(archive, request.getBannerImageId(), user.getUserId());
 
-        // SEQ 5. 리턴용 조회
+        // SEQ 5. 공개 범위(Visibility) 변경 시 Stats 테이블 동기화
+        if (request.getVisibility() != null) {
+            archiveStatsRepository.syncVisibility(archive.getId(), request.getVisibility());
+        }
+
+        // SEQ 6. 리턴용 조회
+        ArchiveStats stats = archiveStatsRepository.findById(archiveId).orElse(ArchiveStats.create(archive));
         boolean isLiked = likeRepository.existsByArchiveIdAndUserId(archiveId, user.getUserId());
 
         return ArchiveDto.Response.of(
-                archive,
-                bannerUrl,
-                archive.getViewCount(),
-                archive.getLikeCount(),
-                isLiked,
-                true
+                archive, bannerUrl, stats.getViewCount(), stats.getLikeCount(), isLiked, true
         );
     }
 
@@ -212,8 +230,10 @@ public class ArchiveService {
         // 6️⃣ Sticker Domain Cleanup
         stickerRepository.deleteByArchiveId(archiveId); // Level 2
 
-        // Step 2. 명시적 삭제 - Like
+        // Step 2. 명시적 삭제 - 통계 데이터
         likeRepository.deleteByArchiveId(archiveId);
+        archiveStatsRepository.deleteById(archiveId);
+        archiveLikeCountRepository.deleteById(archiveId);
 
         // Step 3. Root 삭제
         // Cascade -> Sub Domain 삭제: DiaryBook, GalleryBook, TicketBook, RepostBook, Banner

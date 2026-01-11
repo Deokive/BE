@@ -119,9 +119,9 @@ public class ArchiveDto {
         @Schema(description = "페이지 크기", example = "10", defaultValue = "10")
         private int size = 10;
 
-        @Pattern(regexp = "^(createdAt|lastModifiedAt|viewCount|likeCount|hotScore)$", message = "정렬 기준이 올바르지 않습니다.")
+        @Pattern(regexp = "^(createdAt|viewCount|likeCount|hotScore)$", message = "정렬 기준이 올바르지 않습니다.")
         @Schema(description = "정렬 기준 컬럼", defaultValue = "createdAt",
-                allowableValues = {"createdAt", "lastModifiedAt", "viewCount", "likeCount", "hotScore"}, example = "createdAt")
+                allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"}, example = "createdAt")
         private String sort = "createdAt";
 
         @Pattern(regexp = "^(ASC|DESC|asc|desc)$", message = "정렬 방향은 'ASC' 또는 'DESC' 여야 합니다.")

@@ -2,6 +2,7 @@ package com.depth.deokive.system.scheduler;
 
 import com.depth.deokive.domain.archive.entity.enums.Badge;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.archive.repository.ArchiveStatsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,11 +20,12 @@ import java.util.stream.Collectors;
 public class ArchiveBadgeScheduler {
 
     private final ArchiveRepository archiveRepository;
+    private final ArchiveStatsRepository archiveStatsRepository;
 
     @Scheduled(cron = "${scheduler.badge-cron}")
     @Transactional
     public void updateArchiveBadges() {
-        log.info("🏅 [Scheduler] Starting Archive Badge Update...");
+        log.info("[Scheduler] Starting Archive Badge Update...");
 
         LocalDateTime now = LocalDateTime.now();
         int totalUpdated = 0;
@@ -43,8 +45,10 @@ public class ArchiveBadgeScheduler {
             int count = archiveRepository.updateBadgesBulk(targetBadge, cutOffDate, lowerBadges);
 
             if (count > 0) {
+                int countStats = archiveStatsRepository.updateBadgesBulkInStats(targetBadge, cutOffDate, lowerBadges);
+
                 log.info("   👉 Promoted to {}: {} archives", targetBadge, count);
-                totalUpdated += count;
+                totalUpdated += countStats;
             }
         }
 

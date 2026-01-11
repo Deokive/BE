@@ -20,25 +20,10 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
     @Query("UPDATE ArchiveStats s SET s.viewCount = s.viewCount + :count WHERE s.id = :id")
     void incrementViewCount(@Param("id") Long id, @Param("count") Long count);
 
-    // 2. 핫스코어 업데이트 (Atomic)
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE ArchiveStats s SET s.hotScore = :score WHERE s.id = :id")
-    void updateHotScore(@Param("id") Long id, @Param("score") Double score);
-
-    // 3. 좋아요 수 동기화 (LikeCount -> Stats)
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE ArchiveStats s SET s.likeCount = :count WHERE s.id = :id")
-    void syncLikeCount(@Param("id") Long id, @Param("count") Long count);
-
-    // 4. 반정규화 필드 동기화 (Visibility)
+    // 2. 반정규화 필드 동기화 (Visibility)
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.visibility = :visibility WHERE s.id = :id")
     void syncVisibility(@Param("id") Long id, @Param("visibility") Visibility visibility);
-
-    // 5. 반정규화 필드 동기화 (Badge)
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE ArchiveStats s SET s.badge = :badge WHERE s.id = :id")
-    void syncBadge(@Param("id") Long id, @Param("badge") Badge badge);
 
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.badge = :targetBadge " +
