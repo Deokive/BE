@@ -134,3 +134,4 @@ scheduler:
 
   view-interval: 300000 # 5 min (5*60*1000ms)
   view-cooldown-minutes: 10
+  like-interval: 10000
