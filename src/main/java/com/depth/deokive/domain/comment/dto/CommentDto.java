@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.comment.dto;
 
 import com.depth.deokive.domain.comment.entity.Comment;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,9 +38,13 @@ public class CommentDto {
         private String nickname;
         private boolean isDeleted;
         private LocalDateTime createdAt;
+
+        @JsonProperty("isOwner")
+        private boolean isOwner;
+
         private List<Response> children;
 
-        public static Response from(Comment comment) {
+        public static Response from(Comment comment, Long currentUserId) {
             return Response.builder()
                     .commentId(comment.getId())
                     .content(comment.isDeleted() ? "삭제된 댓글입니다." : comment.getContent())
@@ -47,6 +52,7 @@ public class CommentDto {
                     .nickname(comment.getUser().getNickname())
                     .isDeleted(comment.isDeleted())
                     .createdAt(comment.getCreatedAt())
+                    .isOwner(currentUserId != null & currentUserId.equals(comment.getUser().getId()))
                     .children(new ArrayList<>())
                     .build();
         }
