@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CommentCountRepository extends JpaRepository<CommentCount, Long> {
+
     @Modifying
     @Transactional
     @Query(value = "INSERT INTO comment_count (post_id, count) VALUES (:postId, 1) " +
@@ -16,8 +17,8 @@ public interface CommentCountRepository extends JpaRepository<CommentCount, Long
 
     @Modifying
     @Transactional
-    @Query("UPDATE CommentCount c SET c.count = c.count - 1 WHERE c.postId = :postId AND c.count > 0")
-    void decreaseCount(@Param("postId") Long postId);
+    @Query("UPDATE CommentCount c SET c.count = c.count - :amount WHERE c.postId = :postId AND c.count >= :amount")
+    void decreaseCount(@Param("postId") Long postId, @Param("amount") long amount);
 
 }
 
