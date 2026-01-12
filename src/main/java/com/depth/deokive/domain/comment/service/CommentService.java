@@ -106,26 +106,16 @@ public class CommentService {
         }
 
         // SEQ 2. 댓글 수 감소
-        commentCountRepository.decreaseCount(comment.getPost().getId());
+        long deletedCount = 1 + comment.getChildren().size();
 
-        if (comment.getChildren().size() > 0) {
-            // 자식이 있으면 Soft Delete
-            comment.changeDeletedStatus(true);
-        } else {
-            // 자식이 없으면 삭제 가능한 부모 찾아서 Hard Delete
-            commentRepository.delete(getDeletableAncestorComment(comment));
-        }
+        // SEQ 3. 댓글 삭제
+        commentRepository.delete(comment);
+
+        // SER 4. 게시글 댓글 수 감소
+        commentCountRepository.decreaseCount(comment.getPost().getId(), deletedCount);
     }
 
     // --- Helper Methods ---
-    private Comment getDeletableAncestorComment(Comment comment) {
-        Comment parent = comment.getParent();
-        if (parent != null && parent.isDeleted() && parent.getChildren().size() == 1) {
-            return getDeletableAncestorComment(parent);
-        }
-        return comment;
-    }
-
     private List<CommentDto.Response> convertToHierarchy(List<Comment> comments) {
         List<CommentDto.Response> result = new ArrayList<>();
         Map<Long, CommentDto.Response> map = new HashMap<>();
