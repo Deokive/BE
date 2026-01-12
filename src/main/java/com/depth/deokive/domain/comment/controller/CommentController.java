@@ -38,9 +38,13 @@ public class CommentController {
     public ResponseEntity<Slice<CommentDto.Response>> getComments(
             @PathVariable Long postId,
             @RequestParam(required = false) Long lastCommentId,
-            @PageableDefault(size = 10) Pageable pageable
+            @PageableDefault(size = 10) Pageable pageable,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
             ) {
-        return ResponseEntity.ok(commentService.getComments(postId, lastCommentId, pageable));
+        // 로그인 X -> null, 로그인 O -> Id
+        Long currentUserId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+
+        return ResponseEntity.ok(commentService.getComments(postId, lastCommentId, pageable, currentUserId));
     }
 
     @Operation(summary = "댓글 삭제", description = "댓글을 삭제합니다. 자식이 있으면 '삭제된 댓글'로 표시됩니다.")

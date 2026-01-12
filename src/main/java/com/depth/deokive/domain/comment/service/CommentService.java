@@ -77,7 +77,7 @@ public class CommentService {
      * 댓글 조회
      */
     @Transactional
-    public Slice<CommentDto.Response> getComments(Long postId, Long lastCommentId, Pageable pageable) {
+    public Slice<CommentDto.Response> getComments(Long postId, Long lastCommentId, Pageable pageable, Long currentUserId) {
         if (!postRepository.existsById(postId)) {
             throw new RestException(ErrorCode.POST_NOT_FOUND);
         }
@@ -86,7 +86,7 @@ public class CommentService {
         Slice<Comment> commentSlice = commentQueryRepository.findAllByPostId(postId, lastCommentId, pageable);
 
         // SEQ 2. 조회된 Entity 리스트를 계층형 DTO 구조로 변환
-        List<CommentDto.Response> responseList = convertToHierarchy(commentSlice.getContent());
+        List<CommentDto.Response> responseList = convertToHierarchy(commentSlice.getContent(), currentUserId);
 
         // 3. 변환된 DTO 리스트와 Slice 정보를 합쳐서 반환
         return new SliceImpl<>(responseList, pageable, commentSlice.hasNext());
@@ -116,13 +116,13 @@ public class CommentService {
     }
 
     // --- Helper Methods ---
-    private List<CommentDto.Response> convertToHierarchy(List<Comment> comments) {
+    private List<CommentDto.Response> convertToHierarchy(List<Comment> comments, Long currentUserId) {
         List<CommentDto.Response> result = new ArrayList<>();
         Map<Long, CommentDto.Response> map = new HashMap<>();
 
         // SEQ 1. DTO 변환 및 Map 저장
         comments.forEach(c -> {
-            CommentDto.Response dto = CommentDto.Response.from(c);
+            CommentDto.Response dto = CommentDto.Response.from(c, currentUserId);
             map.put(dto.getCommentId(), dto);
         });
 
