@@ -58,7 +58,6 @@ public class ArchiveService {
     private final UserRepository userRepository;
     private final ArchiveStatsRepository archiveStatsRepository;
     private final ArchiveQueryRepository archiveQueryRepository;
-    private final ArchiveLikeCountRepository archiveLikeCountRepository;
 
     // --- Sub-Domain Content Repositories (For Bulk Delete) ---
     private final EventRepository eventRepository;
@@ -106,8 +105,8 @@ public class ArchiveService {
         archiveStatsRepository.save(stats);
 
         // SEQ 7. ArchiveLikeCount 생성 및 저장
-        ArchiveLikeCount likeCount = ArchiveLikeCount.create(archive.getId());
-        archiveLikeCountRepository.save(likeCount);
+        // ArchiveLikeCount likeCount = ArchiveLikeCount.create(archive.getId());
+        // archiveLikeCountRepository.save(likeCount);
 
         // SEQ 8. Response
         String bannerUrl = (archive.getBannerFile() != null)
@@ -118,51 +117,51 @@ public class ArchiveService {
         return ArchiveDto.Response.of(archive, bannerUrl, 0, 0, false, true);
     }
 
-    @Transactional // viewCount 바꿔서 readOnly가 아닌거임
-    public ArchiveDto.Response getArchiveDetail(
-            UserPrincipal userPrincipal,
-            Long archiveId,
-            HttpServletRequest request
-    ) {
-        // SEQ 1. Fetch Join을 사용하여 Archive + User 조회 (N+1 방지)
-        Archive archive = archiveRepository.findByIdWithUser(archiveId)
-                .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
-
-        // SEQ 2. Viewer & Owner 판별
-        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-        boolean isOwner = archive.getUser().getId().equals(viewerId);
-
-        // SEQ 3. 권한 체크 -> 친구면 RESTRICTED 까지, 비회원이면 PUBLIC까지
-        archiveGuard.checkArchiveReadPermission(archive, userPrincipal);
-
-        // SEQ 4. 통계 정보 -> Stats 테이블에서 조회 (없으면 뭔가 문제있는거니까 생성->방ㅇ로직)
-        ArchiveStats stats = archiveStatsRepository.findById(archiveId)
-                .orElseGet(() -> {
-                    ArchiveStats newStats = ArchiveStats.create(archive);
-                    archiveStatsRepository.save(newStats);
-                    return newStats;
-                });
-
-        // SEQ 5. 실시간 좋아요 수 조회
-        long realTimeLikeCount = archiveLikeCountRepository.findById(archiveId)
-                .map(ArchiveLikeCount::getCount).orElse(0L);
-
-        // SEQ 6. 조회수 증가 (Redis Write Back Pattern)
-        increaseViewCount(userPrincipal, archiveId, request);
-
-        // SEQ 7. 배너 데이터 조회
-        String bannerUrl = (archive.getBannerFile() != null)
-                ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
-                : null;
-
-        // SEQ 8. 좋아요 여부 조회
-        boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
-
-        // Response: viewCount는 Stats에서, likeCount는 RealTime Table에서
-        return ArchiveDto.Response.of(
-                archive, bannerUrl, stats.getViewCount(), realTimeLikeCount, isLiked, isOwner
-        );
-    }
+    // @Transactional // viewCount 바꿔서 readOnly가 아닌거임
+    // public ArchiveDto.Response getArchiveDetail(
+    //         UserPrincipal userPrincipal,
+    //         Long archiveId,
+    //         HttpServletRequest request
+    // ) {
+    //     // SEQ 1. Fetch Join을 사용하여 Archive + User 조회 (N+1 방지)
+    //     Archive archive = archiveRepository.findByIdWithUser(archiveId)
+    //             .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+    //
+    //     // SEQ 2. Viewer & Owner 판별
+    //     Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+    //     boolean isOwner = archive.getUser().getId().equals(viewerId);
+    //
+    //     // SEQ 3. 권한 체크 -> 친구면 RESTRICTED 까지, 비회원이면 PUBLIC까지
+    //     archiveGuard.checkArchiveReadPermission(archive, userPrincipal);
+    //
+    //     // SEQ 4. 통계 정보 -> Stats 테이블에서 조회 (없으면 뭔가 문제있는거니까 생성->방ㅇ로직)
+    //     ArchiveStats stats = archiveStatsRepository.findById(archiveId)
+    //             .orElseGet(() -> {
+    //                 ArchiveStats newStats = ArchiveStats.create(archive);
+    //                 archiveStatsRepository.save(newStats);
+    //                 return newStats;
+    //             });
+    //
+    //     // SEQ 5. 실시간 좋아요 수 조회
+    //     long realTimeLikeCount = archiveLikeCountRepository.findById(archiveId)
+    //             .map(ArchiveLikeCount::getCount).orElse(0L);
+    //
+    //     // SEQ 6. 조회수 증가 (Redis Write Back Pattern)
+    //     increaseViewCount(userPrincipal, archiveId, request);
+    //
+    //     // SEQ 7. 배너 데이터 조회
+    //     String bannerUrl = (archive.getBannerFile() != null)
+    //             ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
+    //             : null;
+    //
+    //     // SEQ 8. 좋아요 여부 조회
+    //     boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
+    //
+    //     // Response: viewCount는 Stats에서, likeCount는 RealTime Table에서
+    //     return ArchiveDto.Response.of(
+    //             archive, bannerUrl, stats.getViewCount(), realTimeLikeCount, isLiked, isOwner
+    //     );
+    // }
 
     @Transactional
     public ArchiveDto.Response updateArchive(UserPrincipal user, Long archiveId, ArchiveDto.UpdateRequest request) {
@@ -233,7 +232,7 @@ public class ArchiveService {
         // Step 2. 명시적 삭제 - 통계 데이터
         likeRepository.deleteByArchiveId(archiveId);
         archiveStatsRepository.deleteById(archiveId);
-        archiveLikeCountRepository.deleteById(archiveId);
+        // archiveLikeCountRepository.deleteById(archiveId);
 
         // Step 3. Root 삭제
         // Cascade -> Sub Domain 삭제: DiaryBook, GalleryBook, TicketBook, RepostBook, Banner
