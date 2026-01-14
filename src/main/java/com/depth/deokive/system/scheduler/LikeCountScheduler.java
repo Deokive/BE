@@ -37,7 +37,6 @@ public class LikeCountScheduler {
 
     // 매분 40초에 실행 (0분 40초, 1분 40초...) -> Post와 30초 간격 벌림
     @Scheduled(cron = "${scheduler.archive-like-cron}")
-    @Scheduled(fixedRate = 60000)
     @Transactional
     public void syncArchiveLikes() {
         log.info("🔥 [Scheduler] Starting Archive Like Count Sync (Redis -> DB)...");
