@@ -14,7 +14,7 @@ public interface PostStatsRepository extends JpaRepository<PostStats, Long> {
     // 현재 값에 delta를 더함. X-Lock 점유 시간 극소화.
     @Modifying(clearAutomatically = true)
     @Query("UPDATE PostStats ps SET ps.viewCount = ps.viewCount + :count WHERE ps.id = :postId")
-    void incrementViewCount(@Param("postId") Long postId, @Param("count") Long count);
+    void incrementViewCountForWriteBack(@Param("postId") Long postId, @Param("count") Long count);
 
     // [User Action] 3. 카테고리 동기화
     // Post 수정 시 카테고리가 바뀌면 여기도 바꿔야 정렬 인덱스가 안 깨짐.

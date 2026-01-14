@@ -27,7 +27,7 @@ public class ViewCountScheduler {
     public void syncPostViews() {
         log.info("🔥 [Scheduler] Starting Post View Count Sync...");
         try {
-            syncViews(ViewLikeDomain.POST, postStatsRepository::incrementViewCount);
+            syncViews(ViewLikeDomain.POST, postStatsRepository::incrementViewCountForWriteBack);
             log.info("✅ [Scheduler] Synced Post Views");
         } catch (Exception e) {
             log.error("🔴 [Scheduler] Post View Sync Failed", e);
@@ -38,7 +38,7 @@ public class ViewCountScheduler {
     public void syncArchiveViews() {
         log.info("🔥 [Scheduler] Starting Archive View Count Sync...");
         try {
-            syncViews(ViewLikeDomain.ARCHIVE, archiveStatsRepository::incrementViewCount);
+            syncViews(ViewLikeDomain.ARCHIVE, archiveStatsRepository::incrementViewCountForWriteBack);
             log.info("✅ [Scheduler] Synced Archive Views");
         } catch (Exception e) {
             log.error("🔴 [Scheduler] Archive View Sync Failed", e);

@@ -18,7 +18,7 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
     // 1. 조회수 증가 (Atomic Update)
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.viewCount = s.viewCount + :count WHERE s.id = :id")
-    void incrementViewCount(@Param("id") Long id, @Param("count") Long count);
+    void incrementViewCountForWriteBack(@Param("id") Long id, @Param("count") Long count);
 
     // 2. 반정규화 필드 동기화 (Visibility)
     @Modifying(clearAutomatically = true)
