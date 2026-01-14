@@ -95,13 +95,13 @@ public class SystemSchedulerController {
 
         return ResponseEntity.ok("🟢 View Count Sync Completed! (Redis -> DB)");
     }
-
-    @ExecutionTime
-    @PostMapping("/like-count")
-    @Operation(summary = "❤️ 좋아요 동기화 (LikeCount -> PostStats)", description = "좋아요: 실시간 테이블 값을 검색용 통계 테이블로 동기화")
-    public ResponseEntity<String> triggerLikeCountSync() {
-        log.info("Manual Trigger: Like Count Sync");
-        likeCountScheduler.syncLikeCounts();
-        return ResponseEntity.ok("🟢 Like Count Sync Completed! (PostLikeCount -> PostStats)");
-    }
+    //
+    // @ExecutionTime
+    // @PostMapping("/like-count")
+    // @Operation(summary = "❤️ 좋아요 동기화 (LikeCount -> PostStats)", description = "좋아요: 실시간 테이블 값을 검색용 통계 테이블로 동기화")
+    // public ResponseEntity<String> triggerLikeCountSync() {
+    //     log.info("Manual Trigger: Like Count Sync");
+    //     likeCountScheduler.syncLikeCounts();
+    //     return ResponseEntity.ok("🟢 Like Count Sync Completed! (PostLikeCount -> PostStats)");
+    // }
 }
