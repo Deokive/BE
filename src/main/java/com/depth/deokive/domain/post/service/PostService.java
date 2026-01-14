@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.service.LikeRedisService;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.PageUtils;

@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.post.service;
+package com.depth.deokive.common.service;
 
 import com.depth.deokive.common.dto.LikeMessageDto;
 import com.depth.deokive.common.enums.ViewDomain;
