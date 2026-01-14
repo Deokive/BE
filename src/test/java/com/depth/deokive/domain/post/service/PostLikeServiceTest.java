@@ -1,8 +1,9 @@
 package com.depth.deokive.domain.post.service;
 
-import com.depth.deokive.common.enums.ViewLikeDomain; // [New] 도메인 Enum 추가
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.LikeRedisService;
 import com.depth.deokive.common.test.IntegrationTestSupport;
+import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostStats;
 import com.depth.deokive.domain.post.entity.enums.Category;
@@ -14,13 +15,14 @@ import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
 import com.depth.deokive.system.scheduler.LikeCountScheduler;
 import com.depth.deokive.system.security.model.UserPrincipal;
-import com.rabbitmq.client.ConnectionFactory;
 import org.junit.jupiter.api.*;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -40,7 +42,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-@DisplayName("PostLikeService E2E 통합 테스트 (Spring Boot 3.4+ Standard)")
+@DisplayName("PostLikeService 테스트")
 class PostLikeServiceTest extends IntegrationTestSupport {
 
     @Autowired PostService postService;
@@ -54,7 +56,7 @@ class PostLikeServiceTest extends IntegrationTestSupport {
 
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired RabbitTemplate rabbitTemplate;
-    @Autowired RabbitListenerEndpointRegistry registry;
+    @Autowired ApplicationContext applicationContext;
 
     @MockitoSpyBean
     PostLikeRepository postLikeRepository;
@@ -62,41 +64,37 @@ class PostLikeServiceTest extends IntegrationTestSupport {
     private User postOwner;
     private Post targetPost;
 
+    private RabbitListenerEndpointRegistry getRegistry() {
+        return applicationContext.getBean(RabbitListenerEndpointRegistry.class);
+    }
+
     @BeforeEach
     void setUp() {
-        redisTemplate.getConnectionFactory().getConnection().flushAll();
+        // 리스너 시작 전에 Redis/DB 청소 (이전 테스트 잔재 제거)
+        cleanupData();
+        getRegistry().start();
 
-        postOwner = createUser("owner@test.com", "owner");
+        // 데이터 정리 후 리스너 다시 시작
+        getRegistry().start();
+
+        // 유니크한 이메일 사용 (Duplicate Entry 방지)
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        postOwner = createUser("owner-" + uniqueSuffix + "@test.com", "owner");
+
         targetPost = createPost(postOwner, "Target Post");
-
-        flushAndClear();
     }
 
     @AfterEach
     void tearDown() {
-        registry.stop();
+        // 리스너부터 끄고 데이터 정리 (락 충돌 방지)
+        getRegistry().stop();
 
+        // 큐 비우기
         RabbitAdmin rabbitAdmin = new RabbitAdmin(rabbitTemplate.getConnectionFactory());
-
         rabbitAdmin.purgeQueue(ViewLikeDomain.POST.getQueueName(), false);
         rabbitAdmin.purgeQueue(ViewLikeDomain.ARCHIVE.getQueueName(), false);
 
-        // 2. 그 다음 DB를 초기화
-        TransactionTemplate requireNewTemplate = new TransactionTemplate(transactionManager);
-        requireNewTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-
-        requireNewTemplate.execute(status -> {
-            postLikeRepository.deleteAllInBatch();
-            postStatsRepository.deleteAllInBatch();
-            postRepository.deleteAllInBatch();
-            userRepository.deleteAllInBatch();
-            return null;
-        });
-
-        // 3. Redis 초기화
-        redisTemplate.getConnectionFactory().getConnection().flushAll();
-
-        registry.start();
+        cleanupData();
     }
 
     @Nested
@@ -115,12 +113,13 @@ class PostLikeServiceTest extends IntegrationTestSupport {
             // Then 1: Warming 검증 (findAllUserIdsByPostId 호출 확인)
             verify(postLikeRepository, times(1)).findAllUserIdsByPostId(eq(targetPost.getId()));
 
-            // [수정] isLiked 호출 시 Domain과 Loader 전달
+            // isLiked 호출 시 Domain과 Loader 전달
             boolean isLiked = likeRedisService.isLiked(
                     ViewLikeDomain.POST,
                     targetPost.getId(),
                     liker.getId(),
-                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId())
+                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId()),
+                    () -> {}
             );
             assertThat(isLiked).isTrue();
 
@@ -137,13 +136,65 @@ class PostLikeServiceTest extends IntegrationTestSupport {
                     ViewLikeDomain.POST,
                     targetPost.getId(),
                     liker.getId(),
-                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId())
+                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId()),
+                    () -> {}
             );
             assertThat(isLikedAfter).isFalse();
         }
 
         @Test
-        @DisplayName("SCENE 6. [Async Persistence] Redis 변경사항이 RabbitMQ를 거쳐 DB PostLike 테이블에 반영된다.")
+        @DisplayName("SCENE 3. [Policy] 게시글 작성자 본인도 자신의 글에 좋아요를 누를 수 있다 (Self-Like).")
+        void self_Like_Should_Succeed() {
+            // Given: 게시글 주인(postOwner)이 로그인 함
+            UserPrincipal ownerPrincipal = UserPrincipal.from(postOwner);
+
+            // When: 본인이 좋아요 누름
+            PostDto.LikeResponse response = postService.toggleLike(ownerPrincipal, targetPost.getId());
+
+            // Then
+            assertThat(response.isLiked()).isTrue();
+            assertThat(response.getLikeCount()).isEqualTo(1L);
+
+            // Redis 검증
+            Long redisCount = likeRedisService.getCount(
+                    ViewLikeDomain.POST,
+                    targetPost.getId(),
+                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId()),
+                    () -> {}
+            );
+            assertThat(redisCount).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("SCENE 4. [Read Integration] 게시글 상세 조회(getPost) 시 Redis의 실시간 좋아요 정보가 포함되어야 한다.")
+        void getPost_Should_Include_Redis_Like_Info() {
+            // Given: UserA가 좋아요를 누른 상태
+            User userA = createUser("scene5@test.com", "Scene5User");
+            postService.toggleLike(UserPrincipal.from(userA), targetPost.getId());
+
+            // When: UserA가 게시글 상세 조회 (getPost 호출)
+            MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+            mockRequest.setRemoteAddr("127.0.0.1"); // 필요하다면 IP 설정
+
+            PostDto.Response postResponse = postService.getPost(UserPrincipal.from(userA), targetPost.getId(), mockRequest);
+
+            // Then
+            // 1. 좋아요 수가 1이어야 함 (Redis에서 가져옴)
+            assertThat(postResponse.getLikeCount()).isEqualTo(1L);
+            // 2. 내가 눌렀으니 isLiked가 true여야 함
+            assertThat(postResponse.isLiked()).isTrue();
+
+            // When 2: 좋아요 안 누른 UserB가 조회
+            User userB = createUser("scene5_b@test.com", "Scene5UserB");
+            PostDto.Response responseB = postService.getPost(UserPrincipal.from(userB), targetPost.getId(), null);
+
+            // Then 2
+            assertThat(responseB.getLikeCount()).isEqualTo(1L); // 카운트는 여전히 1
+            assertThat(responseB.isLiked()).isFalse();          // B는 안 눌렀으니 false
+        }
+
+        @Test
+        @DisplayName("SCENE 5. [Async Persistence] Redis 변경사항이 RabbitMQ를 거쳐 DB PostLike 테이블에 반영된다.")
         void async_Persistence_Check() {
             User liker = createUser("async@test.com", "asyncUser");
 
@@ -155,7 +206,8 @@ class PostLikeServiceTest extends IntegrationTestSupport {
             Long redisCount = likeRedisService.getCount(
                     ViewLikeDomain.POST,
                     targetPost.getId(),
-                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId())
+                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId()),
+                    () -> {}
             );
             assertThat(redisCount).isEqualTo(1L);
 
@@ -172,7 +224,7 @@ class PostLikeServiceTest extends IntegrationTestSupport {
     class ConcurrencyTest {
 
         @Test
-        @DisplayName("SCENE 4. [Thundering Herd] 동시 접속 시 DB Warming 쿼리 폭주 방지 (Redisson Lock)")
+        @DisplayName("SCENE 6. [Thundering Herd] 동시 접속 시 DB Warming 쿼리 폭주 방지 (Redisson Lock)")
         void prevent_Thundering_Herd() throws InterruptedException {
             redisTemplate.getConnectionFactory().getConnection().flushAll();
             int threadCount = 50;
@@ -207,7 +259,8 @@ class PostLikeServiceTest extends IntegrationTestSupport {
             Long finalCount = likeRedisService.getCount(
                     ViewLikeDomain.POST,
                     targetPost.getId(),
-                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId())
+                    () -> postLikeRepository.findAllUserIdsByPostId(targetPost.getId()),
+                    () -> {}
             );
             assertThat(finalCount).isEqualTo((long) threadCount);
         }
@@ -229,6 +282,30 @@ class PostLikeServiceTest extends IntegrationTestSupport {
             // Then
             PostStats stats = postStatsRepository.findById(targetPost.getId()).orElseThrow();
             assertThat(stats.getLikeCount()).isEqualTo(100L);
+        }
+    }
+
+    @Nested
+    @DisplayName("IV. 예외 및 데이터 정합성 (Lazy Validation & Cleanup)")
+    class EdgeCaseTest {
+
+        @Test
+        @DisplayName("SCENE 8. [Lazy Validation] 존재하지 않는 게시글에 좋아요 시도 시, DB를 확인하고 예외를 던지며 Redis를 오염시키지 않는다.")
+        void not_Found_Post_Should_Throw_Exception_And_Protect_Redis() {
+            // Given: 존재하지 않는 ID
+            Long nonExistentId = 999999L;
+
+            // When & Then: 예외 발생 검증
+            // PostService.toggleLike 내부의 Lazy Validator 람다가 실행되는지 확인
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                            postService.toggleLike(UserPrincipal.from(postOwner), nonExistentId)
+                    )
+                    .isInstanceOf(com.depth.deokive.system.exception.model.RestException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", com.depth.deokive.system.exception.model.ErrorCode.POST_NOT_FOUND);
+
+            // Then: Redis에 키가 생성되지 않아야 함 (Warming 방지)
+            String countKey = "like:post:count:" + nonExistentId;
+            assertThat(redisTemplate.hasKey(countKey)).isFalse();
         }
     }
 
@@ -269,6 +346,21 @@ class PostLikeServiceTest extends IntegrationTestSupport {
             postStatsRepository.save(PostStats.create(savedPost));
 
             return savedPost;
+        });
+    }
+
+    private void cleanupData() {
+        redisTemplate.getConnectionFactory().getConnection().flushAll();
+
+        TransactionTemplate requireNewTemplate = new TransactionTemplate(transactionManager);
+        requireNewTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        requireNewTemplate.execute(status -> {
+            postLikeRepository.deleteAllInBatch();
+            postStatsRepository.deleteAllInBatch();
+            postRepository.deleteAllInBatch();
+            userRepository.deleteAllInBatch();
+            return null;
         });
     }
 }

@@ -4,9 +4,16 @@ import com.depth.deokive.domain.s3.service.S3Service;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeEach;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -35,6 +42,7 @@ public abstract class ApiTestSupport {
     @SuppressWarnings("resource")
     static final GenericContainer<?> REDIS_CONTAINER = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379)
+            .withCommand("redis-server --requirepass test")
             .withReuse(true);
 
     // --- 3. MailHog Container (SMTP & API) ---
@@ -76,6 +84,7 @@ public abstract class ApiTestSupport {
         // Redis Configuration
         registry.add("spring.data.redis.host", REDIS_CONTAINER::getHost);
         registry.add("spring.data.redis.port", () -> REDIS_CONTAINER.getMappedPort(6379).toString());
+        registry.add("spring.data.redis.password", () -> "test");
 
         // MailHog Configuration
         registry.add("spring.mail.host", MAILHOG_CONTAINER::getHost);
