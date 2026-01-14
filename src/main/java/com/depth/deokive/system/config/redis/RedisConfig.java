@@ -4,12 +4,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.GenericToStringSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Slf4j
@@ -92,5 +94,20 @@ public class RedisConfig {
                         "  return 0 " +
                         "end";
         return new DefaultRedisScript<>(script, Long.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, Long> longRedisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, Long> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+
+        // Key는 문자열
+        template.setKeySerializer(new StringRedisSerializer());
+
+        // Value는 Long이지만, Redis에는 문자열("123")로 저장되도록 설정
+        // 이 Serializer가 'Long <-> String' 변환을 자동으로 최적화해서 수행함
+        template.setValueSerializer(new GenericToStringSerializer<>(Long.class));
+
+        return template;
     }
 }
