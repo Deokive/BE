@@ -1,3 +1,10 @@
+server:
+  tomcat:
+    threads:
+      max: 120 # 120
+      min-spare: 20 # 20
+
+
 spring:
   jackson:
     time-zone: Asia/Seoul       # 모든 시간대 응답을 KST로 통일
@@ -5,11 +12,29 @@ spring:
       write-dates-as-timestamps: false
 
   profiles:
-    active: dev # 개발할 때는 dev, 배포할 때는 prod
+    active: prod # 개발할 때는 dev, 배포할 때는 prod
 
   batch:
     jdbc:
       initialize-schema: always # 실행 시 BATCH_ 관련 테이블이 없으면 자동 생성
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}          # RabbitMQ 서버 호스트 (로컬 실행 시 localhost, 컨테이너 환경 시 서비스명)
+    port: ${RABBITMQ_PORT:5672}     # RabbitMQ 기본 포트 (AMQP 포트)
+    username: ${RABBITMQ_USERNAME}  # RabbitMQ 사용자 이름 (기본값: guest)
+    password: ${RABBITMQ_PASSWORD}  # RabbitMQ 비밀번호 (기본값: guest)
+    virtual-host: /                 # 가상 호스트 (기본값: /)
+
+    # 리스너(Listener) 관련 설정 (선택 사항)
+    listener:
+      simple:
+        acknowledge-mode: auto  # 메시지 수신 확인 모드 (auto, manual, none)
+        retry:
+          enabled: true         # 메시지 처리 실패 시 재시도 활성화
+          initial-interval: 1000ms
+          max-attempts: 3
+          max-interval: 10000ms
+          multiplier: 2.0
 
   mail:
     host: smtp.gmail.com
@@ -32,6 +57,8 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 6 # t3.small 기준 vCPU * 2 (기존 50)
 
   cloud:
     aws:
@@ -45,6 +72,12 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      lettuce:
+        pool:
+          max-active: 8 # 48
+          max-idle: 8 # 32
+          min-idle: 2 # 8
+          max-wait: 1000ms # 5000ms
 
   security:
     oauth2:
