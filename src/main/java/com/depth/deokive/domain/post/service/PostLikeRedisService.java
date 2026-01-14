@@ -12,6 +12,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -27,8 +28,10 @@ public class PostLikeRedisService {
     private final RabbitTemplate rabbitTemplate;
     private final PostLikeRepository postLikeRepository;
     private final RedissonClient redissonClient;
+    private final DefaultRedisScript<Long> likeScript; // 주입
 
     private static final String DUMMY_VALUE = "dummy";
+    private static final String TTL_SECONDS = "259200"; // 3일
 
     private String getLikeCountKey(Long postId) { return "like:post:count:" + postId; }
     private String getLikeSetKey(Long postId) { return "like:post:users:" + postId; }
@@ -44,44 +47,25 @@ public class PostLikeRedisService {
             warmingWithLock(postId, setKey, countKey);
         }
 
-        // 2. Redis 연산
-        boolean isLiked;
-        // 추가됨(1), 이미존재(0)
-        Long result = redisTemplate.opsForSet().add(setKey, userIdStr);
+        // 2. Lua Script 실행: 중복체크 + 카운팅 + TTL을 Redis 내부에서 원자적으로 처리
+        // 락 없이도 Redis 싱글 스레드 특성상 완벽한 원자성 보장
+        Long result = redisTemplate.execute(
+                likeScript,
+                List.of(setKey, countKey), // KEYS[1], KEYS[2]
+                String.valueOf(userId),    // ARGV[1]
+                DUMMY_VALUE,               // ARGV[2]
+                TTL_SECONDS                // ARGV[3]
+        );
 
-        if (result != null && result == 1) {
-            // New Like
-            isLiked = true;
-            redisTemplate.opsForValue().increment(countKey);
+        boolean isLiked = (result != null && result == 1);
 
-            // 진짜 유저가 들어왔으니, 자리 차지하던 'dummy' 제거 -> 있으면 지워지고, 없으면 무시됨
-            redisTemplate.opsForSet().remove(setKey, DUMMY_VALUE);
-
-        } else {
-            // Already Exists -> Unlike
-            isLiked = false;
-            redisTemplate.opsForSet().remove(setKey, userIdStr);
-            redisTemplate.opsForValue().decrement(countKey);
-
-            // 만약 모든 유저가 다 취소해서 Set이 비어버리면?
-            // -> Redis Key가 사라져서 다시 'Cache Miss'가 발생할 수 있음.
-            // -> 다시 Cache Miss가 나도 Warming 로직이 "좋아요 0개"로 잘 복구함
-        }
-
-        // 3. TTL 연장
-        redisTemplate.expire(setKey, 3, TimeUnit.DAYS);
-        redisTemplate.expire(countKey, 3, TimeUnit.DAYS);
-
-        // 4. 현재 개수 조회
-        Long currentCount = getCount(postId);
-
-        // 5. MQ 전송
+        // 3. MQ 전송
         sendToQueue(postId, userId, isLiked);
 
         return PostDto.LikeResponse.builder()
                 .postId(postId)
                 .isLiked(isLiked)
-                .likeCount(currentCount)
+                .likeCount(getCount(postId))
                 .build();
     }
 
