@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 @Slf4j
 @Component
@@ -24,51 +25,48 @@ public class ViewCountScheduler {
 
     private static final int BATCH_SIZE = 5000;
 
-    @Scheduled(fixedRateString = "${scheduler.view-interval:300000}") // Default : 5분
-    public void syncAllViewCounts() {
-        log.info("🔥 [Scheduler] Starting View Count Sync...");
-        syncPostViews();
-        syncArchiveViews();
-        log.info("✅ [Scheduler] View Count Sync Finished.");
+    @Scheduled(cron = "${scheduler.post-view-cron}")
+    public void syncPostViews() {
+        log.info("🔥 [Scheduler] Starting Post View Count Sync...");
+        try {
+            syncViews(ViewDomain.POST, postStatsRepository::incrementViewCount);
+            log.info("✅ [Scheduler] Synced Post Views");
+        } catch (Exception e) {
+            log.error("🔴 [Scheduler] Post View Sync Failed", e);
+        }
     }
 
-    private void syncPostViews() {
-        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(ViewDomain.POST, BATCH_SIZE);
+    @Scheduled(cron = "${scheduler.archive-view-cron}")
+    public void syncArchiveViews() {
+        log.info("🔥 [Scheduler] Starting Archive View Count Sync...");
+        try {
+            syncViews(ViewDomain.ARCHIVE, archiveStatsRepository::incrementViewCount);
+            log.info("✅ [Scheduler] Synced Archive Views");
+        } catch (Exception e) {
+            log.error("🔴 [Scheduler] Archive View Sync Failed", e);
+        }
+    }
+
+    private void syncViews(ViewDomain domain, BiConsumer<Long, Long> dbUpdater) {
+        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(domain, BATCH_SIZE);
         if (counts.isEmpty()) return;
 
         counts.forEach((id, count) -> {
             if (count > 0) {
                 try {
-                    postStatsRepository.incrementViewCount(id, count);
-                    redisViewService.decrementCount(ViewDomain.POST, id, count);
+                    // 1. DB 업데이트 (함수형 인터페이스 실행)
+                    dbUpdater.accept(id, count);
+
+                    // 2. Redis 차감 (DB 성공 시에만)
+                    redisViewService.decrementCount(domain, id, count);
                 } catch (Exception e) {
-                    log.error("🔴 Post View Sync Failed ID: {}", id, e);
+                    log.error("🔴 View Sync Error ID: {} ({})", id, domain, e);
                 }
             } else {
-                // 조회수가 0 이하인 경우 DB 업데이트 없이 Redis 키만 삭제 (Zombie Key 정리)
-                redisViewService.deleteViewCountKey(ViewDomain.POST, id);
+                // 3. Zombie Key 정리 (Count <= 0)
+                redisViewService.deleteViewCountKey(domain, id);
             }
         });
-        log.info("✅ Synced Post Views: {} items", counts.size());
-    }
-
-    private void syncArchiveViews() {
-        Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(ViewDomain.ARCHIVE, BATCH_SIZE);
-        if (counts.isEmpty()) return;
-
-        counts.forEach((id, count) -> {
-            if (count > 0) {
-                try {
-                    archiveStatsRepository.incrementViewCount(id, count);
-                    redisViewService.decrementCount(ViewDomain.ARCHIVE, id, count);
-                } catch (Exception e) {
-                    log.error("🔴 Archive View Sync Failed ID: {}", id, e);
-                }
-            } else {
-                // 조회수가 0 이하인 경우 DB 업데이트 없이 Redis 키만 삭제 (Zombie Key 정리)
-                redisViewService.deleteViewCountKey(ViewDomain.POST, id);
-            }
-        });
-        log.info("✅ Synced Archive Views: {} items", counts.size());
+        log.info("✅ Synced {} Views: {} items", domain, counts.size());
     }
 }

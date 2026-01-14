@@ -15,7 +15,6 @@ import java.util.List;
 public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long> {
 
     // 1. 조회수 증가 (Atomic Update)
-    @Transactional
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.viewCount = s.viewCount + :count WHERE s.id = :id")
     void incrementViewCount(@Param("id") Long id, @Param("count") Long count);

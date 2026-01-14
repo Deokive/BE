@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 public interface PostStatsRepository extends JpaRepository<PostStats, Long> {
     // [Scheduler] 1. 조회수 증가 (Atomic Update)
     // 현재 값에 delta를 더함. X-Lock 점유 시간 극소화.
-    @Transactional
     @Modifying(clearAutomatically = true)
     @Query("UPDATE PostStats ps SET ps.viewCount = ps.viewCount + :count WHERE ps.id = :postId")
     void incrementViewCount(@Param("postId") Long postId, @Param("count") Long count);
