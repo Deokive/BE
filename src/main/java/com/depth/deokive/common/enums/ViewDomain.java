@@ -6,8 +6,11 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum ViewDomain {
-    POST("post"),
-    ARCHIVE("archive");
+    POST("post", "post.like.queue", "post.like.exchange", "post.like.key"),
+    ARCHIVE("archive", "archive.like.queue", "archive.like.exchange", "archive.like.key");
 
-    private final String prefix; // redis key에 사용할 소문자 접두사
+    private final String prefix;
+    private final String queueName;
+    private final String exchangeName;
+    private final String routingKey;
 }
