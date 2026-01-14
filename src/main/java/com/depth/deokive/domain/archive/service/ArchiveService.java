@@ -144,7 +144,8 @@ public class ArchiveService {
         Long realTimeLikeCount = likeRedisService.getCount(
                 ViewLikeDomain.ARCHIVE,
                 archiveId,
-                () -> likeRepository.findAllUserIdsByArchiveId(archiveId) // Warming용 DB Loader
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId), // Warming용 DB Loader
+                () -> {}
         );
 
         // SEQ 6. 조회수 증가 (Redis Write Back Pattern)
@@ -160,7 +161,8 @@ public class ArchiveService {
                 ViewLikeDomain.ARCHIVE,
                 archiveId,
                 viewerId,
-                () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> {}
         );
 
         // Response: viewCount는 Stats에서, likeCount는 RealTime Table에서
@@ -196,14 +198,16 @@ public class ArchiveService {
         Long realTimeLikeCount = likeRedisService.getCount(
                 ViewLikeDomain.ARCHIVE,
                 archiveId,
-                () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> {}
         );
 
         boolean isLiked = likeRedisService.isLiked(
                 ViewLikeDomain.ARCHIVE,
                 archiveId,
                 user.getUserId(),
-                () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> {}
         );
 
         return ArchiveDto.Response.of(
@@ -255,6 +259,9 @@ public class ArchiveService {
         // Step 3. Root 삭제
         // Cascade -> Sub Domain 삭제: DiaryBook, GalleryBook, TicketBook, RepostBook, Banner
         archiveRepository.delete(archive);
+
+        // Step 4. Redis 캐시 삭제
+        likeRedisService.deleteLikeData(ViewLikeDomain.ARCHIVE, archiveId);
 
         log.info("🟢 Archive Delete Completed.");
     }
@@ -331,14 +338,24 @@ public class ArchiveService {
                 ViewLikeDomain.ARCHIVE,
                 archiveId,
                 userPrincipal.getUserId(),
-                () -> likeRepository.findAllUserIdsByArchiveId(archiveId) // Warming을 위한 DB Loader
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> { // Lazy Validator: 필요할 때만 DB 조회
+                    if (!archiveRepository.existsById(archiveId)) {
+                        throw new RestException(ErrorCode.ARCHIVE_NOT_FOUND);
+                    }
+                }
         );
 
         // 3. 변경된 실시간 카운트 조회
         Long realTimeLikeCount = likeRedisService.getCount(
                 ViewLikeDomain.ARCHIVE,
                 archiveId,
-                () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> { // Lazy Validator: 필요할 때만 DB 조회
+                    if (!archiveRepository.existsById(archiveId)) {
+                        throw new RestException(ErrorCode.ARCHIVE_NOT_FOUND);
+                    }
+                }
         );
 
         return ArchiveDto.LikeResponse.builder()

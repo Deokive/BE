@@ -86,7 +86,8 @@ public class PostService {
         Long realTimeLikeCount = likeRedisService.getCount(
                 ViewLikeDomain.POST,
                 postId,
-                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> {}
         );
 
         // SEQ 4. 해당 게시글의 파일 매핑 조회
@@ -101,7 +102,8 @@ public class PostService {
                 ViewLikeDomain.POST,
                 postId,
                 viewerId,
-                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> {}
         );
 
         // SEQ 7. Return
@@ -167,6 +169,9 @@ public class PostService {
 
         // SEQ 6. 게시글 삭제
         postRepository.delete(post);
+
+        // SEQ 7. 캐시 삭제
+        likeRedisService.deleteLikeData(ViewLikeDomain.POST, postId);
     }
 
     @ExecutionTime
@@ -193,13 +198,23 @@ public class PostService {
                 ViewLikeDomain.POST,
                 postId,
                 userPrincipal.getUserId(),
-                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> { // Validator: 필요할 때만 실행됨
+                    if (!postRepository.existsById(postId)) {
+                        throw new RestException(ErrorCode.POST_NOT_FOUND);
+                    }
+                }
         );
 
         Long realTimeLikeCount = likeRedisService.getCount(
                 ViewLikeDomain.POST,
                 postId,
-                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> { // Validator: 필요할 때만 실행됨
+                    if (!postRepository.existsById(postId)) {
+                        throw new RestException(ErrorCode.POST_NOT_FOUND);
+                    }
+                }
         );
 
         return PostDto.LikeResponse.builder()

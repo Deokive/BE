@@ -40,7 +40,8 @@ public class LikeRedisService {
             ViewLikeDomain domain,
             Long targetId,
             Long userId,
-            Supplier<List<Long>> dbLoader
+            Supplier<List<Long>> dbLoader,
+            Runnable existenceValidator
     ) {
         String setKey = getLikeSetKey(domain, targetId);
         String countKey = getLikeCountKey(domain, targetId);
@@ -48,7 +49,7 @@ public class LikeRedisService {
 
         // 1. 캐시 없으면 Warming (분산 락)
         if (!longRedisTemplate.hasKey(setKey)) {
-            warmingWithLock(setKey, countKey, lockKey, dbLoader);
+            warmingWithLock(setKey, countKey, lockKey, dbLoader, existenceValidator);
         }
 
         // 2. Lua Script 실행: 중복체크 + 카운팅 + TTL을 Redis 내부에서 원자적으로 처리
@@ -69,20 +70,20 @@ public class LikeRedisService {
         return isLiked;
     }
 
-    public boolean isLiked(ViewLikeDomain domain, Long targetId, Long userId, Supplier<List<Long>> dbLoader) {
+    public boolean isLiked(ViewLikeDomain domain, Long targetId, Long userId, Supplier<List<Long>> dbLoader, Runnable existenceValidator) {
         String setKey = getLikeSetKey(domain, targetId);
         if (!longRedisTemplate.hasKey(setKey)) {
-            warmingWithLock(setKey, getLikeCountKey(domain, targetId), getLockKey(domain, targetId), dbLoader);
+            warmingWithLock(setKey, getLikeCountKey(domain, targetId), getLockKey(domain, targetId), dbLoader, existenceValidator);
         }
         return Boolean.TRUE.equals(longRedisTemplate.opsForSet().isMember(setKey, String.valueOf(userId)));
     }
 
-    public Long getCount(ViewLikeDomain domain, Long targetId, Supplier<List<Long>> dbLoader) {
+    public Long getCount(ViewLikeDomain domain, Long targetId, Supplier<List<Long>> dbLoader, Runnable existenceValidator) {
         String countKey = getLikeCountKey(domain, targetId);
         Object countObj = longRedisTemplate.opsForValue().get(countKey);
         if (countObj != null) return Long.parseLong(countObj.toString());
 
-        warmingWithLock(getLikeSetKey(domain, targetId), countKey, getLockKey(domain, targetId), dbLoader);
+        warmingWithLock(getLikeSetKey(domain, targetId), countKey, getLockKey(domain, targetId), dbLoader, existenceValidator);
         Object warmedCount = longRedisTemplate.opsForValue().get(countKey);
         return warmedCount != null ? Long.parseLong(warmedCount.toString()) : 0L;
     }
@@ -91,13 +92,17 @@ public class LikeRedisService {
             String setKey,
             String countKey,
             String lockKey,
-            Supplier<List<Long>> dbLoader
+            Supplier<List<Long>> dbLoader,
+            Runnable existenceValidator
     ) {
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
             if (!lock.tryLock(3, 5, TimeUnit.SECONDS)) return;
             if (longRedisTemplate.hasKey(setKey)) return;
+
+            // DB 웜업 직전에 존재 여부 검증 -> 여기서 예외가 터지면 Redis Key가 생성되지 않고 404가 나감
+            if (existenceValidator != null) { existenceValidator.run(); }
 
             // 1. DB 전체 로딩 (목적: 이미 좋아요했던 사람이 취소하려고 눌렀는데 등록이 되버리는 상황 방지)
             List<Long> userIds = dbLoader.get();
@@ -130,5 +135,15 @@ public class LikeRedisService {
         LikeMessageDto message = new LikeMessageDto(targetId, userId, isLiked);
         rabbitTemplate.convertAndSend(domain.getExchangeName(), domain.getRoutingKey(), message);
         log.info("🐇 [MQ Send] Domain: {}, TargetId: {}, Action: {}", domain, targetId, isLiked ? "LIKE" : "UNLIKE");
+    }
+
+    public void deleteLikeData(ViewLikeDomain domain, Long targetId) {
+        String setKey = getLikeSetKey(domain, targetId);
+        String countKey = getLikeCountKey(domain, targetId);
+
+        // Lock Key는 TTL이 짧고 자동 만료되므로 굳이 삭제 안 해도 됨
+
+        longRedisTemplate.delete(List.of(setKey, countKey));
+        log.info("[Redis] Deleted Like Data for {} ID: {}", domain, targetId);
     }
 }
