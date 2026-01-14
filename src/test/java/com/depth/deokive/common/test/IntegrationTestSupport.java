@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.RabbitMQContainer;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -35,11 +36,19 @@ public abstract class IntegrationTestSupport {
     @SuppressWarnings("resource")
     static final GenericContainer<?> REDIS_CONTAINER = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379)
+            .withCommand("redis-server --requirepass test")
+            .withReuse(true);
+
+    // 3. RabbitMQ (추가됨)
+    @SuppressWarnings("resource")
+    static final RabbitMQContainer RABBIT_CONTAINER = new RabbitMQContainer("rabbitmq:3.12-management")
+            .withExposedPorts(5672, 15672)
             .withReuse(true);
 
     static {
         MYSQL_CONTAINER.start();
         REDIS_CONTAINER.start();
+        RABBIT_CONTAINER.start(); // 시작
     }
 
     // Datasource & Redis 설정 덮어쓰기
@@ -57,6 +66,22 @@ public abstract class IntegrationTestSupport {
         // Redis
         registry.add("spring.data.redis.host", REDIS_CONTAINER::getHost);
         registry.add("spring.data.redis.port", () -> REDIS_CONTAINER.getMappedPort(6379).toString());
+        registry.add("spring.data.redis.password", () -> "test");
+
+        // RabbitMQ 설정 (추가됨)
+        registry.add("spring.rabbitmq.host", RABBIT_CONTAINER::getHost);
+        registry.add("spring.rabbitmq.port", RABBIT_CONTAINER::getAmqpPort);
+        registry.add("spring.rabbitmq.username", RABBIT_CONTAINER::getAdminUsername);
+        registry.add("spring.rabbitmq.password", RABBIT_CONTAINER::getAdminPassword);
+
+        registry.add("scheduler.post-like-cron", () -> "-");
+        registry.add("scheduler.archive-like-cron", () -> "-");
+        registry.add("scheduler.post-view-cron", () -> "-");
+        registry.add("scheduler.archive-view-cron", () -> "-");
+        registry.add("scheduler.post-hot-score-cron", () -> "-");
+        registry.add("scheduler.archive-hot-score-cron", () -> "-");
+        registry.add("scheduler.file-cleanup-cron", () -> "-");
+        registry.add("scheduler.badge-cron", () -> "-");
     }
 
     @Autowired protected UserRepository userRepository;

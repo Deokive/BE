@@ -13,6 +13,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 @ActiveProfiles("test")
@@ -43,6 +44,12 @@ public abstract class ApiTestSupport {
             .waitingFor(Wait.forHttp("/api/v2/messages").forPort(8025)) // API 헬스체크
             .withReuse(true);
 
+    // --- 4. RabbitMQ Container (추가됨) ---
+    @SuppressWarnings("resource")
+    static final RabbitMQContainer RABBIT_CONTAINER = new RabbitMQContainer("rabbitmq:3.12-management")
+            .withExposedPorts(5672, 15672)
+            .withReuse(true);
+
     // AuthSteps에서 사용할 MailHog HTTP API URL (동적 포트 바인딩)
     public static String MAILHOG_HTTP_URL;
 
@@ -50,6 +57,7 @@ public abstract class ApiTestSupport {
         MYSQL_CONTAINER.start();
         REDIS_CONTAINER.start();
         MAILHOG_CONTAINER.start();
+        RABBIT_CONTAINER.start();
 
         // 컨테이너 시작 후 호스트와 매핑된 포트를 사용하여 URL 구성
         MAILHOG_HTTP_URL = "http://" + MAILHOG_CONTAINER.getHost() + ":" + MAILHOG_CONTAINER.getMappedPort(8025);
@@ -81,6 +89,12 @@ public abstract class ApiTestSupport {
 
         // 메일 그룹명 설정 (EmailService 로직용)
         registry.add("spring.mail.group", () -> "Deokive Team");
+
+        // RabbitMQ Configuration
+        registry.add("spring.rabbitmq.host", RABBIT_CONTAINER::getHost);
+        registry.add("spring.rabbitmq.port", RABBIT_CONTAINER::getAmqpPort);
+        registry.add("spring.rabbitmq.username", RABBIT_CONTAINER::getAdminUsername);
+        registry.add("spring.rabbitmq.password", RABBIT_CONTAINER::getAdminPassword);
     }
 
     // --- Common Beans ---
