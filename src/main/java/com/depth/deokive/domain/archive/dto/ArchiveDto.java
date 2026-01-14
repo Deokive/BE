@@ -183,4 +183,18 @@ public class ArchiveDto {
             this.ownerNickname = ownerNickname;
         }
     }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "ArchiveLikeResponse", description = "아카이브 좋아요 토글 결과")
+    public static class LikeResponse {
+        @Schema(description = "아카이브 ID")
+        private Long archiveId;
+
+        @JsonProperty("isLiked")
+        @Schema(description = "토글 후 좋아요 상태 (true: 좋아요 됨, false: 취소 됨)")
+        private boolean isLiked;
+
+        @Schema(description = "실시간 좋아요 개수")
+        private Long likeCount;
+    }
 }
