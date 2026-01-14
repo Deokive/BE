@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.archive.service;
 
 import com.depth.deokive.common.dto.PageDto;
-import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.service.LikeRedisService;
 import com.depth.deokive.common.service.RedisViewService;
@@ -142,7 +142,7 @@ public class ArchiveService {
 
         // SEQ 5. 실시간 좋아요 수 조회
         Long realTimeLikeCount = likeRedisService.getCount(
-                ViewDomain.ARCHIVE,
+                ViewLikeDomain.ARCHIVE,
                 archiveId,
                 () -> likeRepository.findAllUserIdsByArchiveId(archiveId) // Warming용 DB Loader
         );
@@ -157,7 +157,7 @@ public class ArchiveService {
 
         // SEQ 8. 좋아요 여부 조회
         boolean isLiked = (viewerId != null) && likeRedisService.isLiked(
-                ViewDomain.ARCHIVE,
+                ViewLikeDomain.ARCHIVE,
                 archiveId,
                 viewerId,
                 () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
@@ -194,13 +194,13 @@ public class ArchiveService {
                 .orElse(ArchiveStats.create(archive));
 
         Long realTimeLikeCount = likeRedisService.getCount(
-                ViewDomain.ARCHIVE,
+                ViewLikeDomain.ARCHIVE,
                 archiveId,
                 () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
         );
 
         boolean isLiked = likeRedisService.isLiked(
-                ViewDomain.ARCHIVE,
+                ViewLikeDomain.ARCHIVE,
                 archiveId,
                 user.getUserId(),
                 () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
@@ -328,7 +328,7 @@ public class ArchiveService {
 
         // 2. Redis Toggle 수행 (Lua Script)
         boolean isLiked = likeRedisService.toggleLike(
-                ViewDomain.ARCHIVE,
+                ViewLikeDomain.ARCHIVE,
                 archiveId,
                 userPrincipal.getUserId(),
                 () -> likeRepository.findAllUserIdsByArchiveId(archiveId) // Warming을 위한 DB Loader
@@ -336,7 +336,7 @@ public class ArchiveService {
 
         // 3. 변경된 실시간 카운트 조회
         Long realTimeLikeCount = likeRedisService.getCount(
-                ViewDomain.ARCHIVE,
+                ViewLikeDomain.ARCHIVE,
                 archiveId,
                 () -> likeRepository.findAllUserIdsByArchiveId(archiveId)
         );
@@ -386,6 +386,6 @@ public class ArchiveService {
         Long userId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         String clientIp = ClientUtils.getClientIp(request);
 
-        redisViewService.incrementViewCount(ViewDomain.ARCHIVE, archiveId, userId, clientIp);
+        redisViewService.incrementViewCount(ViewLikeDomain.ARCHIVE, archiveId, userId, clientIp);
     }
 }

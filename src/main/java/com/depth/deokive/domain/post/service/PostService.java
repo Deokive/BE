@@ -1,7 +1,7 @@
 package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.dto.PageDto;
-import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.LikeRedisService;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.common.util.ClientUtils;
@@ -84,7 +84,7 @@ public class PostService {
 
         // SEQ 3. 실시간 좋아요 수 조회
         Long realTimeLikeCount = likeRedisService.getCount(
-                ViewDomain.POST,
+                ViewLikeDomain.POST,
                 postId,
                 () -> postLikeRepository.findAllUserIdsByPostId(postId)
         );
@@ -98,7 +98,7 @@ public class PostService {
         // SEQ 6. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         boolean isLiked = (viewerId != null) && likeRedisService.isLiked(
-                ViewDomain.POST,
+                ViewLikeDomain.POST,
                 postId,
                 viewerId,
                 () -> postLikeRepository.findAllUserIdsByPostId(postId)
@@ -190,14 +190,14 @@ public class PostService {
     @Transactional
     public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
         boolean isLiked = likeRedisService.toggleLike(
-                ViewDomain.POST,
+                ViewLikeDomain.POST,
                 postId,
                 userPrincipal.getUserId(),
                 () -> postLikeRepository.findAllUserIdsByPostId(postId)
         );
 
         Long realTimeLikeCount = likeRedisService.getCount(
-                ViewDomain.POST,
+                ViewLikeDomain.POST,
                 postId,
                 () -> postLikeRepository.findAllUserIdsByPostId(postId)
         );
@@ -289,6 +289,6 @@ public class PostService {
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         String clientIp = ClientUtils.getClientIp(request);
 
-        redisViewService.incrementViewCount(ViewDomain.POST, postId, viewerId, clientIp);
+        redisViewService.incrementViewCount(ViewLikeDomain.POST, postId, viewerId, clientIp);
     }
 }

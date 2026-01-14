@@ -1,6 +1,6 @@
 package com.depth.deokive.system.config.rabbitmq;
 
-import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
@@ -16,17 +16,17 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     // --- Post Domain ---
-    @Bean public Queue postLikeQueue() { return new Queue(ViewDomain.POST.getQueueName(), true); }
-    @Bean public DirectExchange postLikeExchange() { return new DirectExchange(ViewDomain.POST.getExchangeName()); }
+    @Bean public Queue postLikeQueue() { return new Queue(ViewLikeDomain.POST.getQueueName(), true); }
+    @Bean public DirectExchange postLikeExchange() { return new DirectExchange(ViewLikeDomain.POST.getExchangeName()); }
     @Bean public Binding postLikeBinding() {
-        return BindingBuilder.bind(postLikeQueue()).to(postLikeExchange()).with(ViewDomain.POST.getRoutingKey());
+        return BindingBuilder.bind(postLikeQueue()).to(postLikeExchange()).with(ViewLikeDomain.POST.getRoutingKey());
     }
 
     // --- Archive Domain ---
-    @Bean public Queue archiveLikeQueue() { return new Queue(ViewDomain.ARCHIVE.getQueueName(), true); }
-    @Bean public DirectExchange archiveLikeExchange() { return new DirectExchange(ViewDomain.ARCHIVE.getExchangeName()); }
+    @Bean public Queue archiveLikeQueue() { return new Queue(ViewLikeDomain.ARCHIVE.getQueueName(), true); }
+    @Bean public DirectExchange archiveLikeExchange() { return new DirectExchange(ViewLikeDomain.ARCHIVE.getExchangeName()); }
     @Bean public Binding archiveLikeBinding() {
-        return BindingBuilder.bind(archiveLikeQueue()).to(archiveLikeExchange()).with(ViewDomain.ARCHIVE.getRoutingKey());
+        return BindingBuilder.bind(archiveLikeQueue()).to(archiveLikeExchange()).with(ViewLikeDomain.ARCHIVE.getRoutingKey());
     }
 
     // 4. JSON Converter

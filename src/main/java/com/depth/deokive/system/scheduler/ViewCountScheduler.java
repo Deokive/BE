@@ -1,9 +1,7 @@
 package com.depth.deokive.system.scheduler;
 
-import com.depth.deokive.common.enums.ViewDomain;
-import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.domain.archive.repository.ArchiveStatsRepository;
-import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.domain.post.repository.PostStatsRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +27,7 @@ public class ViewCountScheduler {
     public void syncPostViews() {
         log.info("🔥 [Scheduler] Starting Post View Count Sync...");
         try {
-            syncViews(ViewDomain.POST, postStatsRepository::incrementViewCount);
+            syncViews(ViewLikeDomain.POST, postStatsRepository::incrementViewCount);
             log.info("✅ [Scheduler] Synced Post Views");
         } catch (Exception e) {
             log.error("🔴 [Scheduler] Post View Sync Failed", e);
@@ -40,14 +38,14 @@ public class ViewCountScheduler {
     public void syncArchiveViews() {
         log.info("🔥 [Scheduler] Starting Archive View Count Sync...");
         try {
-            syncViews(ViewDomain.ARCHIVE, archiveStatsRepository::incrementViewCount);
+            syncViews(ViewLikeDomain.ARCHIVE, archiveStatsRepository::incrementViewCount);
             log.info("✅ [Scheduler] Synced Archive Views");
         } catch (Exception e) {
             log.error("🔴 [Scheduler] Archive View Sync Failed", e);
         }
     }
 
-    private void syncViews(ViewDomain domain, BiConsumer<Long, Long> dbUpdater) {
+    private void syncViews(ViewLikeDomain domain, BiConsumer<Long, Long> dbUpdater) {
         Map<Long, Long> counts = redisViewService.getAndFlushViewCounts(domain, BATCH_SIZE);
         if (counts.isEmpty()) return;
 

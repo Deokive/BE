@@ -1,6 +1,6 @@
 package com.depth.deokive.common.service;
 
-import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,7 +27,7 @@ public class RedisViewService {
     private static final String COUNT_KEY_FORMAT = "view:count:%s:%s"; // Key 패턴: view:count:{domain}:{id}
 
     /** 조회수 증가 로직 */
-    public void incrementViewCount(ViewDomain domain, Long id, Long userId, String clientIp) {
+    public void incrementViewCount(ViewLikeDomain domain, Long id, Long userId, String clientIp) {
         String identifier = (userId != null) ? "user:" + userId : "ip:" + clientIp;
 
         // SEQ 1. Define logKey
@@ -49,7 +49,7 @@ public class RedisViewService {
     }
 
     /** 특정 도메인의 조회수 데이터를 모두 스캔하여 반환 */
-    public Map<Long, Long> getAndFlushViewCounts(ViewDomain domain, int limit) {
+    public Map<Long, Long> getAndFlushViewCounts(ViewLikeDomain domain, int limit) {
         Map<Long, Long> viewCounts = new HashMap<>();
         String pattern = String.format("view:count:%s:*", domain.getPrefix()); // Ex. view:count:archive:*
 
@@ -81,7 +81,7 @@ public class RedisViewService {
     }
 
     /** DB 반영 후 차감 */
-    public void decrementCount(ViewDomain domain, Long id, Long count) {
+    public void decrementCount(ViewLikeDomain domain, Long id, Long count) {
         String key = String.format(COUNT_KEY_FORMAT, domain.getPrefix(), id);
         redisTemplate.opsForValue().decrement(key, count);
 
@@ -92,7 +92,7 @@ public class RedisViewService {
     }
 
     /** 키 삭제 */
-    public void deleteViewCountKey(ViewDomain domain, Long id) {
+    public void deleteViewCountKey(ViewLikeDomain domain, Long id) {
         String key = String.format(COUNT_KEY_FORMAT, domain.getPrefix(), id);
         redisTemplate.delete(key);
     }

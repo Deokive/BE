@@ -1,7 +1,7 @@
 package com.depth.deokive.common.service;
 
 import com.depth.deokive.common.dto.LikeMessageDto;
-import com.depth.deokive.common.enums.ViewDomain;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
@@ -32,12 +32,12 @@ public class LikeRedisService {
     private static final String TTL_SECONDS = "259200"; // 3일
 
     // --- Key Generators
-    private String getLikeCountKey(ViewDomain domain, Long id) { return "like:" + domain.getPrefix() + ":count:" + id; }
-    private String getLikeSetKey(ViewDomain domain, Long id) { return "like:" + domain.getPrefix() + ":users:" + id; }
-    private String getLockKey(ViewDomain domain, Long id) { return "lock:like:" + domain.getPrefix() + ":" + id; }
+    private String getLikeCountKey(ViewLikeDomain domain, Long id) { return "like:" + domain.getPrefix() + ":count:" + id; }
+    private String getLikeSetKey(ViewLikeDomain domain, Long id) { return "like:" + domain.getPrefix() + ":users:" + id; }
+    private String getLockKey(ViewLikeDomain domain, Long id) { return "lock:like:" + domain.getPrefix() + ":" + id; }
 
     public boolean toggleLike(
-            ViewDomain domain,
+            ViewLikeDomain domain,
             Long targetId,
             Long userId,
             Supplier<List<Long>> dbLoader
@@ -69,7 +69,7 @@ public class LikeRedisService {
         return isLiked;
     }
 
-    public boolean isLiked(ViewDomain domain, Long targetId, Long userId, Supplier<List<Long>> dbLoader) {
+    public boolean isLiked(ViewLikeDomain domain, Long targetId, Long userId, Supplier<List<Long>> dbLoader) {
         String setKey = getLikeSetKey(domain, targetId);
         if (!redisTemplate.hasKey(setKey)) {
             warmingWithLock(setKey, getLikeCountKey(domain, targetId), getLockKey(domain, targetId), dbLoader);
@@ -77,7 +77,7 @@ public class LikeRedisService {
         return Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(setKey, String.valueOf(userId)));
     }
 
-    public Long getCount(ViewDomain domain, Long targetId, Supplier<List<Long>> dbLoader) {
+    public Long getCount(ViewLikeDomain domain, Long targetId, Supplier<List<Long>> dbLoader) {
         String countKey = getLikeCountKey(domain, targetId);
         Object countObj = redisTemplate.opsForValue().get(countKey);
         if (countObj != null) return Long.parseLong(countObj.toString());
@@ -126,7 +126,7 @@ public class LikeRedisService {
     }
 
     @Async("messagingTaskExecutor")
-    public void sendToQueue(ViewDomain domain, Long targetId, Long userId, boolean isLiked) {
+    public void sendToQueue(ViewLikeDomain domain, Long targetId, Long userId, boolean isLiked) {
         LikeMessageDto message = new LikeMessageDto(targetId, userId, isLiked);
         rabbitTemplate.convertAndSend(domain.getExchangeName(), domain.getRoutingKey(), message);
         log.debug("🐇 [MQ Send] Domain: {}, TargetId: {}, Action: {}", domain, targetId, isLiked ? "LIKE" : "UNLIKE");

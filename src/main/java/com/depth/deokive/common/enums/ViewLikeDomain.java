@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum ViewDomain {
+public enum ViewLikeDomain {
     POST("post", "post.like.queue", "post.like.exchange", "post.like.key"),
     ARCHIVE("archive", "archive.like.queue", "archive.like.exchange", "archive.like.key");
 
