@@ -80,16 +80,22 @@ app:
   allowed-origins: "*"
 
 scheduler:
-  hot-score-cron: "0 0 * * * *"     # 1시간 간격으로 핫스코어 갱신
-  badge-cron: "0 0 0 * * *"         # 자정마다 배지 갱신
-  file-cleanup-cron: "0 0 3 * * *"  # 매일 새벽 3시에 파일 정리
+  post-hot-score-cron: "5 0 * * * *"      # Post: 매시 정각 05초 (ViewCount와 5초 간격)
+  archive-hot-score-cron: "5 30 * * * *"  # Archive: 매시 30분 05초 (Post와 30분 간격)
+  badge-cron: "0 0 3 * * *"               # 트래픽이 적은 "새벽 3시 00분"
+  file-cleanup-cron: "0 30 4 * * *"       # 매일 새벽 3시에 파일 정리
   file-cleanup:
-    threshold-hours: 24              # 파일 생성 후 삭제 대상이 되기까지의 시간 (시간 단위)
-    skip-limit: 10                   # S3 삭제 실패 시 최대 스킵 허용 개수
+    threshold-hours: 24                   # 파일 생성 후 삭제 대상이 되기까지의 시간 (시간 단위)
+    skip-limit: 10                        # S3 삭제 실패 시 최대 스킵 허용 개수
     retry:
-      max-attempts: 3                # S3 삭제 재시도 최대 횟수
-      delay-ms: 1000                 # 재시도 간 지연 시간 (밀리초)
+      max-attempts: 3                     # S3 삭제 재시도 최대 횟수
+      delay-ms: 1000                      # 재시도 간 지연 시간 (밀리초)
 
-  view-interval: 300000 # 5 min (5*60*1000ms)
+  post-view-cron: "0 */5 * * * *"         # Post: 매 3분 00초
+  archive-view-cron: "30 */5 * * * *"     # Archive: 매 3분 30초 (Post와 30초 간격)
+
+  # LikeCount: 분산 실행 (Post는 10초, Archive는 40초)
+  post-like-cron: "10 * * * * *"
+  archive-like-cron: "40 * * * * *"
+
   view-cooldown-minutes: 10
-  like-interval: 10000
