@@ -81,11 +81,23 @@ dependencies {
     // Batch
     implementation 'org.springframework.boot:spring-boot-starter-batch'
 
+    // RabbitMQ
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+    // Mutex (Distributed Lock)
+    implementation 'org.redisson:redisson-spring-boot-starter:3.27.0'
+
+    // L1 Cache (Caffeine Cache)
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     //testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testImplementation 'org.junit.platform:junit-platform-launcher'
     testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.awaitility:awaitility:4.2.0'
+    testImplementation 'org.testcontainers:rabbitmq:1.19.0'
     
     // Test Database (H2 for @DataJpaTest)
     testRuntimeOnly 'com.h2database:h2'
