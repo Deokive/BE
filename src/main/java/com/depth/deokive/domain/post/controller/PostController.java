@@ -82,4 +82,13 @@ public class PostController {
     ) {
         return ResponseEntity.ok(postService.getPosts(request));
     }
+
+    @PostMapping("/{postId}/like")
+    @Operation(summary = "게시글 좋아요 토글", description = "좋아요를 처리합니다.")
+    public ResponseEntity<PostDto.LikeResponse> toggleLike(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long postId
+    ) {
+        return ResponseEntity.ok(postService.toggleLike(userPrincipal, postId));
+    }
 }
