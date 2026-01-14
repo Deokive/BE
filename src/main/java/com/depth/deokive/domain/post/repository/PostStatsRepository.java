@@ -21,4 +21,8 @@ public interface PostStatsRepository extends JpaRepository<PostStats, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE PostStats ps SET ps.category = :category WHERE ps.id = :postId")
     void syncUpdateCategory(@Param("postId") Long postId, @Param("category") Category category);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE PostStats ps SET ps.likeCount = :count WHERE ps.id = :postId")
+    void updateLikeCount(@Param("postId") Long postId, @Param("count") Long count);
 }
