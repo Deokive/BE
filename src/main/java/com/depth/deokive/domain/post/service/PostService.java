@@ -10,10 +10,7 @@ import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
-import com.depth.deokive.domain.post.entity.Post;
-import com.depth.deokive.domain.post.entity.PostFileMap;
-import com.depth.deokive.domain.post.entity.PostLikeCount;
-import com.depth.deokive.domain.post.entity.PostStats;
+import com.depth.deokive.domain.post.entity.*;
 import com.depth.deokive.domain.post.repository.*;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -47,7 +44,7 @@ public class PostService {
     private final PostQueryRepository postQueryRepository;
     private final RedisViewService redisViewService;
     private final PostStatsRepository postStatsRepository;
-    private final PostLikeCountRepository postLikeCountRepository;
+    private final PostLikeRedisService postLikeRedisService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -84,8 +81,12 @@ public class PostService {
                     return newStats;
                 });
 
+        log.info("🔍 [PostService] getPost Requested. PostId: {}, User: {}",
+                postId,
+                (userPrincipal != null ? userPrincipal.getUserId() : "NULL (Guest)"));
+
         // SEQ 3. 실시간 좋아요 수 조회
-        long realTimeLikeCount = postLikeCountRepository.findById(postId).map(PostLikeCount::getCount).orElse(0L);
+        Long realTimeLikeCount = postLikeRedisService.getCount(postId);
 
         // SEQ 4. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
@@ -95,7 +96,7 @@ public class PostService {
 
         // SEQ 6. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-        boolean isLiked = (viewerId != null) && postLikeRepository.existsByPostIdAndUserId(postId, viewerId);
+        boolean isLiked = (viewerId != null) && postLikeRedisService.isLiked(postId, viewerId);
 
         // SEQ 7. Return
         return PostDto.Response.of(post, stats.getViewCount(), realTimeLikeCount, stats.getHotScore(), maps, isLiked);
@@ -156,7 +157,6 @@ public class PostService {
         postLikeRepository.deleteByPostId(postId);
 
         // SEQ 5. 통계 테이블 삭제
-        postLikeCountRepository.deleteById(postId); // 좋아요 갯수 테이블
         postStatsRepository.deleteById(postId);     // 통계 테이블 삭제
 
         // SEQ 6. 게시글 삭제
@@ -179,6 +179,17 @@ public class PostService {
         else { title = request.getCategory().name() + " 게시판"; }
 
         return PageDto.PageListResponse.of(title, page);
+    }
+
+    /**
+     * [좋아요 토글 로직]
+     * 1. PostLikeCount 테이블의 해당 Post Row에 비관적 락(X-Lock)을 획득합니다. (대기 발생)
+     * 2. 락을 획득한 스레드만 PostLike(관계) 테이블을 조회/수정합니다.
+     * 3. 카운트를 증감하고 커밋하면 락이 해제됩니다.
+     */
+    @Transactional
+    public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
+        return postLikeRedisService.toggleLike(postId, userPrincipal.getUserId());
     }
 
     // ------ Helper Methods -------
