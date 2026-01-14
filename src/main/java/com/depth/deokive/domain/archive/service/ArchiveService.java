@@ -400,6 +400,8 @@ public class ArchiveService {
     }
 
     private void increaseViewCount(UserPrincipal userPrincipal, Long archiveId, HttpServletRequest request) {
+        if (request == null) return;
+
         Long userId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         String clientIp = ClientUtils.getClientIp(request);
 

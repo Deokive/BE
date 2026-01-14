@@ -301,6 +301,8 @@ public class PostService {
     }
 
     private void increaseViewCount(UserPrincipal userPrincipal, Long postId, HttpServletRequest request) {
+        if (request == null) return; // Soft Fail
+
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         String clientIp = ClientUtils.getClientIp(request);
 
