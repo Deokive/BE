@@ -1,6 +1,10 @@
 package com.depth.deokive.common.service;
 
 import com.depth.deokive.common.dto.LikeMessageDto;
+import com.depth.deokive.domain.archive.entity.Archive;
+import com.depth.deokive.domain.archive.entity.ArchiveLike;
+import com.depth.deokive.domain.archive.repository.ArchiveLikeRepository;
+import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostLike;
 import com.depth.deokive.domain.post.repository.PostLikeRepository;
@@ -19,14 +23,20 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class LikeEventListener {
 
+    private final UserRepository userRepository;
+
+    // Post Domain
+    private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
-    private final PostRepository postRepository; // getReferenceById 사용
-    private final UserRepository userRepository; // getReferenceById 사용
+
+    // Archive Domain
+    private final ArchiveRepository archiveRepository;
+    private final ArchiveLikeRepository archiveLikeRepository;
 
     // OOM 방지를 위해 containerFactory 설정 적용
-    @RabbitListener(queues = RabbitMQConfig.LIKE_QUEUE_NAME, containerFactory = "prefetchContainerFactory")
+    @RabbitListener(queues = "#{postLikeQueue.name}", containerFactory = "prefetchContainerFactory")
     @Transactional
-    public void handleLikeEvent(LikeMessageDto message) {
+    public void handlePostLikeEvent(LikeMessageDto message) {
         try {
             Long postId = message.getId();
             Long userId = message.getUserId();
@@ -43,12 +53,34 @@ public class LikeEventListener {
                 // DELETE
                 postLikeRepository.deleteByPostIdAndUserId(postId, userId);
             }
-            // 주의: 여기서 PostLikeCount(카운트 테이블)을 업데이트하지 않습니다.
-            // 락 경쟁을 피하기 위해 카운트는 스케줄러가 Redis -> DB로 일괄 동기화합니다.
+            // 주의: 여기서 PostLikeCount(카운트 테이블)을 업데이트 X
+            // 락 경쟁을 피하기 위해 카운트는 스케줄러가 Redis -> DB로 일괄 동기화
 
         } catch (Exception e) {
-            log.error("🔴 [MQ Consume Fail] {}", e.getMessage(), e);
+            log.error("🔴 [Post: MQ Consume Fail] {}", e.getMessage(), e);
             // 필요 시 Dead Letter Queue 처리 로직 추가
+        }
+    }
+
+    @RabbitListener(queues = "#{archiveLikeQueue.name}", containerFactory = "prefetchContainerFactory")
+    @Transactional
+    public void handleArchiveLike(LikeMessageDto message) {
+        try {
+            Long archiveId = message.getId();
+            Long userId = message.getUserId();
+
+            if (message.isLiked()) {
+                if (!archiveLikeRepository.existsByArchiveIdAndUserId(archiveId, userId)) {
+                    Archive archive = archiveRepository.getReferenceById(archiveId);
+                    User user = userRepository.getReferenceById(userId);
+                    archiveLikeRepository.save(ArchiveLike.builder().archive(archive).user(user).build());
+                }
+            } else {
+                // ArchiveLikeRepository에 deleteByArchiveIdAndUserId 메서드 필요
+                archiveLikeRepository.deleteByArchiveIdAndUserId(archiveId, userId);
+            }
+        } catch (Exception e) {
+            log.error("🔴 [Archive: MQ Consume Fail] {}", e.getMessage(), e);
         }
     }
 }

@@ -15,10 +15,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String LIKE_QUEUE_NAME = "post.like.queue";
-    public static final String LIKE_EXCHANGE_NAME = "post.like.exchange";
-    public static final String LIKE_ROUTING_KEY = "post.like.key";
-
     // --- Post Domain ---
     @Bean public Queue postLikeQueue() { return new Queue(ViewDomain.POST.getQueueName(), true); }
     @Bean public DirectExchange postLikeExchange() { return new DirectExchange(ViewDomain.POST.getExchangeName()); }
