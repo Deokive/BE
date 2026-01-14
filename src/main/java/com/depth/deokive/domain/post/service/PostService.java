@@ -82,12 +82,12 @@ public class PostService {
                     return newStats;
                 });
 
-        log.info("🔍 [PostService] getPost Requested. PostId: {}, User: {}",
-                postId,
-                (userPrincipal != null ? userPrincipal.getUserId() : "NULL (Guest)"));
-
         // SEQ 3. 실시간 좋아요 수 조회
-        Long realTimeLikeCount = likeRedisService.getCount(postId);
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewDomain.POST,
+                postId,
+                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+        );
 
         // SEQ 4. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
@@ -97,7 +97,12 @@ public class PostService {
 
         // SEQ 6. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-        boolean isLiked = (viewerId != null) && likeRedisService.isLiked(postId, viewerId);
+        boolean isLiked = (viewerId != null) && likeRedisService.isLiked(
+                ViewDomain.POST,
+                postId,
+                viewerId,
+                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+        );
 
         // SEQ 7. Return
         return PostDto.Response.of(post, stats.getViewCount(), realTimeLikeCount, stats.getHotScore(), maps, isLiked);
@@ -182,15 +187,26 @@ public class PostService {
         return PageDto.PageListResponse.of(title, page);
     }
 
-    /**
-     * [좋아요 토글 로직]
-     * 1. PostLikeCount 테이블의 해당 Post Row에 비관적 락(X-Lock)을 획득합니다. (대기 발생)
-     * 2. 락을 획득한 스레드만 PostLike(관계) 테이블을 조회/수정합니다.
-     * 3. 카운트를 증감하고 커밋하면 락이 해제됩니다.
-     */
     @Transactional
     public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
-        return likeRedisService.toggleLike(postId, userPrincipal.getUserId());
+        boolean isLiked = likeRedisService.toggleLike(
+                ViewDomain.POST,
+                postId,
+                userPrincipal.getUserId(),
+                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+        );
+
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewDomain.POST,
+                postId,
+                () -> postLikeRepository.findAllUserIdsByPostId(postId)
+        );
+
+        return PostDto.LikeResponse.builder()
+                .postId(postId)
+                .isLiked(isLiked)
+                .likeCount(realTimeLikeCount)
+                .build();
     }
 
     // ------ Helper Methods -------
