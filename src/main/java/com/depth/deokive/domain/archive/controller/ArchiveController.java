@@ -99,4 +99,13 @@ public class ArchiveController {
     ) {
         return ResponseEntity.ok(archiveService.getUserArchives(currentUser, userId, request));
     }
+
+    @PostMapping("/{archiveId}/like")
+    @Operation(summary = "아카이브 좋아요 토글", description = "아카이브 좋아요를 처리합니다.")
+    public ResponseEntity<ArchiveDto.LikeResponse> toggleLike(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long archiveId
+    ) {
+        return ResponseEntity.ok(archiveService.toggleLike(userPrincipal, archiveId));
+    }
 }
