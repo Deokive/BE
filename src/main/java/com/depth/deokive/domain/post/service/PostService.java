@@ -44,7 +44,7 @@ public class PostService {
     private final PostQueryRepository postQueryRepository;
     private final RedisViewService redisViewService;
     private final PostStatsRepository postStatsRepository;
-    private final PostLikeRedisService postLikeRedisService;
+    private final LikeRedisService likeRedisService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -86,7 +86,7 @@ public class PostService {
                 (userPrincipal != null ? userPrincipal.getUserId() : "NULL (Guest)"));
 
         // SEQ 3. 실시간 좋아요 수 조회
-        Long realTimeLikeCount = postLikeRedisService.getCount(postId);
+        Long realTimeLikeCount = likeRedisService.getCount(postId);
 
         // SEQ 4. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
@@ -96,7 +96,7 @@ public class PostService {
 
         // SEQ 6. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-        boolean isLiked = (viewerId != null) && postLikeRedisService.isLiked(postId, viewerId);
+        boolean isLiked = (viewerId != null) && likeRedisService.isLiked(postId, viewerId);
 
         // SEQ 7. Return
         return PostDto.Response.of(post, stats.getViewCount(), realTimeLikeCount, stats.getHotScore(), maps, isLiked);
@@ -189,7 +189,7 @@ public class PostService {
      */
     @Transactional
     public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
-        return postLikeRedisService.toggleLike(postId, userPrincipal.getUserId());
+        return likeRedisService.toggleLike(postId, userPrincipal.getUserId());
     }
 
     // ------ Helper Methods -------

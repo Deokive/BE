@@ -1,9 +1,7 @@
 package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.dto.LikeMessageDto;
-import com.depth.deokive.domain.post.dto.PostDto;
-import com.depth.deokive.domain.post.repository.PostLikeRepository;
-import com.depth.deokive.system.config.rabbitmq.RabbitMQConfig;
+import com.depth.deokive.common.enums.ViewDomain;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import lombok.RequiredArgsConstructor;
@@ -18,33 +16,39 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PostLikeRedisService {
+public class LikeRedisService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RabbitTemplate rabbitTemplate;
-    private final PostLikeRepository postLikeRepository;
     private final RedissonClient redissonClient;
-    private final DefaultRedisScript<Long> likeScript; // 주입
+    private final DefaultRedisScript<Long> likeScript;
 
     private static final String DUMMY_VALUE = "dummy";
     private static final String TTL_SECONDS = "259200"; // 3일
 
-    private String getLikeCountKey(Long postId) { return "like:post:count:" + postId; }
-    private String getLikeSetKey(Long postId) { return "like:post:users:" + postId; }
-    private String getLockKey(Long postId) { return "lock:like:" + postId; }
+    // --- Key Generators
+    private String getLikeCountKey(ViewDomain domain, Long id) { return "like:" + domain.getPrefix() + ":count:" + id; }
+    private String getLikeSetKey(ViewDomain domain, Long id) { return "like:" + domain.getPrefix() + ":users:" + id; }
+    private String getLockKey(ViewDomain domain, Long id) { return "lock:like:" + domain.getPrefix() + ":" + id; }
 
-    public PostDto.LikeResponse toggleLike(Long postId, Long userId) {
-        String setKey = getLikeSetKey(postId);
-        String countKey = getLikeCountKey(postId);
-        String userIdStr = String.valueOf(userId);
+    public boolean toggleLike(
+            ViewDomain domain,
+            Long targetId,
+            Long userId,
+            Supplier<List<Long>> dbLoader
+    ) {
+        String setKey = getLikeSetKey(domain, targetId);
+        String countKey = getLikeCountKey(domain, targetId);
+        String lockKey = getLockKey(domain, targetId);
 
         // 1. 캐시 없으면 Warming (분산 락)
         if (!redisTemplate.hasKey(setKey)) {
-            warmingWithLock(postId, setKey, countKey);
+            warmingWithLock(setKey, countKey, lockKey, dbLoader);
         }
 
         // 2. Lua Script 실행: 중복체크 + 카운팅 + TTL을 Redis 내부에서 원자적으로 처리
@@ -60,53 +64,43 @@ public class PostLikeRedisService {
         boolean isLiked = (result != null && result == 1);
 
         // 3. MQ 전송
-        sendToQueue(postId, userId, isLiked);
+        sendToQueue(domain, targetId, userId, isLiked);
 
-        return PostDto.LikeResponse.builder()
-                .postId(postId)
-                .isLiked(isLiked)
-                .likeCount(getCount(postId))
-                .build();
+        return isLiked;
     }
 
-    public boolean isLiked(Long postId, Long userId) {
-        String setKey = getLikeSetKey(postId);
+    public boolean isLiked(ViewDomain domain, Long targetId, Long userId, Supplier<List<Long>> dbLoader) {
+        String setKey = getLikeSetKey(domain, targetId);
         if (!redisTemplate.hasKey(setKey)) {
-            warmingWithLock(postId, setKey, getLikeCountKey(postId));
+            warmingWithLock(setKey, getLikeCountKey(domain, targetId), getLockKey(domain, targetId), dbLoader);
         }
         return Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(setKey, String.valueOf(userId)));
     }
 
-    public Long getCount(Long postId) {
-        String countKey = getLikeCountKey(postId);
+    public Long getCount(ViewDomain domain, Long targetId, Supplier<List<Long>> dbLoader) {
+        String countKey = getLikeCountKey(domain, targetId);
         Object countObj = redisTemplate.opsForValue().get(countKey);
+        if (countObj != null) return Long.parseLong(countObj.toString());
 
-        if (countObj != null) {
-            return Long.parseLong(countObj.toString());
-        }
-        warmingWithLock(postId, getLikeSetKey(postId), countKey);
+        warmingWithLock(getLikeSetKey(domain, targetId), countKey, getLockKey(domain, targetId), dbLoader);
         Object warmedCount = redisTemplate.opsForValue().get(countKey);
         return warmedCount != null ? Long.parseLong(warmedCount.toString()) : 0L;
     }
 
-    private void warmingWithLock(Long postId, String setKey, String countKey) {
-        RLock lock = redissonClient.getLock(getLockKey(postId));
+    private void warmingWithLock(
+            String setKey,
+            String countKey,
+            String lockKey,
+            Supplier<List<Long>> dbLoader
+    ) {
+        RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            boolean available = lock.tryLock(3, 5, TimeUnit.SECONDS);
-
-            if (!available) {
-                // 락 획득 실패 시, 잠시 대기 후 리턴 -> retry 해야하지 않을까?
-                return;
-            }
-
-            if (redisTemplate.hasKey(setKey)) {
-                return;
-            }
+            if (!lock.tryLock(3, 5, TimeUnit.SECONDS)) return;
+            if (redisTemplate.hasKey(setKey)) return;
 
             // 1. DB 전체 로딩 (목적: 이미 좋아요했던 사람이 취소하려고 눌렀는데 등록이 되버리는 상황 방지)
-            List<String> userIds = postLikeRepository.findAllUserIdsByPostId(postId)
-                    .stream().map(String::valueOf).toList();
+            List<Long> userIds = dbLoader.get();
 
             // 2. Set 적재
             if (!userIds.isEmpty()) {
@@ -132,9 +126,9 @@ public class PostLikeRedisService {
     }
 
     @Async("messagingTaskExecutor")
-    public void sendToQueue(Long postId, Long userId, boolean isLiked) {
-        LikeMessageDto message = new LikeMessageDto(postId, userId, isLiked);
-        rabbitTemplate.convertAndSend(RabbitMQConfig.LIKE_EXCHANGE_NAME, RabbitMQConfig.LIKE_ROUTING_KEY, message);
-        log.info("🐇 [MQ Send] PostId: {}, UserId: {}, Action: {}", postId, userId, isLiked ? "LIKE" : "UNLIKE");
+    public void sendToQueue(ViewDomain domain, Long targetId, Long userId, boolean isLiked) {
+        LikeMessageDto message = new LikeMessageDto(targetId, userId, isLiked);
+        rabbitTemplate.convertAndSend(domain.getExchangeName(), domain.getRoutingKey(), message);
+        log.debug("🐇 [MQ Send] Domain: {}, TargetId: {}, Action: {}", domain, targetId, isLiked ? "LIKE" : "UNLIKE");
     }
 }
