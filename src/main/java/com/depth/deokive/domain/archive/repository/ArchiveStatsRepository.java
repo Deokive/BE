@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -35,6 +36,7 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
     );
 
     // Scheduler Sync -> 좋아요 수 업데이트
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.likeCount = :count WHERE s.id = :id")
     void updateLikeCount(@Param("id") Long id, @Param("count") Long count);
