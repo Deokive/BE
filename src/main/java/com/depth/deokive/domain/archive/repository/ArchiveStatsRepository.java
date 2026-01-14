@@ -34,4 +34,9 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
             @Param("cutOffDate") LocalDateTime cutOffDate,
             @Param("targetBadges") List<Badge> targetBadges
     );
+
+    // Scheduler Sync -> 좋아요 수 업데이트
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ArchiveStats s SET s.likeCount = :count WHERE s.id = :id")
+    void updateLikeCount(@Param("id") Long id, @Param("count") Long count);
 }
