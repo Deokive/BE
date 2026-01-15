@@ -4,6 +4,8 @@ on:
   push:
     branches: [ "main" ]
 
+  workflow_dispatch:
+
 env:
   AWS_REGION: ap-northeast-2
   AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
@@ -137,13 +139,17 @@ jobs:
             echo "🟢 MySQL Ping Test"
             docker exec -e MYSQL_PWD=$DB_PASSWORD mysql-container mysqladmin ping -h localhost -uroot
             
+            # RabbitMQ 테스트
+            echo "🟢 RabbitMQ Ping Test"
+            docker exec rabbitmq-container rabbitmq-diagnostics -q ping
+            
             echo "💡 Step 2-2. 실행 : Spring Boot"
             echo "🟢 Spring Boot 실행"
             echo "🟢 deokive.service 재시작"
             sudo systemctl restart deokive.service
             
-            echo "🟢 Spring Boot Health Check (최대 60초 대기)"
-            for i in {1..12}; do
+            echo "🟢 Spring Boot Health Check (최대 100초 대기)"
+            for i in {1..20}; do
               if curl -fs http://localhost:8080/api/system/health > /dev/null; then
                 echo "✅ Health check 성공! 배포 완료."
             
@@ -153,7 +159,7 @@ jobs:
             
                 exit 0 # 스크립트 성공 종료
               fi
-              echo "($i/12) Spring Boot 시작 대기 중... (5초 후 재시도)"
+              echo "($i/20) Spring Boot 시작 대기 중... (5초 후 재시도)"
               sleep 5
             done
             
