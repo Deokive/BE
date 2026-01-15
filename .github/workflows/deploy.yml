@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "DEOK-50-좋아요-조회수-구현" ]
 
   workflow_dispatch:
 
