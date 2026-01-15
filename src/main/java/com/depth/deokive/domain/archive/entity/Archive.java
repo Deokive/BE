@@ -27,13 +27,6 @@ import lombok.experimental.SuperBuilder;
         // 1. 마이/친구 아카이브용 (유저별 + 생성/수정일 정렬)
         @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC, id DESC"),
         @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC, id DESC"),
-
-        // 2. 피드/핫피드용 (공개범위 + 핫스코어/조회수/좋아요 정렬)
-        // 커버링 인덱스 효과를 극대화하기 위해 visibility를 선행 컬럼으로 둠
-        @Index(name = "idx_archive_pub_hot", columnList = "visibility, hot_score DESC, id DESC"),
-        @Index(name = "idx_archive_pub_view", columnList = "visibility, view_count DESC, id DESC"),
-        @Index(name = "idx_archive_pub_like", columnList = "visibility, like_count DESC, id DESC"),
-        @Index(name = "idx_archive_pub_new", columnList = "visibility, created_at DESC, id DESC")
 })
 public class Archive extends TimeBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -54,18 +47,6 @@ public class Archive extends TimeBaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     Badge badge = Badge.NEWBIE;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private Long viewCount = 0L;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private Long likeCount = 0L;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private Double hotScore = 0.0;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "banner_file_id")
@@ -90,6 +71,8 @@ public class Archive extends TimeBaseEntity {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
+
+        // Notice: visibility나 badge 변경 시 Service에서 ArchiveStats도 동기화해야 함
         this.visibility = nonBlankOrDefault(request.getVisibility(), this.visibility);
     }
 
@@ -102,9 +85,6 @@ public class Archive extends TimeBaseEntity {
             this.thumbnailKey = null;
         }
     }
-
-    public void updateHotScore(Double score) { this.hotScore = score; }
-    public void increaseViewCount() { this.viewCount++; }
 
     // CascadeType.ALL 로 인해 연관된 북들도 함께 저장/삭제됨
     public void setBooks(DiaryBook diary, TicketBook ticket, GalleryBook gallery, RepostBook repost) {

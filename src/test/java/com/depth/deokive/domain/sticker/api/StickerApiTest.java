@@ -1,4 +1,4 @@
-package com.depth.deokive.common.api.sticker;
+package com.depth.deokive.domain.sticker.api;
 
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;

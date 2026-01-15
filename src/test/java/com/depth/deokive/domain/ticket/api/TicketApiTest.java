@@ -1,10 +1,8 @@
-package com.depth.deokive.common.api.ticket;
+package com.depth.deokive.domain.ticket.api;
 
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.file.repository.FileRepository;
-import com.depth.deokive.domain.friend.entity.FriendMap;
-import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
 import com.depth.deokive.domain.ticket.entity.Ticket;
@@ -21,7 +19,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

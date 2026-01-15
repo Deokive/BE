@@ -22,19 +22,7 @@ import lombok.experimental.SuperBuilder;
     @Table(
     name = "post",
     indexes = {
-        // 1. 카테고리별 정렬 조회 최적화 (category 필터 있을 때)
-        @Index(name = "idx_post_cat_hot", columnList = "category, hot_score DESC, id DESC"),
-        @Index(name = "idx_post_cat_new", columnList = "category, created_at DESC, id DESC"),
-        @Index(name = "idx_post_cat_view", columnList = "category, view_count DESC, id DESC"),
-        @Index(name = "idx_post_cat_like", columnList = "category, like_count DESC, id DESC"),
-
-        // 2. 전체 조회 정렬 최적화 (category 필터 없을 때)
-        @Index(name = "idx_post_hot", columnList = "hot_score DESC, id DESC"),
-        @Index(name = "idx_post_new", columnList = "created_at DESC, id DESC"),
-        @Index(name = "idx_post_view", columnList = "view_count DESC, id DESC"),
-        @Index(name = "idx_post_like", columnList = "like_count DESC, id DESC"),
-
-        // 3. 마이페이지용 (내 글 조회)
+        // 마이페이지용 (내 글 조회)
         @Index(name = "idx_post_user_new", columnList = "user_id, created_at DESC, id DESC")
     }
 )
@@ -59,28 +47,15 @@ public class Post extends UserBaseEntity {
     @Column(name = "thumbnail_key")
     private String thumbnailKey; // Denormalization Fields for Pagination Performance
 
-    @Builder.Default
-    @Column(nullable = false)
-    private Long viewCount = 0L;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private Long likeCount = 0L;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private Double hotScore = 0.0;
-
     public void update(PostDto.UpdateRequest request) {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
-        this.category = nonBlankOrDefault(request.getCategory(), this.category);
+        this.category = nonBlankOrDefault(request.getCategory(), this.category); // postStats의 category도 변경해줘야 함
         this.content = nonBlankOrDefault(request.getContent(), this.content);
     }
 
     public void updateThumbnail(String thumbnailKey) { this.thumbnailKey = thumbnailKey; }
-    public void increaseViewCount() { this.viewCount++; }
 
     private <T> T nonBlankOrDefault(T newValue, T currentValue) {
         return newValue != null ? newValue : currentValue;

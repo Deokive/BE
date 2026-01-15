@@ -8,6 +8,9 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 50  # 기본값 10 -> 50으로 증설
+      connection-timeout: 30000
 
   jpa:
     hibernate:
@@ -75,3 +78,24 @@ app:
   front-redirect-uri: http://localhost:3000/oauth/callback
   front-base-url: http://localhost:3000
   allowed-origins: "*"
+
+scheduler:
+  post-hot-score-cron: "5 0 * * * *"      # Post: 매시 정각 05초 (ViewCount와 5초 간격)
+  archive-hot-score-cron: "5 30 * * * *"  # Archive: 매시 30분 05초 (Post와 30분 간격)
+  badge-cron: "0 0 3 * * *"               # 트래픽이 적은 "새벽 3시 00분"
+  file-cleanup-cron: "0 30 4 * * *"       # 매일 새벽 3시에 파일 정리
+  file-cleanup:
+    threshold-hours: 24                   # 파일 생성 후 삭제 대상이 되기까지의 시간 (시간 단위)
+    skip-limit: 10                        # S3 삭제 실패 시 최대 스킵 허용 개수
+    retry:
+      max-attempts: 3                     # S3 삭제 재시도 최대 횟수
+      delay-ms: 1000                      # 재시도 간 지연 시간 (밀리초)
+
+  post-view-cron: "0 */5 * * * *"         # Post: 매 3분 00초
+  archive-view-cron: "30 */5 * * * *"     # Archive: 매 3분 30초 (Post와 30초 간격)
+
+  # LikeCount: 분산 실행 (Post는 10초, Archive는 40초)
+  post-like-cron: "10 * * * * *"
+  archive-like-cron: "40 * * * * *"
+
+  view-cooldown-minutes: 10

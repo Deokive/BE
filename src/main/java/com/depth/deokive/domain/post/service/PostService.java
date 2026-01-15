@@ -1,24 +1,25 @@
 package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.enums.ViewLikeDomain;
+import com.depth.deokive.common.service.LikeRedisService;
+import com.depth.deokive.common.service.RedisViewService;
+import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.service.FileService;
 import com.depth.deokive.domain.post.dto.PostDto;
-import com.depth.deokive.domain.post.entity.Post;
-import com.depth.deokive.domain.post.entity.PostFileMap;
-import com.depth.deokive.domain.post.repository.PostFileMapRepository;
-import com.depth.deokive.domain.post.repository.PostLikeRepository;
-import com.depth.deokive.domain.post.repository.PostQueryRepository;
-import com.depth.deokive.domain.post.repository.PostRepository;
+import com.depth.deokive.domain.post.entity.*;
+import com.depth.deokive.domain.post.repository.*;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,9 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final FileService fileService;
     private final PostQueryRepository postQueryRepository;
+    private final RedisViewService redisViewService;
+    private final PostStatsRepository postStatsRepository;
+    private final LikeRedisService likeRedisService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -53,31 +57,57 @@ public class PostService {
         Post post = PostDto.CreateRequest.from(request, foundUser);
         postRepository.save(post);
 
-        // SEQ 3. 파일 연결
+        // SEQ 3. 통계 엔티티 생성 및 저장 (Sync OK)
+        PostStats stats = PostStats.create(post);
+        postStatsRepository.save(stats);
+
+        // SEQ 4. 파일 연결
         List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 4. Response (생성 시점에는 좋아요 없음)
-        return PostDto.Response.of(post, maps, false);
+        // SEQ 5. Response (생성 시점에는 좋아요 없음)
+        return PostDto.Response.of(post, stats, maps, false);
     }
 
     @Transactional
-    public PostDto.Response getPost(UserPrincipal userPrincipal, Long postId) {
+    public PostDto.Response getPost(UserPrincipal userPrincipal, Long postId, HttpServletRequest request) {
         // SEQ 1. 게시글 조회
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
 
-        // SEQ 2. 해당 게시글의 파일 매핑 조회
+        // SEQ 2. 통계 정보 조회 - ViewCount, HotScore용
+        PostStats stats = postStatsRepository.findById(postId)
+                .orElseGet(() -> {
+                    PostStats newStats = PostStats.create(post);
+                    postStatsRepository.save(newStats);
+                    return newStats;
+                });
+
+        // SEQ 3. 실시간 좋아요 수 조회
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewLikeDomain.POST,
+                postId,
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> {}
+        );
+
+        // SEQ 4. 해당 게시글의 파일 매핑 조회
         List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
 
-        // SEQ 3. 상세 조회 시 조회수 증가 (동시성 이슈 고려 시 Redis 권장하나 일단 DB update)
-        post.increaseViewCount();
+        // SEQ 5. Redis 조회수 증가 (Write Back)
+        increaseViewCount(userPrincipal, postId, request);
 
-        // SEQ 4. 좋아요 여부 조회
+        // SEQ 6. 좋아요 여부 조회
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
-        boolean isLiked = (viewerId != null) && postLikeRepository.existsByPostIdAndUserId(postId, viewerId);
+        boolean isLiked = (viewerId != null) && likeRedisService.isLiked(
+                ViewLikeDomain.POST,
+                postId,
+                viewerId,
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> {}
+        );
 
-        // SEQ 5. Return
-        return PostDto.Response.of(post, maps, isLiked);
+        // SEQ 7. Return
+        return PostDto.Response.of(post, stats.getViewCount(), realTimeLikeCount, stats.getHotScore(), maps, isLiked);
     }
 
     @Transactional
@@ -92,7 +122,12 @@ public class PostService {
         // SEQ 3. 게시글 정보 업데이트 (Dirty Checking)
         post.update(request);
 
-        // SEQ 4. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
+        // SEQ 4. 카테고리가 변경되었다면 PostStats도 동기화 (커버링 인덱스용)
+        if (request.getCategory() != null) {
+            postStatsRepository.syncUpdateCategory(postId, request.getCategory());
+        }
+
+        // SEQ 5. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
         List<PostFileMap> maps;
 
         // request.getFiles()가 null이면 파일 변경 없음.
@@ -105,11 +140,12 @@ public class PostService {
             maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(postId);
         }
 
-        // SEQ 5. 좋아요 여부 조회
+        // SEQ 6. 통계 조회, 좋아요 여부 조회
+        PostStats stats = postStatsRepository.findById(postId).orElse(PostStats.create(post));
         boolean isLiked = postLikeRepository.existsByPostIdAndUserId(postId, userPrincipal.getUserId());
 
-        // SEQ 6. Return
-        return PostDto.Response.of(post, maps, isLiked);
+        // SEQ 7. Return
+        return PostDto.Response.of(post, stats, maps, isLiked);
     }
 
     @Transactional
@@ -128,8 +164,14 @@ public class PostService {
         // SEQ 4. 좋아요 삭제
         postLikeRepository.deleteByPostId(postId);
 
-        // SEQ 5. 게시글 삭제
+        // SEQ 5. 통계 테이블 삭제
+        postStatsRepository.deleteById(postId);     // 통계 테이블 삭제
+
+        // SEQ 6. 게시글 삭제
         postRepository.delete(post);
+
+        // SEQ 7. 캐시 삭제
+        likeRedisService.deleteLikeData(ViewLikeDomain.POST, postId);
     }
 
     @ExecutionTime
@@ -148,6 +190,38 @@ public class PostService {
         else { title = request.getCategory().name() + " 게시판"; }
 
         return PageDto.PageListResponse.of(title, page);
+    }
+
+    @Transactional
+    public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
+        boolean isLiked = likeRedisService.toggleLike(
+                ViewLikeDomain.POST,
+                postId,
+                userPrincipal.getUserId(),
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> { // Validator: 필요할 때만 실행됨
+                    if (!postRepository.existsById(postId)) {
+                        throw new RestException(ErrorCode.POST_NOT_FOUND);
+                    }
+                }
+        );
+
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewLikeDomain.POST,
+                postId,
+                () -> postLikeRepository.findAllUserIdsByPostId(postId),
+                () -> { // Validator: 필요할 때만 실행됨
+                    if (!postRepository.existsById(postId)) {
+                        throw new RestException(ErrorCode.POST_NOT_FOUND);
+                    }
+                }
+        );
+
+        return PostDto.LikeResponse.builder()
+                .postId(postId)
+                .isLiked(isLiked)
+                .likeCount(realTimeLikeCount)
+                .build();
     }
 
     // ------ Helper Methods -------
@@ -225,6 +299,13 @@ public class PostService {
             throw new RestException(ErrorCode.AUTH_FORBIDDEN); // 권한 없음 예외
         }
     }
+
+    private void increaseViewCount(UserPrincipal userPrincipal, Long postId, HttpServletRequest request) {
+        if (request == null) return; // Soft Fail
+
+        Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        String clientIp = ClientUtils.getClientIp(request);
+
+        redisViewService.incrementViewCount(ViewLikeDomain.POST, postId, viewerId, clientIp);
+    }
 }
-
-

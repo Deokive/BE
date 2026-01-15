@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -41,9 +42,10 @@ public class PostController {
     @ApiResponse(responseCode = "200", description = "게시글 조회 성공")
     public ResponseEntity<PostDto.Response> getPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @PathVariable Long postId
+            @PathVariable Long postId,
+            HttpServletRequest request
     ) {
-        PostDto.Response response = postService.getPost(userPrincipal, postId);
+        PostDto.Response response = postService.getPost(userPrincipal, postId, request);
         return ResponseEntity.ok(response);
     }
 
@@ -79,5 +81,14 @@ public class PostController {
             @Valid @ModelAttribute PostDto.PostPageRequest request
     ) {
         return ResponseEntity.ok(postService.getPosts(request));
+    }
+
+    @PostMapping("/{postId}/like")
+    @Operation(summary = "게시글 좋아요 토글", description = "좋아요를 처리합니다.")
+    public ResponseEntity<PostDto.LikeResponse> toggleLike(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long postId
+    ) {
+        return ResponseEntity.ok(postService.toggleLike(userPrincipal, postId));
     }
 }

@@ -119,9 +119,9 @@ public class ArchiveDto {
         @Schema(description = "페이지 크기", example = "10", defaultValue = "10")
         private int size = 10;
 
-        @Pattern(regexp = "^(createdAt|lastModifiedAt|viewCount|likeCount|hotScore)$", message = "정렬 기준이 올바르지 않습니다.")
+        @Pattern(regexp = "^(createdAt|viewCount|likeCount|hotScore)$", message = "정렬 기준이 올바르지 않습니다.")
         @Schema(description = "정렬 기준 컬럼", defaultValue = "createdAt",
-                allowableValues = {"createdAt", "lastModifiedAt", "viewCount", "likeCount", "hotScore"}, example = "createdAt")
+                allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"}, example = "createdAt")
         private String sort = "createdAt";
 
         @Pattern(regexp = "^(ASC|DESC|asc|desc)$", message = "정렬 방향은 'ASC' 또는 'DESC' 여야 합니다.")
@@ -182,5 +182,19 @@ public class ArchiveDto {
             this.lastModifiedAt = lastModifiedAt;
             this.ownerNickname = ownerNickname;
         }
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "ArchiveLikeResponse", description = "아카이브 좋아요 토글 결과")
+    public static class LikeResponse {
+        @Schema(description = "아카이브 ID")
+        private Long archiveId;
+
+        @JsonProperty("isLiked")
+        @Schema(description = "토글 후 좋아요 상태 (true: 좋아요 됨, false: 취소 됨)")
+        private boolean isLiked;
+
+        @Schema(description = "실시간 좋아요 개수")
+        private Long likeCount;
     }
 }

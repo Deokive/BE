@@ -1,6 +1,5 @@
-package com.depth.deokive.common.api.archive;
+package com.depth.deokive.domain.archive.api;
 
-import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
@@ -48,6 +47,8 @@ class ArchiveApiTest extends ApiTestSupport {
     @Autowired private UserRepository userRepository;
     @Autowired private FriendMapRepository friendMapRepository;
     @Autowired private FileRepository fileRepository;
+    @Autowired private com.depth.deokive.domain.archive.repository.ArchiveStatsRepository archiveStatsRepository;
+    @Autowired private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
 
     // --- Actors (Token) ---
     private static String tokenUserA; // Me (Owner)
@@ -278,10 +279,68 @@ class ArchiveApiTest extends ApiTestSupport {
 
         @Test @DisplayName("SCENE 19. 조회수 증가")
         void checkViewCount() {
-            long initial = given().cookie("ATK", tokenUserA).get("/api/v1/archives/{id}", publicId).jsonPath().getLong("viewCount");
-            given().cookie("ATK", tokenUserC).get("/api/v1/archives/{id}", publicId); // +1
+            // 초기 조회수는 DB에서 직접 가져옴 (API 호출 시 조회수 증가 방지)
+            long initial = archiveStatsRepository.findById(publicId)
+                    .orElseThrow(() -> new RuntimeException("ArchiveStats not found"))
+                    .getViewCount();
+            
+            // 2번 조회 (UserC 1번, UserA 1번)
+            given().cookie("ATK", tokenUserC).get("/api/v1/archives/{id}", publicId)
+                    .then().statusCode(200); // +1
             given().cookie("ATK", tokenUserA).get("/api/v1/archives/{id}", publicId)
-                    .then().body("viewCount", equalTo((int) initial + 2)); // Owner read also +1
+                    .then().statusCode(200); // +1 (Owner read also +1)
+            
+            // 스케줄러 강제 실행 (DB 반영) - API를 통해 호출
+            given().contentType(ContentType.JSON)
+                    .post("/api/system/test/scheduler/view-count")
+                    .then()
+                    .statusCode(HttpStatus.OK.value());
+            
+            // DB 반영 후 검증
+            given().cookie("ATK", tokenUserA).get("/api/v1/archives/{id}", publicId)
+                    .then().body("viewCount", equalTo((int) initial + 2));
+        }
+
+        @Test
+        @DisplayName("SCENE 26. 조회수 증가 확인 (DB 반영 확인)")
+        void readArchive_ViewCount_DB_Sync() {
+            String countKey = "view:count:archive:" + publicId;
+            long initialCount = archiveStatsRepository.findById(publicId)
+                    .orElseThrow(() -> new RuntimeException("ArchiveStats not found"))
+                    .getViewCount();
+
+            // 1. 3번 조회 (다른 IP로 시뮬레이션)
+            given().header("X-Forwarded-For", "1.1.1.1")
+                    .get("/api/v1/archives/{id}", publicId)
+                    .then().statusCode(200);
+
+            given().header("X-Forwarded-For", "1.1.1.2")
+                    .get("/api/v1/archives/{id}", publicId)
+                    .then().statusCode(200);
+
+            given().header("X-Forwarded-For", "1.1.1.3")
+                    .get("/api/v1/archives/{id}", publicId)
+                    .then().statusCode(200);
+
+            // 2. Redis에 쌓였는지 확인 (아직 DB 반영 전)
+            String redisValue = redisTemplate.opsForValue().get(countKey);
+            assertThat(redisValue).isNotNull();
+            assertThat(Long.parseLong(redisValue)).isEqualTo(3L);
+
+            // 3. 스케줄러 강제 실행 (DB 반영) - API를 통해 호출
+            given().contentType(ContentType.JSON)
+                    .post("/api/system/test/scheduler/view-count")
+                    .then()
+                    .statusCode(HttpStatus.OK.value());
+
+            // 4. DB 검증 (ArchiveStats에서 조회)
+            long finalCount = archiveStatsRepository.findById(publicId)
+                    .orElseThrow(() -> new RuntimeException("ArchiveStats not found"))
+                    .getViewCount();
+            assertThat(finalCount).isEqualTo(initialCount + 3);
+
+            // 5. Redis 키 삭제 확인
+            assertThat(redisTemplate.hasKey(countKey)).isFalse();
         }
     }
 
@@ -470,6 +529,38 @@ class ArchiveApiTest extends ApiTestSupport {
                     .then().statusCode(200)
                     .body("content.size()", equalTo(1))
                     .body("page.hasNext", equalTo(true));
+        }
+
+        @Test
+        @DisplayName("SCENE 70. 페이지네이션 정렬 확인 (조회수 정렬)")
+        void userList_SortByViewCount() {
+            // Given: UserA의 Archive 2개 생성
+            Long archive1Id = ArchiveSteps.create(tokenUserA, "Archive1", "PUBLIC");
+            Long archive2Id = ArchiveSteps.create(tokenUserA, "Archive2", "PUBLIC");
+
+            // Archive2에 조회수 증가 (다른 IP로 여러 번 조회)
+            for (int i = 0; i < 10; i++) {
+                given().header("X-Forwarded-For", "1.1.1." + i)
+                        .get("/api/v1/archives/{id}", archive2Id)
+                        .then().statusCode(200);
+            }
+
+            // 스케줄러 강제 실행 (DB 반영)
+            given().contentType(ContentType.JSON)
+                    .post("/api/system/test/scheduler/view-count")
+                    .then()
+                    .statusCode(HttpStatus.OK.value());
+
+            // When: 조회수 내림차순(DESC) 조회
+            given().cookie("ATK", tokenUserA)
+                    .param("sort", "viewCount")
+                    .param("direction", "DESC")
+                    .param("size", 20)
+                    .when().get("/api/v1/archives/users/{userId}", userAId)
+                    .then().statusCode(200)
+                    .body("content[0].archiveId", equalTo(archive2Id.intValue())) // 조회수 높은 것 먼저
+                    .body("content[0].viewCount", greaterThan(0))
+                    .body("content.size()", greaterThanOrEqualTo(2));
         }
     }
 

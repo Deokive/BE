@@ -11,21 +11,25 @@ import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.PostFileMap;
 import com.depth.deokive.domain.post.entity.PostLike;
+import com.depth.deokive.domain.post.entity.PostStats;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.post.repository.PostFileMapRepository;
 import com.depth.deokive.domain.post.repository.PostLikeRepository;
 import com.depth.deokive.domain.post.repository.PostRepository;
+import com.depth.deokive.domain.post.repository.PostStatsRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
+import com.depth.deokive.system.scheduler.ViewCountScheduler;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
@@ -44,6 +48,7 @@ class PostServiceTest extends IntegrationTestSupport {
     @Autowired PostFileMapRepository postFileMapRepository;
     @Autowired PostLikeRepository postLikeRepository;
     @Autowired FileRepository fileRepository;
+    @Autowired private PostStatsRepository postStatsRepository;
 
     // Test Data
     private User userA;
@@ -51,6 +56,8 @@ class PostServiceTest extends IntegrationTestSupport {
 
     private List<File> userAFiles;
     private List<File> userBFiles;
+
+    private MockHttpServletRequest mockRequest;
 
     @BeforeEach
     void setUp() {
@@ -66,6 +73,9 @@ class PostServiceTest extends IntegrationTestSupport {
         userBFiles = createFiles(userB, 5);
 
         SecurityContextHolder.clearContext();
+
+        mockRequest = new MockHttpServletRequest();
+        mockRequest.setRemoteAddr("127.0.0.1");
     }
 
     private User createTestUser(String email, String nickname) {
@@ -331,11 +341,10 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 10: 정상 케이스 (파일 포함, 본인 조회)")
         void getPost_Owner() {
             setupMockUser(userA);
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userA), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userA), postWithFiles.getId(), mockRequest);
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getFiles()).hasSize(3);
             assertThat(response.getFiles().get(0).getSequence()).isEqualTo(0);
-            assertThat(response.getViewCount()).isEqualTo(1); // Service increments viewCount
             assertThat(response.isLiked()).isFalse(); // 좋아요 없음
         }
 
@@ -343,10 +352,9 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 11: 정상 케이스 (파일 포함, 타인 조회)")
         void getPost_Stranger() {
             setupMockUser(userB);
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId(), mockRequest);
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getFiles()).hasSize(3);
-            assertThat(response.getViewCount()).isEqualTo(1);
             assertThat(response.isLiked()).isFalse(); // 좋아요 없음
         }
 
@@ -354,20 +362,19 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 12: 정상 케이스 (비회원 조회)")
         void getPost_Anonymous() {
             // When: 비회원이 조회
-            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId(), mockRequest);
 
             // Then: 정상 조회 가능
             assertThat(response.getId()).isEqualTo(postWithFiles.getId());
             assertThat(response.getTitle()).isEqualTo("With Files");
             assertThat(response.getFiles()).hasSize(3);
-            assertThat(response.getViewCount()).isEqualTo(1);
             assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
         }
 
         @Test
         @DisplayName("SCENE 13: 정상 케이스 (파일 없음)")
         void getPost_NoFiles() {
-            PostDto.Response response = postService.getPost(null, postNoFiles.getId());
+            PostDto.Response response = postService.getPost(null, postNoFiles.getId(), mockRequest);
             assertThat(response.getId()).isEqualTo(postNoFiles.getId());
             assertThat(response.getFiles()).isEmpty();
             assertThat(response.isLiked()).isFalse(); // 비회원은 좋아요 없음
@@ -376,7 +383,7 @@ class PostServiceTest extends IntegrationTestSupport {
         @Test
         @DisplayName("SCENE 14: 정상 케이스 (PREVIEW 파일 포함 확인)")
         void getPost_Preview() {
-            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId(), mockRequest);
             assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.PREVIEW);
         }
 
@@ -393,37 +400,17 @@ class PostServiceTest extends IntegrationTestSupport {
             flushAndClear();
 
             // When
-            PostDto.Response response = postService.getPost(null, res.getId());
+            PostDto.Response response = postService.getPost(null, res.getId(), mockRequest);
 
             // Then
             assertThat(response.getFiles().get(0).getMediaRole()).isEqualTo(MediaRole.CONTENT);
         }
 
-        @Test
-        @DisplayName("SCENE 16: 조회수 증가 확인 (DB 반영 확인)")
-        void getPost_ViewCount() {
-            Long id = postNoFiles.getId();
-
-            // 1st
-            postService.getPost(null, id);
-            flushAndClear();
-
-            // 2nd
-            postService.getPost(null, id);
-            flushAndClear();
-
-            // 3rd
-            postService.getPost(null, id);
-            flushAndClear();
-
-            Post post = postRepository.findById(id).orElseThrow();
-            assertThat(post.getViewCount()).isEqualTo(3);
-        }
 
         @Test
         @DisplayName("SCENE 17: 존재하지 않는 Post")
         void getPost_NotFound() {
-            assertThatThrownBy(() -> postService.getPost(null, 99999L))
+            assertThatThrownBy(() -> postService.getPost(null, 99999L, mockRequest))
                     .isInstanceOf(RestException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
         }
@@ -440,7 +427,7 @@ class PostServiceTest extends IntegrationTestSupport {
             flushAndClear();
 
             // When: UserB가 조회
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId(), mockRequest);
 
             // Then: isLiked가 true
             assertThat(response.isLiked()).isTrue();
@@ -453,7 +440,7 @@ class PostServiceTest extends IntegrationTestSupport {
             setupMockUser(userB);
 
             // When: UserB가 조회
-            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId());
+            PostDto.Response response = postService.getPost(UserPrincipal.from(userB), postWithFiles.getId(), mockRequest);
 
             // Then: isLiked가 false
             assertThat(response.isLiked()).isFalse();
@@ -463,7 +450,7 @@ class PostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 20: isLiked 필드 검증 (비회원)")
         void getPost_IsLiked_Anonymous() {
             // When: 비회원이 조회
-            PostDto.Response response = postService.getPost(null, postWithFiles.getId());
+            PostDto.Response response = postService.getPost(null, postWithFiles.getId(), mockRequest);
 
             // Then: isLiked가 false
             assertThat(response.isLiked()).isFalse();
@@ -526,6 +513,7 @@ class PostServiceTest extends IntegrationTestSupport {
             // 20: Category only
             postService.updatePost(UserPrincipal.from(userA), post.getId(), PostDto.UpdateRequest.builder().category(Category.ANIMATION).build());
             flushAndClear();
+            em.clear(); // 영속성 컨텍스트 클리어 후 재조회
             assertThat(postRepository.findById(post.getId()).get().getCategory()).isEqualTo(Category.ANIMATION);
         }
 
@@ -554,7 +542,7 @@ class PostServiceTest extends IntegrationTestSupport {
             List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
             assertThat(maps).hasSize(1);
             assertThat(maps.get(0).getFile().getId()).isEqualTo(userAFiles.get(5).getId());
-            
+
             // 기존 파일 ID가 더 이상 매핑에 없는지 확인
             List<Long> newFileIds = maps.stream()
                     .map(map -> map.getFile().getId())
@@ -625,14 +613,14 @@ class PostServiceTest extends IntegrationTestSupport {
             // Then: 기존 파일 ID가 유지되고 신규 파일이 추가됨
             List<PostFileMap> maps = postFileMapRepository.findAllByPostIdOrderBySequenceAsc(post.getId());
             assertThat(maps).hasSize(3);
-            
+
             List<Long> fileIds = maps.stream()
                     .map(map -> map.getFile().getId())
                     .toList();
             assertThat(fileIds).contains(originalFile0Id); // 기존 파일 유지
             assertThat(fileIds).contains(originalFile1Id); // 기존 파일 유지
             assertThat(fileIds).contains(userAFiles.get(2).getId()); // 신규 파일 추가
-            
+
             // Sequence 검증
             assertThat(maps.get(0).getSequence()).isEqualTo(0);
             assertThat(maps.get(1).getSequence()).isEqualTo(1);
@@ -738,11 +726,19 @@ class PostServiceTest extends IntegrationTestSupport {
                         .title("Post " + i)
                         .content("Content")
                         .category(cat)
+                        .build();
+                postRepository.save(post);
+                
+                // PostStats 생성 (viewCount, likeCount, hotScore는 PostStats에 저장)
+                PostStats stats = PostStats.builder()
+                        .post(post)
+                        .category(cat)
                         .viewCount((long) i) // ID 비례
                         .likeCount((long) i)
                         .hotScore(i * 10.0) // Explicit hotScore for sorting test
+                        .createdAt(post.getCreatedAt() != null ? post.getCreatedAt() : java.time.LocalDateTime.now())
                         .build();
-                postRepository.save(post);
+                postStatsRepository.save(stats);
             }
             flushAndClear();
         }
@@ -758,7 +754,7 @@ class PostServiceTest extends IntegrationTestSupport {
             assertThat(res.getContent()).hasSize(10);
             assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30"); // Latest
             assertThat(res.getTitle()).contains("전체");
-            
+
             // 정렬 검증: createdAt DESC (최신순)
             List<PostDto.PostPageResponse> content = res.getContent();
             for (int i = 0; i < content.size() - 1; i++) {
@@ -779,7 +775,7 @@ class PostServiceTest extends IntegrationTestSupport {
             assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 30");
             assertThat(res.getContent().get(9).getTitle()).isEqualTo("Post 21");
             assertThat(res.getTitle()).contains("핫한");
-            
+
             // 정렬 검증: hotScore DESC
             List<PostDto.PostPageResponse> content = res.getContent();
             for (int i = 0; i < content.size() - 1; i++) {
@@ -813,7 +809,7 @@ class PostServiceTest extends IntegrationTestSupport {
 
             assertThat(res.getContent()).allMatch(p -> p.getCategory() == Category.IDOL);
             assertThat(res.getContent().get(0).getTitle()).isEqualTo("Post 29"); // Odd numbers are IDOL (Highest odd is 29)
-            
+
             // 정렬 검증: hotScore DESC
             List<PostDto.PostPageResponse> content = res.getContent();
             for (int i = 0; i < content.size() - 1; i++) {
@@ -887,7 +883,10 @@ class PostServiceTest extends IntegrationTestSupport {
             PostDto.PostPageRequest req = new PostDto.PostPageRequest();
 
             // 45: Empty (Delete all first)
+            // Foreign key constraint를 피하기 위해 post_stats를 먼저 삭제
+            postStatsRepository.deleteAll();
             postRepository.deleteAll();
+            flushAndClear();
             assertThat(postService.getPosts(req).getContent()).isEmpty();
 
             // 46: Specific category empty

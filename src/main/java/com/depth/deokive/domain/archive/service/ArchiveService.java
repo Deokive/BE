@@ -1,7 +1,11 @@
 package com.depth.deokive.domain.archive.service;
 
 import com.depth.deokive.common.dto.PageDto;
+import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.service.LikeRedisService;
+import com.depth.deokive.common.service.RedisViewService;
+import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
@@ -10,6 +14,7 @@ import com.depth.deokive.domain.user.repository.UserRepository;
 import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -46,13 +51,15 @@ public class ArchiveService {
 
     private final FileService fileService;
     private final ArchiveGuard archiveGuard;
-
-    private final ArchiveQueryRepository archiveQueryRepository;
+    private final RedisViewService redisViewService;
 
     // --- Core Repositories ---
     private final ArchiveRepository archiveRepository;
     private final ArchiveLikeRepository likeRepository;
     private final UserRepository userRepository;
+    private final ArchiveStatsRepository archiveStatsRepository;
+    private final ArchiveQueryRepository archiveQueryRepository;
+    private final LikeRedisService likeRedisService;
 
     // --- Sub-Domain Content Repositories (For Bulk Delete) ---
     private final EventRepository eventRepository;
@@ -95,8 +102,11 @@ public class ArchiveService {
         // SEQ 5. 저장 (Archive + Books Cascade)
         archiveRepository.save(archive);
 
+        // SEQ 6. ArchiveStats 생성 및 저장 (Sync OK)
+        ArchiveStats stats = ArchiveStats.create(archive);
+        archiveStatsRepository.save(stats);
 
-        // SEQ 6. Response
+        // SEQ 7. Response
         String bannerUrl = (archive.getBannerFile() != null)
                 ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
                 : null;
@@ -106,35 +116,58 @@ public class ArchiveService {
     }
 
     @Transactional // viewCount 바꿔서 readOnly가 아닌거임
-    public ArchiveDto.Response getArchiveDetail(UserPrincipal userPrincipal, Long archiveId) {
+    public ArchiveDto.Response getArchiveDetail(
+            UserPrincipal userPrincipal,
+            Long archiveId,
+            HttpServletRequest request
+    ) {
         // SEQ 1. Fetch Join을 사용하여 Archive + User 조회 (N+1 방지)
         Archive archive = archiveRepository.findByIdWithUser(archiveId)
                 .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
 
-        // SEQ 2. Viewer & Owner 판별 // TODO: Check Arcchive Guard Owner
+        // SEQ 2. Viewer & Owner 판별
         Long viewerId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
         boolean isOwner = archive.getUser().getId().equals(viewerId);
 
         // SEQ 3. 권한 체크 -> 친구면 RESTRICTED 까지, 비회원이면 PUBLIC까지
         archiveGuard.checkArchiveReadPermission(archive, userPrincipal);
 
-        // SEQ 4. 조회수 증가 (Dirty Checking)
-        archive.increaseViewCount();
+        // SEQ 4. 통계 정보 -> Stats 테이블에서 조회 (없으면 뭔가 문제있는거니까 생성->방ㅇ로직)
+        ArchiveStats stats = archiveStatsRepository.findById(archiveId)
+                .orElseGet(() -> {
+                    ArchiveStats newStats = ArchiveStats.create(archive);
+                    archiveStatsRepository.save(newStats);
+                    return newStats;
+                });
 
-        // SEQ 5. 데이터 조회 : 좋아요 수, 조회수, isLiked, isOwner, bannerUrl, archive
+        // SEQ 5. 실시간 좋아요 수 조회
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewLikeDomain.ARCHIVE,
+                archiveId,
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId), // Warming용 DB Loader
+                () -> {}
+        );
+
+        // SEQ 6. 조회수 증가 (Redis Write Back Pattern)
+        increaseViewCount(userPrincipal, archiveId, request);
+
+        // SEQ 7. 배너 데이터 조회
         String bannerUrl = (archive.getBannerFile() != null)
                 ? FileUrlUtils.buildCdnUrl(archive.getBannerFile().getS3ObjectKey())
                 : null;
 
-        boolean isLiked = (viewerId != null) && likeRepository.existsByArchiveIdAndUserId(archiveId, viewerId);
+        // SEQ 8. 좋아요 여부 조회
+        boolean isLiked = (viewerId != null) && likeRedisService.isLiked(
+                ViewLikeDomain.ARCHIVE,
+                archiveId,
+                viewerId,
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> {}
+        );
 
+        // Response: viewCount는 Stats에서, likeCount는 RealTime Table에서
         return ArchiveDto.Response.of(
-                archive,
-                bannerUrl,
-                archive.getViewCount(),
-                archive.getLikeCount(),
-                isLiked,
-                isOwner
+                archive, bannerUrl, stats.getViewCount(), realTimeLikeCount, isLiked, isOwner
         );
     }
 
@@ -153,16 +186,32 @@ public class ArchiveService {
         // SEQ 4. 배너 수정
         String bannerUrl = updateBannerImage(archive, request.getBannerImageId(), user.getUserId());
 
-        // SEQ 5. 리턴용 조회
-        boolean isLiked = likeRepository.existsByArchiveIdAndUserId(archiveId, user.getUserId());
+        // SEQ 5. 공개 범위(Visibility) 변경 시 Stats 테이블 동기화
+        if (request.getVisibility() != null) {
+            archiveStatsRepository.syncVisibility(archive.getId(), request.getVisibility());
+        }
+
+        // SEQ 6. 리턴용 조회
+        ArchiveStats stats = archiveStatsRepository.findById(archiveId)
+                .orElse(ArchiveStats.create(archive));
+
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewLikeDomain.ARCHIVE,
+                archiveId,
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> {}
+        );
+
+        boolean isLiked = likeRedisService.isLiked(
+                ViewLikeDomain.ARCHIVE,
+                archiveId,
+                user.getUserId(),
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> {}
+        );
 
         return ArchiveDto.Response.of(
-                archive,
-                bannerUrl,
-                archive.getViewCount(),
-                archive.getLikeCount(),
-                isLiked,
-                true
+                archive, bannerUrl, stats.getViewCount(), realTimeLikeCount, isLiked, true
         );
     }
 
@@ -203,12 +252,16 @@ public class ArchiveService {
         // 6️⃣ Sticker Domain Cleanup
         stickerRepository.deleteByArchiveId(archiveId); // Level 2
 
-        // Step 2. 명시적 삭제 - Like
+        // Step 2. 명시적 삭제 - 통계 데이터
         likeRepository.deleteByArchiveId(archiveId);
+        archiveStatsRepository.deleteById(archiveId);
 
         // Step 3. Root 삭제
         // Cascade -> Sub Domain 삭제: DiaryBook, GalleryBook, TicketBook, RepostBook, Banner
         archiveRepository.delete(archive);
+
+        // Step 4. Redis 캐시 삭제
+        likeRedisService.deleteLikeData(ViewLikeDomain.ARCHIVE, archiveId);
 
         log.info("🟢 Archive Delete Completed.");
     }
@@ -270,6 +323,48 @@ public class ArchiveService {
         return PageDto.PageListResponse.of(pageTitle, page);
     }
 
+    /**
+     * 아카이브 좋아요 토글 (Redis + RabbitMQ)
+     */
+    @Transactional
+    public ArchiveDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long archiveId) {
+        // 1. 아카이브 존재 확인 (불필요한 Redis 연산 방지)
+        // if (!archiveRepository.existsById(archiveId)) {
+        //     throw new RestException(ErrorCode.ARCHIVE_NOT_FOUND);
+        // } -> 이거 하나 때문에 성능이 폭망함 (Bottle neck Point) -> 아니 애초에 게시글을 들어와서 좋아요를 누르겠지....
+
+        // 2. Redis Toggle 수행 (Lua Script)
+        boolean isLiked = likeRedisService.toggleLike(
+                ViewLikeDomain.ARCHIVE,
+                archiveId,
+                userPrincipal.getUserId(),
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> { // Lazy Validator: 필요할 때만 DB 조회
+                    if (!archiveRepository.existsById(archiveId)) {
+                        throw new RestException(ErrorCode.ARCHIVE_NOT_FOUND);
+                    }
+                }
+        );
+
+        // 3. 변경된 실시간 카운트 조회
+        Long realTimeLikeCount = likeRedisService.getCount(
+                ViewLikeDomain.ARCHIVE,
+                archiveId,
+                () -> likeRepository.findAllUserIdsByArchiveId(archiveId),
+                () -> { // Lazy Validator: 필요할 때만 DB 조회
+                    if (!archiveRepository.existsById(archiveId)) {
+                        throw new RestException(ErrorCode.ARCHIVE_NOT_FOUND);
+                    }
+                }
+        );
+
+        return ArchiveDto.LikeResponse.builder()
+                .archiveId(archiveId)
+                .isLiked(isLiked)
+                .likeCount(realTimeLikeCount)
+                .build();
+    }
+
     // -------- Helper Methods
     private void linkSubDomainBooks(Archive archive) {
         String baseTitle = archive.getTitle();
@@ -302,5 +397,14 @@ public class ArchiveService {
             archive.updateBanner(newBanner);
             return FileUrlUtils.buildCdnUrl(newBanner.getS3ObjectKey());
         }
+    }
+
+    private void increaseViewCount(UserPrincipal userPrincipal, Long archiveId, HttpServletRequest request) {
+        if (request == null) return;
+
+        Long userId = (userPrincipal != null) ? userPrincipal.getUserId() : null;
+        String clientIp = ClientUtils.getClientIp(request);
+
+        redisViewService.incrementViewCount(ViewLikeDomain.ARCHIVE, archiveId, userId, clientIp);
     }
 }

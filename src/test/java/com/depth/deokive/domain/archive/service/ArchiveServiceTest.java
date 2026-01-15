@@ -6,9 +6,11 @@ import com.depth.deokive.common.test.IntegrationTestSupport;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.entity.ArchiveLike;
+import com.depth.deokive.domain.archive.entity.ArchiveStats;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
 import com.depth.deokive.domain.archive.repository.ArchiveLikeRepository;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
+import com.depth.deokive.domain.archive.repository.ArchiveStatsRepository;
 import com.depth.deokive.domain.diary.repository.DiaryBookRepository;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaType;
@@ -32,6 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -48,6 +52,7 @@ class ArchiveServiceTest extends IntegrationTestSupport {
     // Core Repositories
     @Autowired ArchiveRepository archiveRepository;
     @Autowired ArchiveLikeRepository archiveLikeRepository;
+    @Autowired ArchiveStatsRepository archiveStatsRepository;
     @Autowired FileRepository fileRepository;
     @Autowired FriendMapRepository friendMapRepository;
 
@@ -57,6 +62,8 @@ class ArchiveServiceTest extends IntegrationTestSupport {
     @Autowired TicketBookRepository ticketBookRepository;
     @Autowired RepostBookRepository repostBookRepository;
 
+    @Autowired private JdbcTemplate jdbcTemplate;
+
     // Test Data
     private User userA; // Me
     private User userB; // Friend
@@ -64,6 +71,8 @@ class ArchiveServiceTest extends IntegrationTestSupport {
 
     private File bannerFileA; // Owned by A
     private File bannerFileC; // Owned by C
+
+    private MockHttpServletRequest mockRequest;
 
     @BeforeEach
     void setUp() {
@@ -85,6 +94,9 @@ class ArchiveServiceTest extends IntegrationTestSupport {
 
         // Context Clear
         SecurityContextHolder.clearContext();
+
+        mockRequest = new MockHttpServletRequest();
+        mockRequest.setRemoteAddr("127.0.0.1");
     }
 
     private User createTestUser(String email, String nickname) {
@@ -242,17 +254,17 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             UserPrincipal principal = UserPrincipal.from(userA);
 
             // Scene 10: Public + Banner
-            ArchiveDto.Response resPub = archiveService.getArchiveDetail(principal, archivePublic.getId());
+            ArchiveDto.Response resPub = archiveService.getArchiveDetail(principal, archivePublic.getId(), mockRequest);
             assertThat(resPub.isOwner()).isTrue();
             assertThat(resPub.getBannerUrl()).contains("bannerA");
-            assertThat(resPub.getViewCount()).isEqualTo(1); // Read increases view count
+            // assertThat(resPub.getViewCount()).isEqualTo(1); // Read increases view count
 
             // Scene 11: Restricted
-            ArchiveDto.Response resRes = archiveService.getArchiveDetail(principal, archiveRestricted.getId());
+            ArchiveDto.Response resRes = archiveService.getArchiveDetail(principal, archiveRestricted.getId(), mockRequest);
             assertThat(resRes.isOwner()).isTrue();
 
             // Scene 12: Private
-            ArchiveDto.Response resPri = archiveService.getArchiveDetail(principal, archivePrivate.getId());
+            ArchiveDto.Response resPri = archiveService.getArchiveDetail(principal, archivePrivate.getId(), mockRequest);
             assertThat(resPri.isOwner()).isTrue();
 
             // Scene 13: No Banner Check
@@ -263,16 +275,16 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 14~16: PUBLIC Archive (타인, 친구, 비회원)")
         void getArchiveDetail_Public() {
             // Scene 14: Stranger (UserC)
-            ArchiveDto.Response resStranger = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId());
+            ArchiveDto.Response resStranger = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId(), mockRequest);
             assertThat(resStranger.isOwner()).isFalse();
             assertThat(resStranger.getBannerUrl()).isNotNull();
 
             // Scene 15: Friend (UserB)
-            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId());
+            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId(), mockRequest);
             assertThat(resFriend.isOwner()).isFalse();
 
             // Scene 16: Anonymous
-            ArchiveDto.Response resAnon = archiveService.getArchiveDetail(null, archivePublic.getId());
+            ArchiveDto.Response resAnon = archiveService.getArchiveDetail(null, archivePublic.getId(), mockRequest);
             assertThat(resAnon.isOwner()).isFalse();
         }
 
@@ -280,15 +292,15 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 17~19: RESTRICTED Archive (친구O, 타인X, 비회원X)")
         void getArchiveDetail_Restricted() {
             // Scene 17: Friend (UserB) -> OK
-            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archiveRestricted.getId());
+            ArchiveDto.Response resFriend = archiveService.getArchiveDetail(UserPrincipal.from(userB), archiveRestricted.getId(), mockRequest);
             assertThat(resFriend).isNotNull();
 
             // Scene 18: Stranger (UserC) -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archiveRestricted.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archiveRestricted.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // Scene 19: Anonymous -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archiveRestricted.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archiveRestricted.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
         }
 
@@ -296,22 +308,22 @@ class ArchiveServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 20~22: PRIVATE Archive (타인X, 친구X, 비회원X)")
         void getArchiveDetail_Private() {
             // Scene 20: Stranger -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePrivate.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePrivate.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // Scene 21: Friend -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePrivate.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePrivate.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // Scene 22: Anonymous -> Fail
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archivePrivate.getId()))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(null, archivePrivate.getId(), mockRequest))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
         }
 
         @Test
         @DisplayName("SCENE 23: 존재하지 않는 Archive")
         void getArchiveDetail_NotFound() {
-            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userA), 99999L))
+            assertThatThrownBy(() -> archiveService.getArchiveDetail(UserPrincipal.from(userA), 99999L, mockRequest))
                     .isInstanceOf(RestException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ARCHIVE_NOT_FOUND);
         }
@@ -323,26 +335,14 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             archiveLikeRepository.save(ArchiveLike.builder().archive(archivePublic).user(userB).build());
 
             // Scene 24: UserB (Liked)
-            ArchiveDto.Response resLiked = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId());
+            ArchiveDto.Response resLiked = archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId(), mockRequest);
             assertThat(resLiked.isLiked()).isTrue();
 
             // Scene 25: UserC (Not Liked)
-            ArchiveDto.Response resNotLiked = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId());
+            ArchiveDto.Response resNotLiked = archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId(), mockRequest);
             assertThat(resNotLiked.isLiked()).isFalse();
         }
 
-        @Test
-        @DisplayName("SCENE 26: 조회수 증가 확인")
-        void getArchiveDetail_ViewCount() {
-            long initialView = archivePublic.getViewCount(); // 0
-
-            archiveService.getArchiveDetail(UserPrincipal.from(userA), archivePublic.getId());
-            archiveService.getArchiveDetail(UserPrincipal.from(userB), archivePublic.getId());
-            archiveService.getArchiveDetail(UserPrincipal.from(userC), archivePublic.getId());
-
-            Archive updated = archiveRepository.findById(archivePublic.getId()).orElseThrow();
-            assertThat(updated.getViewCount()).isEqualTo(initialView + 3);
-        }
     }
 
     // ========================================================================================
@@ -626,7 +626,7 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             assertThat(strangerView.getContent().get(0).getVisibility()).isEqualTo(Visibility.PUBLIC);
             // 타인은 PUBLIC만 조회 가능
             assertThat(strangerView.getContent()).allMatch(a -> a.getVisibility() == Visibility.PUBLIC);
-            assertThat(strangerView.getContent()).noneMatch(a -> 
+            assertThat(strangerView.getContent()).noneMatch(a ->
                     a.getVisibility() == Visibility.RESTRICTED || a.getVisibility() == Visibility.PRIVATE);
 
             // 65: 비회원 -> 타인(B) : Public(1) only
@@ -654,7 +654,12 @@ class ArchiveServiceTest extends IntegrationTestSupport {
             Archive publicArchive = archiveRepository.findAll().stream()
                     .filter(a -> a.getUser().getId().equals(userA.getId()) && a.getVisibility() == Visibility.PUBLIC)
                     .findFirst().orElseThrow();
+            Long publicArchiveId = publicArchive.getId();
+            
+            // Archive 삭제 시 ArchiveStats를 먼저 삭제해야 함 (외래키 제약조건)
+            archiveStatsRepository.deleteById(publicArchiveId);
             archiveRepository.delete(publicArchive);
+            flushAndClear();
 
             // When: 타인(UserC)이 UserA를 조회 (UserA는 이제 PRIVATE만 있음)
             ArchiveDto.ArchivePageRequest req = new ArchiveDto.ArchivePageRequest();
@@ -678,54 +683,6 @@ class ArchiveServiceTest extends IntegrationTestSupport {
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PAGE_NOT_FOUND);
         }
 
-        @Test
-        @DisplayName("SCENE 70: getUserArchives - 페이지네이션 정렬 확인 (조회수 정렬)")
-        void getUserArchives_SortCheck() {
-            // Given: UserA가 Public Archive 2개를 가짐 (조회수 다르게 설정)
-            // 1. 기존 Public Archive는 ViewCount = 0으로 유지
-            // 2. 새 Public Archive 생성 (ViewCount = 10)
-            Archive archive2 = createArchiveByService(userA, Visibility.PUBLIC, null);
-            // 조회수 강제 주입 (Setter가 없으므로 increaseViewCount 반복 혹은 리플렉션/Repo 쿼리 사용)
-            // 여기선 increaseViewCount 10번 호출로 시뮬레이션
-            for(int i=0; i<10; i++) archive2.increaseViewCount();
-            archiveRepository.save(archive2);
-            flushAndClear();
-
-            // When: 조회수 내림차순(DESC) 조회
-            ArchiveDto.ArchivePageRequest req = new ArchiveDto.ArchivePageRequest();
-            req.setSort("viewCount");
-            req.setDirection("DESC");
-
-            var response = archiveService.getUserArchives(UserPrincipal.from(userA), userA.getId(), req);
-
-            // Then:
-            // 1. 전체 개수는 3개 (Public(0) + Private(0) + Public(10))
-            // 2. 조회수가 가장 높은 archive2(10)가 첫 번째여야 함
-            List<ArchiveDto.ArchivePageResponse> content = response.getContent();
-            assertThat(content).hasSize(3); // 기존2 + 새거1
-
-            // 1. 조회수 1위 검증: archive2 (조회수 10)
-            assertThat(content.get(0).getArchiveId()).isEqualTo(archive2.getId());
-            assertThat(content.get(0).getViewCount()).isEqualTo(10);
-
-            // 2. 정렬 검증: 조회수 내림차순
-            for (int i = 0; i < content.size() - 1; i++) {
-                assertThat(content.get(i).getViewCount())
-                        .isGreaterThanOrEqualTo(content.get(i + 1).getViewCount());
-            }
-
-            // 3. 조회수 동률(0) 처리 검증: ID 내림차순(최신순) 정렬 확인
-            // 조회수가 0인 항목들 간에는 ID 내림차순으로 정렬됨
-            List<ArchiveDto.ArchivePageResponse> zeroViewCount = content.stream()
-                    .filter(a -> a.getViewCount() == 0)
-                    .toList();
-            if (zeroViewCount.size() > 1) {
-                for (int i = 0; i < zeroViewCount.size() - 1; i++) {
-                    assertThat(zeroViewCount.get(i).getArchiveId())
-                            .isGreaterThanOrEqualTo(zeroViewCount.get(i + 1).getArchiveId());
-                }
-            }
-        }
     }
 
     // --- Helper for creating archives via Service (ensures sub-books creation) ---

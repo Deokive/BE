@@ -4,15 +4,23 @@ import com.depth.deokive.domain.s3.service.S3Service;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeEach;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 @ActiveProfiles("test")
@@ -34,6 +42,7 @@ public abstract class ApiTestSupport {
     @SuppressWarnings("resource")
     static final GenericContainer<?> REDIS_CONTAINER = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379)
+            .withCommand("redis-server --requirepass test")
             .withReuse(true);
 
     // --- 3. MailHog Container (SMTP & API) ---
@@ -43,6 +52,12 @@ public abstract class ApiTestSupport {
             .waitingFor(Wait.forHttp("/api/v2/messages").forPort(8025)) // API 헬스체크
             .withReuse(true);
 
+    // --- 4. RabbitMQ Container (추가됨) ---
+    @SuppressWarnings("resource")
+    static final RabbitMQContainer RABBIT_CONTAINER = new RabbitMQContainer("rabbitmq:3.12-management")
+            .withExposedPorts(5672, 15672)
+            .withReuse(true);
+
     // AuthSteps에서 사용할 MailHog HTTP API URL (동적 포트 바인딩)
     public static String MAILHOG_HTTP_URL;
 
@@ -50,6 +65,7 @@ public abstract class ApiTestSupport {
         MYSQL_CONTAINER.start();
         REDIS_CONTAINER.start();
         MAILHOG_CONTAINER.start();
+        RABBIT_CONTAINER.start();
 
         // 컨테이너 시작 후 호스트와 매핑된 포트를 사용하여 URL 구성
         MAILHOG_HTTP_URL = "http://" + MAILHOG_CONTAINER.getHost() + ":" + MAILHOG_CONTAINER.getMappedPort(8025);
@@ -68,6 +84,7 @@ public abstract class ApiTestSupport {
         // Redis Configuration
         registry.add("spring.data.redis.host", REDIS_CONTAINER::getHost);
         registry.add("spring.data.redis.port", () -> REDIS_CONTAINER.getMappedPort(6379).toString());
+        registry.add("spring.data.redis.password", () -> "test");
 
         // MailHog Configuration
         registry.add("spring.mail.host", MAILHOG_CONTAINER::getHost);
@@ -81,6 +98,12 @@ public abstract class ApiTestSupport {
 
         // 메일 그룹명 설정 (EmailService 로직용)
         registry.add("spring.mail.group", () -> "Deokive Team");
+
+        // RabbitMQ Configuration
+        registry.add("spring.rabbitmq.host", RABBIT_CONTAINER::getHost);
+        registry.add("spring.rabbitmq.port", RABBIT_CONTAINER::getAmqpPort);
+        registry.add("spring.rabbitmq.username", RABBIT_CONTAINER::getAdminUsername);
+        registry.add("spring.rabbitmq.password", RABBIT_CONTAINER::getAdminPassword);
     }
 
     // --- Common Beans ---

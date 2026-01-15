@@ -1,9 +1,7 @@
-package com.depth.deokive.common.api.event;
+package com.depth.deokive.domain.event.api;
 
-import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
-import com.depth.deokive.domain.event.dto.EventDto;
 import com.depth.deokive.domain.event.entity.Event;
 import com.depth.deokive.domain.event.entity.SportRecord;
 import com.depth.deokive.domain.event.repository.EventHashtagMapRepository;
@@ -14,7 +12,6 @@ import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
-import com.depth.deokive.domain.s3.service.S3Service;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
 import io.restassured.RestAssured;
@@ -33,7 +30,6 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

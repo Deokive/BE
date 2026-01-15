@@ -1,6 +1,5 @@
-package com.depth.deokive.common.api.diary;
+package com.depth.deokive.domain.diary.api;
 
-import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.diary.repository.DiaryBookRepository;
