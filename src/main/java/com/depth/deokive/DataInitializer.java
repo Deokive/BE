@@ -284,8 +284,17 @@ public class DataInitializer implements CommandLineRunner {
         String repostTabSql = "INSERT INTO repost_tab (id, repost_book_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?)";
         String repostSql = "INSERT INTO repost (repost_tab_id, post_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?)";
 
-        // Range Mapping based on Image
-        insertDiaries(diarySql, 1L, 1, 100, now);
+        // Diaries: one archive has either 0 or 100 diaries.
+        // Here we generate 100 diaries for every archive(=diary_book_id) to match visibility distribution spec:
+        // - PUBLIC archive: PUBLIC:RESTRICTED:PRIVATE = 6:3:1 per 10 diaries (=> 60/30/10 per 100)
+        // - RESTRICTED archive: RESTRICTED:PRIVATE = 9:1 per 10 diaries (=> 90/10 per 100)
+        // - PRIVATE archive: PRIVATE 100%
+        for (long archiveId = 1L; archiveId <= ARCHIVE_COUNT; archiveId++) {
+            int start = (int) ((archiveId - 1) * 100 + 1);
+            int end = (int) (archiveId * 100);
+            insertDiaries(diarySql, archiveId, start, end, now);
+        }
+
         insertGalleries(gallerySql, 1L, 1, 100, now, fileCursor);
         insertTickets(ticketSql, 1L, 1, 100, now);
         insertReposts(repostTabSql, repostSql, 1L, 1, 100, now);
@@ -294,15 +303,12 @@ public class DataInitializer implements CommandLineRunner {
         insertTickets(ticketSql, 2L, 101, 200, now);
         insertReposts(repostTabSql, repostSql, 2L, 101, 200, now);
 
-        insertDiaries(diarySql, 3L, 101, 200, now);
         insertTickets(ticketSql, 3L, 201, 300, now);
         insertReposts(repostTabSql, repostSql, 3L, 201, 300, now);
 
-        insertDiaries(diarySql, 4L, 201, 300, now);
         insertGalleries(gallerySql, 4L, 201, 300, now, fileCursor);
         insertReposts(repostTabSql, repostSql, 4L, 301, 400, now);
 
-        insertDiaries(diarySql, 5L, 301, 400, now);
         insertGalleries(gallerySql, 5L, 301, 400, now, fileCursor);
         insertTickets(ticketSql, 5L, 301, 400, now);
 
@@ -315,16 +321,11 @@ public class DataInitializer implements CommandLineRunner {
         insertGalleries(gallerySql, 8L, 501, 600, now, fileCursor);
         insertTickets(ticketSql, 8L, 501, 600, now);
 
-        insertDiaries(diarySql, 9L, 401, 500, now);
         insertReposts(repostTabSql, repostSql, 9L, 601, 700, now);
 
-        insertDiaries(diarySql, 10L, 501, 600, now);
         insertTickets(ticketSql, 10L, 601, 700, now);
 
-        insertDiaries(diarySql, 11L, 601, 700, now);
         insertGalleries(gallerySql, 11L, 601, 700, now, fileCursor);
-
-        insertDiaries(diarySql, 12L, 701, 800, now);
 
         insertGalleries(gallerySql, 13L, 701, 800, now, fileCursor);
 
