@@ -36,7 +36,8 @@ public abstract class ApiTestSupport {
             .withDatabaseName("deokive_test")
             .withUsername("test")
             .withPassword("test")
-            .withReuse(true);
+            .withReuse(true)
+            .withEnv("TZ", "Asia/Seoul");
 
     // --- 2. Redis Container ---
     @SuppressWarnings("resource")
@@ -74,7 +75,8 @@ public abstract class ApiTestSupport {
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         // MySQL Configuration
-        registry.add("spring.datasource.url", MYSQL_CONTAINER::getJdbcUrl);
+        registry.add("spring.datasource.url", () ->
+                MYSQL_CONTAINER.getJdbcUrl() + "?serverTimezone=Asia/Seoul&characterEncoding=UTF-8");
         registry.add("spring.datasource.username", MYSQL_CONTAINER::getUsername);
         registry.add("spring.datasource.password", MYSQL_CONTAINER::getPassword);
         registry.add("spring.datasource.driver-class-name", MYSQL_CONTAINER::getDriverClassName);
