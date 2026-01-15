@@ -17,6 +17,8 @@ spring:
   batch:
     jdbc:
       initialize-schema: always # 실행 시 BATCH_ 관련 테이블이 없으면 자동 생성
+    job:
+      enabled: false
 
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}          # RabbitMQ 서버 호스트 (로컬 실행 시 localhost, 컨테이너 환경 시 서비스명)
