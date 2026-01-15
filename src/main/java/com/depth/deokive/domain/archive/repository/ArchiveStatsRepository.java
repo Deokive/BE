@@ -22,7 +22,7 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
     void incrementViewCountForWriteBack(@Param("id") Long id, @Param("count") Long count);
 
     // 2. 반정규화 필드 동기화 (Visibility)
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("UPDATE ArchiveStats s SET s.visibility = :visibility WHERE s.id = :id")
     void syncVisibility(@Param("id") Long id, @Param("visibility") Visibility visibility);
 
