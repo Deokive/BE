@@ -55,9 +55,6 @@ test-scenario/
 ### Frontend ### 
 frontend/
 
-### 페이지 네이션 테스트를 위한 더미 데이터 ###
-DataInitializer.java
-
 ### Test resources  ###
 src/test/resources/application.yml
 mysql-data/
