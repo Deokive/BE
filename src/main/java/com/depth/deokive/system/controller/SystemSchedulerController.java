@@ -38,7 +38,7 @@ public class SystemSchedulerController {
     @Operation(summary = "핫 스코어 갱신 강제 실행", description = "100만 건 기준 약 1~3초 소요 예상")
     public ResponseEntity<String> triggerHotScore() {
         hotScoreScheduler.updatePostHotScores(); // Post 갱신
-        hotScoreScheduler.updateHotScores();     // Archive 갱신
+        hotScoreScheduler.updateArchiveHotScores();     // Archive 갱신
 
         return ResponseEntity.ok("🟢 Hot Score Update Completed! (Archive & Post)");
     }
@@ -80,7 +80,7 @@ public class SystemSchedulerController {
 
     @ExecutionTime
     @PostMapping("/view-count")
-    @Operation(summary = "👁️ 조회수 동기화 강제 실행 (Redis -> DB)", description = "Redis에 캐싱된 조회수를 DB에 일괄 반영하고 Redis에서 차감합니다.")
+    @Operation(summary = "조회수 동기화 강제 실행 (Redis -> DB)", description = "Redis에 캐싱된 조회수를 DB에 일괄 반영하고 Redis에서 차감합니다.")
     public ResponseEntity<String> triggerViewCountSync() {
         log.info("Manual Trigger: View Count Sync");
 
@@ -92,7 +92,7 @@ public class SystemSchedulerController {
 
     @ExecutionTime
     @PostMapping("/like-count")
-    @Operation(summary = "❤️ 좋아요 동기화", description = "좋아요: 실시간 테이블 값을 검색용 통계 테이블로 동기화")
+    @Operation(summary = "좋아요 동기화", description = "좋아요: 실시간 테이블 값을 검색용 통계 테이블로 동기화")
     public ResponseEntity<String> triggerLikeCountSync() {
         log.info("Manual Trigger: Like Count Sync");
 

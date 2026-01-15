@@ -17,19 +17,40 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long> {
     @Query("SELECT a FROM Archive a JOIN FETCH a.user WHERE a.id = :id")
     Optional<Archive> findByIdWithUser(@Param("id") Long id);
 
+    // 1. 일반 핫스코어 업데이트 (최근 7일 이내)
     @Modifying(clearAutomatically = true)
     @Query(value = """
         UPDATE archive_stats
         SET hot_score = (
-            (like_count * :w1 + LOG10(1 + view_count) * :w2)
+            ( :w1 * LN(1 + like_count) + :w2 * LN(1 + view_count) )
             * EXP(-:lambda * TIMESTAMPDIFF(HOUR, created_at, NOW()))
         )
         WHERE visibility = 'PUBLIC'
           AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
     """, nativeQuery = true)
-    int updateHotScoreBulkInStats(
-            @Param("w1") int w1,
-            @Param("w2") int w2,
+    int updateHotScoreStandard(
+            @Param("w1") double w1,
+            @Param("w2") double w2,
+            @Param("lambda") double lambda
+    );
+
+    // 2. 게이트키퍼 패널티 적용 (7일 ~ 7일+1시간)
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        UPDATE archive_stats
+        SET hot_score = (
+            (
+                ( :w1 * LN(1 + like_count) + :w2 * LN(1 + view_count) )
+                * EXP(-:lambda * TIMESTAMPDIFF(HOUR, created_at, NOW()))
+            ) * 0.5
+        )
+        WHERE visibility = 'PUBLIC'
+          AND created_at BETWEEN DATE_SUB(NOW(), INTERVAL 169 HOUR) 
+                             AND DATE_SUB(NOW(), INTERVAL 168 HOUR)
+    """, nativeQuery = true)
+    int applyHotScorePenalty(
+            @Param("w1") double w1,
+            @Param("w2") double w2,
             @Param("lambda") double lambda
     );
 
