@@ -19,7 +19,7 @@ public interface PostStatsRepository extends JpaRepository<PostStats, Long> {
 
     // [User Action] 3. 카테고리 동기화
     // Post 수정 시 카테고리가 바뀌면 여기도 바꿔야 정렬 인덱스가 안 깨짐.
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("UPDATE PostStats ps SET ps.category = :category WHERE ps.id = :postId")
     void syncUpdateCategory(@Param("postId") Long postId, @Param("category") Category category);
 
