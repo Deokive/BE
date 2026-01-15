@@ -18,12 +18,13 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long> {
     Optional<Archive> findByIdWithUser(@Param("id") Long id);
 
     // 1. 일반 핫스코어 업데이트 (최근 7일 이내)
+    // 수정: TIMESTAMPDIFF(HOUR, ...) -> TIMESTAMPDIFF(MINUTE, ...) / 60.0
     @Modifying(clearAutomatically = true)
     @Query(value = """
         UPDATE archive_stats
         SET hot_score = (
             ( :w1 * LN(1 + like_count) + :w2 * LN(1 + view_count) )
-            * EXP(-:lambda * TIMESTAMPDIFF(HOUR, created_at, NOW()))
+            * EXP(-:lambda * (TIMESTAMPDIFF(MINUTE, created_at, NOW()) / 60.0))
         )
         WHERE visibility = 'PUBLIC'
           AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
@@ -41,7 +42,7 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long> {
         SET hot_score = (
             (
                 ( :w1 * LN(1 + like_count) + :w2 * LN(1 + view_count) )
-                * EXP(-:lambda * TIMESTAMPDIFF(HOUR, created_at, NOW()))
+                * EXP(-:lambda * (TIMESTAMPDIFF(MINUTE, created_at, NOW()) / 60.0))
             ) * 0.5
         )
         WHERE visibility = 'PUBLIC'

@@ -9,13 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
     // 1. 일반 핫스코어 업데이트 (최근 7일 이내)
-    // Formula: (w1 * ln(1+l) + w2 * ln(1+v)) * e^(-lambda * a) [cite: 215]
+    // 수정: TIMESTAMPDIFF(HOUR, ...) -> TIMESTAMPDIFF(MINUTE, ...) / 60.0 (정밀도 향상)
     @Modifying(clearAutomatically = true)
     @Query(value = """
         UPDATE post_stats
         SET hot_score = (
             ( :w1 * LN(1 + like_count) + :w2 * LN(1 + view_count) )
-            * EXP(-:lambda * TIMESTAMPDIFF(HOUR, created_at, NOW()))
+            * EXP(-:lambda * (TIMESTAMPDIFF(MINUTE, created_at, NOW()) / 60.0))
         )
         WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
     """, nativeQuery = true)
@@ -32,7 +32,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         SET hot_score = (
             (
                 ( :w1 * LN(1 + like_count) + :w2 * LN(1 + view_count) )
-                * EXP(-:lambda * TIMESTAMPDIFF(HOUR, created_at, NOW()))
+                * EXP(-:lambda * (TIMESTAMPDIFF(MINUTE, created_at, NOW()) / 60.0))
             ) * 0.5
         )
         WHERE created_at BETWEEN DATE_SUB(NOW(), INTERVAL 169 HOUR) 
