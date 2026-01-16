@@ -87,14 +87,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (nullableToken.isEmpty()) { filterChain.doFilter(request, response); return; }
 
             // Extract JWT Payload with Validation (Token 자체의 유효성 검증)
-            JwtDto.TokenPayload payload = jwtTokenResolver.resolveToken(nullableToken.get());
+            String tokenString = nullableToken.get();
+            log.debug("🔍 Attempting to resolve token - Token length: {}", tokenString.length());
+            JwtDto.TokenPayload payload;
+            try {
+                payload = jwtTokenResolver.resolveToken(tokenString);
+                log.debug("✅ Token resolved successfully - Subject: {}, Type: {}", payload.getSubject(), payload.getTokenType());
+            } catch (Exception e) {
+                log.error("❌ Token resolution failed - Error: {}, Message: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+                throw e;
+            }
 
             // ATK Validation: isAtk? isValidJti? isBlacklist? (사용 목적에 따른 유효성 검증)
-            jwtTokenValidator.validateAtk(payload);
+            try {
+                jwtTokenValidator.validateAtk(payload);
+                log.debug("✅ ATK validation passed - JTI: {}", payload.getJti());
+            } catch (Exception e) {
+                log.error("❌ ATK validation failed - Error: {}, Message: {}", e.getClass().getSimpleName(), e.getMessage());
+                throw e;
+            }
 
             // Define UserPrincipal
-            UserPrincipal userPrincipal = userLoadService.loadUserById(Long.valueOf(payload.getSubject()))
-                    .orElseThrow(JwtInvalidException::new);
+            UserPrincipal userPrincipal;
+            try {
+                userPrincipal = userLoadService.loadUserById(Long.valueOf(payload.getSubject()))
+                        .orElseThrow(() -> {
+                            log.error("❌ User not found - Subject: {}", payload.getSubject());
+                            return new JwtInvalidException();
+                        });
+                log.debug("✅ UserPrincipal loaded - UserId: {}, Username: {}", userPrincipal.getUserId(), userPrincipal.getUsername());
+            } catch (NumberFormatException e) {
+                log.error("❌ Invalid subject format - Subject: {}", payload.getSubject());
+                throw new JwtInvalidException(e);
+            }
 
             // Create Authentication Instance
             Authentication authentication = createAuthentication(userPrincipal);

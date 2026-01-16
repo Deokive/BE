@@ -41,7 +41,14 @@ public class JwtTokenValidator {
     public Jws<Claims> parseClaimsWithValidation(String token) {
         try {
             return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
-        } catch (SecurityException | UnsupportedJwtException | IllegalArgumentException e) {
+        } catch (SecurityException e) {
+            log.error("⚠️ JWT SecurityException - 시크릿 키 불일치 가능성: {}", e.getMessage());
+            throw new JwtInvalidException(e);
+        } catch (UnsupportedJwtException e) {
+            log.error("⚠️ JWT UnsupportedJwtException: {}", e.getMessage());
+            throw new JwtInvalidException(e);
+        } catch (IllegalArgumentException e) {
+            log.error("⚠️ JWT IllegalArgumentException: {}", e.getMessage());
             throw new JwtInvalidException(e);
         } catch (MalformedJwtException e) {
             throw new JwtMalformedException(e);

@@ -22,7 +22,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQL8Dialect
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
@@ -43,4 +43,3 @@ jwt:
   secret: ${JWT_SECRET_KEY:ZGVva2l2ZXNlcnZlcnRlYW1hbmRvdGhlcnNmaWdodGluZw==}
   atk-exp-min: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:30}
   rtk-exp-week: ${JWT_REFRESH_TOKEN_EXPIRATION_WEEKS:2}
-

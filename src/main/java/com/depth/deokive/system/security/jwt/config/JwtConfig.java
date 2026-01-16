@@ -46,6 +46,16 @@ public class JwtConfig {
         }
 
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+        
+        // 시크릿 키 일관성 확인을 위한 로깅 (보안을 위해 해시값만 로깅)
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(keyBytes);
+            String hashHex = java.util.HexFormat.of().formatHex(hash);
+            log.info("🔑 JWT Secret Key initialized - Hash: {} (Length: {} bytes)", hashHex.substring(0, 16) + "...", keyBytes.length);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            log.warn("⚠️ Failed to generate secret key hash for logging: {}", e.getMessage());
+        }
     }
 
     @Bean
