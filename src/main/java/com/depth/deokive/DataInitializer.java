@@ -1,6 +1,7 @@
 package com.depth.deokive;
 
 import com.depth.deokive.common.enums.Visibility;
+import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
 import com.depth.deokive.domain.file.entity.enums.MediaType;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
@@ -169,6 +170,27 @@ public class DataInitializer implements CommandLineRunner {
                 {25000, 75}, {20000, 100}, {15000, 125}, {10000, 150}, {5000, 175}
         };
 
+        // 먼저 모든 파일 ID를 수집
+        List<Long> fileIds = new ArrayList<>();
+        for (int i = 1; i <= POST_COUNT; i++) {
+            fileIds.add(getSafeFileId(fileCursor));
+        }
+        
+        // 파일 ID를 한 번에 조회하여 Map으로 변환
+        Map<Long, String> fileKeyMap = new HashMap<>();
+        if (!fileIds.isEmpty()) {
+            String placeholders = String.join(",", Collections.nCopies(fileIds.size(), "?"));
+            List<Map<String, Object>> fileRows = jdbcTemplate.queryForList(
+                    "SELECT id, s3Object_key FROM files WHERE id IN (" + placeholders + ")",
+                    fileIds.toArray()
+            );
+            for (Map<String, Object> row : fileRows) {
+                Long id = ((Number) row.get("id")).longValue();
+                String key = (String) row.get("s3Object_key");
+                fileKeyMap.put(id, key);
+            }
+        }
+
         for (int i = 1; i <= POST_COUNT; i++) {
             long userId = (i <= 100) ? ((i - 1) / 10) + 1 : 11L;
 
@@ -180,9 +202,10 @@ public class DataInitializer implements CommandLineRunner {
             else if (i <= 750) category = Category.ARTIST;
             else category = Category.ANIMATION;
 
-            // Date: (id-1)/2 days ago
+            // Date: (id-1)/2 days ago, 같은 날짜면 1초씩 차이
             long daysToSubtract = (i - 1) / 2;
-            LocalDateTime createdAt = now.minusDays(daysToSubtract);
+            long secondsToSubtract = (i - 1) % 2; // 같은 날짜면 0 또는 1초 차이
+            LocalDateTime createdAt = now.minusDays(daysToSubtract).minusSeconds(secondsToSubtract);
             Timestamp ts = Timestamp.valueOf(createdAt);
 
             // Stats
@@ -193,8 +216,10 @@ public class DataInitializer implements CommandLineRunner {
             }
             double hotScore = calculateHotScore(view, like, createdAt, now);
 
-            String thumbKey = "dummy_post_" + i + "_seq0.jpg";
-            long fileId = getSafeFileId(fileCursor);
+            long fileId = fileIds.get(i - 1);
+            // 파일의 s3ObjectKey를 조회하여 썸네일 키 생성
+            String s3ObjectKey = fileKeyMap.get(fileId);
+            String thumbKey = ThumbnailUtils.getMediumThumbnailKey(s3ObjectKey);
 
             postBatch.add(new Object[]{(long)i, "Post " + i, "Content...", category.name(), userId, thumbKey, ts, ts});
             statsBatch.add(new Object[]{(long)i, view, like, hotScore, category.name(), ts});
@@ -232,6 +257,27 @@ public class DataInitializer implements CommandLineRunner {
                 {25000, 75}, {20000, 100}, {15000, 125}, {10000, 150}, {5000, 175}
         };
 
+        // 먼저 모든 파일 ID를 수집
+        List<Long> archiveFileIds = new ArrayList<>();
+        for (int i = 1; i <= ARCHIVE_COUNT; i++) {
+            archiveFileIds.add(getSafeFileId(fileCursor));
+        }
+        
+        // 파일 ID를 한 번에 조회하여 Map으로 변환
+        Map<Long, String> archiveFileKeyMap = new HashMap<>();
+        if (!archiveFileIds.isEmpty()) {
+            String placeholders = String.join(",", Collections.nCopies(archiveFileIds.size(), "?"));
+            List<Map<String, Object>> fileRows = jdbcTemplate.queryForList(
+                    "SELECT id, s3Object_key FROM files WHERE id IN (" + placeholders + ")",
+                    archiveFileIds.toArray()
+            );
+            for (Map<String, Object> row : fileRows) {
+                Long id = ((Number) row.get("id")).longValue();
+                String key = (String) row.get("s3Object_key");
+                archiveFileKeyMap.put(id, key);
+            }
+        }
+
         for (int i = 1; i <= ARCHIVE_COUNT; i++) {
             long archiveId = i;
             long userId = (long) ((i - 1) / 10) + 1;
@@ -247,14 +293,17 @@ public class DataInitializer implements CommandLineRunner {
                 like = viewLikeSpec[i-1][1];
             }
 
-            // Date: (id-1)/2 days ago
+            // Date: (id-1)/2 days ago, 같은 날짜면 1초씩 차이
             long daysToSubtract = (i - 1) / 2;
-            LocalDateTime createdAt = now.minusDays(daysToSubtract);
+            long secondsToSubtract = (i - 1) % 2; // 같은 날짜면 0 또는 1초 차이
+            LocalDateTime createdAt = now.minusDays(daysToSubtract).minusSeconds(secondsToSubtract);
             Timestamp ts = Timestamp.valueOf(createdAt);
 
             double hotScore = calculateHotScore(view, like, createdAt, now);
-            String thumbKey = "dummy_archive_" + i + ".jpg";
-            long fileId = getSafeFileId(fileCursor);
+            long fileId = archiveFileIds.get(i - 1);
+            // 파일의 s3ObjectKey를 조회하여 썸네일 키 생성
+            String s3ObjectKey = archiveFileKeyMap.get(fileId);
+            String thumbKey = ThumbnailUtils.getMediumThumbnailKey(s3ObjectKey);
 
             archiveBatch.add(new Object[]{archiveId, userId, "Archive " + i, vis.name(), Badge.NEWBIE.name(), fileId, thumbKey, ts, ts});
             statsBatch.add(new Object[]{archiveId, view, like, hotScore, vis.name(), Badge.NEWBIE.name(), ts});
@@ -336,7 +385,8 @@ public class DataInitializer implements CommandLineRunner {
 
     private Timestamp getArchiveDate(Long archiveId, LocalDateTime baseTime) {
         long daysToSubtract = (archiveId - 1) / 2;
-        return Timestamp.valueOf(baseTime.minusDays(daysToSubtract));
+        long secondsToSubtract = (archiveId - 1) % 2; // 같은 날짜면 0 또는 1초 차이
+        return Timestamp.valueOf(baseTime.minusDays(daysToSubtract).minusSeconds(secondsToSubtract));
     }
 
     private Visibility getArchiveVisibility(Long archiveId) {

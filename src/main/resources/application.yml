@@ -12,7 +12,7 @@ spring:
       write-dates-as-timestamps: false
 
   profiles:
-    active: prod # 개발할 때는 dev, 배포할 때는 prod
+    active: dev # 개발할 때는 dev, 배포할 때는 prod
 
   batch:
     jdbc:

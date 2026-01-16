@@ -19,16 +19,10 @@ spring:
           timeout: 15000                 # SMTP 명령 응답 대기 타임아웃 (Ms)
           writetimeout: 15000            # 이메일 본문 전송 시 대기 시간 (Ms)
 
-  datasource:
-    url: jdbc:mysql://localhost:3306/deokive
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: root
-    password: ${DB_PASSWORD}
-
   jpa:
     database-platform: org.hibernate.dialect.MySQL8Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
         format_sql: true
