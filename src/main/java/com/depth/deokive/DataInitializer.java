@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Slf4j
 @Component
-@Profile({"prod", "dev"})
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
