@@ -4,6 +4,10 @@ import com.depth.deokive.domain.comment.dto.CommentDto;
 import com.depth.deokive.domain.comment.service.CommentService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -11,6 +15,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,6 +30,11 @@ public class CommentController {
 
     @Operation(summary = "댓글 생성", description = "게시글에 댓글(또는 대댓글)을 작성합니다.")
     @PostMapping("/comments")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "댓글 작성 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (대댓글 깊이 제한 초과 또는 부모 댓글과 게시글 불일치)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글 또는 부모 댓글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Void> createComment(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody CommentDto.Request request
@@ -35,6 +45,10 @@ public class CommentController {
 
     @Operation(summary = "댓글 조회", description = "특정 게시글의 댓글 목록을 무한 스크롤로 조회.")
     @GetMapping("/posts/{postId}/comments")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "댓글 조회 성공"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Slice<CommentDto.Response>> getComments(
             @PathVariable Long postId,
             @RequestParam(required = false) Long lastCommentId,
@@ -47,8 +61,13 @@ public class CommentController {
         return ResponseEntity.ok(commentService.getComments(postId, lastCommentId, pageable, currentUserId));
     }
 
-    @Operation(summary = "댓글 삭제", description = "댓글을 삭제합니다. 자식이 있으면 '삭제된 댓글'로 표시됩니다.")
+    @Operation(summary = "댓글 삭제", description = "댓글을 삭제합니다.")
     @DeleteMapping("/comments/{commentId}")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "댓글 삭제 성공"),
+            @ApiResponse(responseCode = "403", description = "삭제 권한이 없습니다. (작성자만 삭제 가능)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 댓글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Void> deleteComment(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long commentId

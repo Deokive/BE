@@ -6,13 +6,17 @@ import com.depth.deokive.domain.ticket.service.TicketService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,7 +29,12 @@ public class TicketController {
 
     @PostMapping("/{archiveId}")
     @Operation(summary = "티켓 생성")
-    @ApiResponse(responseCode = "201", description = "티켓 생성 성공")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "티켓 생성 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "생성 권한 없음 (아카이브 소유자가 아님) 또는 파일 접근 권한 없음", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브 또는 파일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<TicketDto.Response> createTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
@@ -37,7 +46,11 @@ public class TicketController {
 
     @GetMapping("/{ticketId}")
     @Operation(summary = "티켓 상세 조회")
-    @ApiResponse(responseCode = "200", description = "티켓 조회 성공")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "티켓 조회 성공"),
+            @ApiResponse(responseCode = "403", description = "조회 권한 없음 (비공개 아카이브)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 티켓입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<TicketDto.Response> getTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId
@@ -48,7 +61,12 @@ public class TicketController {
 
     @PatchMapping("/{ticketId}")
     @Operation(summary = "티켓 수정")
-    @ApiResponse(responseCode = "200", description = "티켓 수정 성공")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "티켓 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님) 또는 파일 접근 권한 없음", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 티켓 또는 파일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<TicketDto.Response> updateTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId,
@@ -60,7 +78,11 @@ public class TicketController {
 
     @DeleteMapping("/{ticketId}")
     @Operation(summary = "티켓 삭제")
-    @ApiResponse(responseCode = "204", description = "티켓 삭제 성공")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "티켓 삭제 성공"),
+            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 티켓입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Void> deleteTicket(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long ticketId
@@ -71,7 +93,12 @@ public class TicketController {
 
     @PatchMapping("/book/{archiveId}")
     @Operation(summary = "티켓북 제목 수정")
-    @ApiResponse(responseCode = "200", description = "티켓북 제목 수정 성공")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "티켓북 제목 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (제목 누락 등)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (아카이브 소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<TicketDto.UpdateBookTitleResponse> updateTicketBookTitle(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,
@@ -83,7 +110,12 @@ public class TicketController {
 
     @GetMapping("/book/{archiveId}")
     @Operation(summary = "티켓북 페이지네이션 조회")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 페이지 요청 (페이지 범위 초과)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "조회 권한 없음 (비공개 아카이브)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<PageDto.PageListResponse<TicketDto.TicketPageResponse>> getTicketBookPage(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long archiveId,

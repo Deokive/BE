@@ -4,10 +4,15 @@ import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +29,11 @@ public class FileController {
      */
     @PostMapping("/multipart/initiate")
     @Operation(summary = "멀티파트 업로드 초기화", description = "파일 크기에 따른 Part 계산 및 Presigned URL 발급")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "초기화 성공 (Upload ID 발급)"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (파일 이름 누락, 지원하지 않는 형식 등)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "S3 연동 실패 (서버 내부 오류)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<FileDto.MultipartUploadInitiateResponse> initiateMultipartUpload(
             @Valid @RequestBody FileDto.MultipartUploadInitiateRequest request
     ) {
@@ -36,6 +46,11 @@ public class FileController {
      */
     @PostMapping("/multipart/complete")
     @Operation(summary = "멀티파트 업로드 완료", description = "S3 병합 요청 및 DB 메타데이터 저장")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "업로드 완료 및 메타데이터 저장 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (Part 정보 불일치, ETag 오류)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "파일 저장 실패 (DB 또는 S3 오류)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<FileDto.UploadFileResponse> completeMultipartUpload(
             @Valid @RequestBody FileDto.CompleteMultipartUploadRequest request
     ) {
@@ -55,6 +70,10 @@ public class FileController {
      */
     @PostMapping("/multipart/abort")
     @Operation(summary = "멀티파트 업로드 취소", description = "업로드 중단 시 S3 잔여 조각 데이터 삭제")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "업로드 취소 성공"),
+            @ApiResponse(responseCode = "500", description = "S3 연동 실패", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Void> abortMultipartUpload(
             @RequestBody FileDto.MultipartUploadAbortRequest request
     ) {
