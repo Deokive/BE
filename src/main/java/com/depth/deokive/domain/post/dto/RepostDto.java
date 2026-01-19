@@ -3,6 +3,7 @@ package com.depth.deokive.domain.post.dto;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.domain.post.entity.Repost;
+import com.depth.deokive.domain.post.entity.RepostBook;
 import com.depth.deokive.domain.post.entity.RepostTab;
 import com.querydsl.core.annotations.QueryProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -185,6 +186,23 @@ public class RepostDto {
                     .tab(tabs)
                     .content(pageData.getContent())
                     .page(new PageDto.PageInfo(pageData))
+                    .build();
+        }
+    }
+
+    @Data @Builder @AllArgsConstructor
+    @Schema(name = "RepostBookUpdateResponse", description = "리포스트북 업데이트 응답")
+    public static class RepostBookUpdateResponse {
+        @Schema(description = "소속 리포스트북 ID", example = "1")
+        private Long repostBookId;
+
+        @Schema(description = "리포스트북 타이틀", example = "리포스트북 타이틀")
+        private String title;
+
+        public static RepostBookUpdateResponse of(RepostBook repostBook) {
+            return RepostBookUpdateResponse.builder()
+                    .repostBookId(repostBook.getId())
+                    .title(repostBook.getTitle())
                     .build();
         }
     }
