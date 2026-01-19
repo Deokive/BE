@@ -154,7 +154,7 @@ public class DataInitializer implements CommandLineRunner {
     // 4. Posts
     private void createPosts(AtomicLong fileCursor, LocalDateTime now) {
         log.info("👉 Step 4. Posts Setup");
-        String postSql = "INSERT INTO post (id, title, content, category, user_id, thumbnail_key, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String postSql = "INSERT INTO post (id, title, content, category, user_id, thumbnail_key, created_at, last_modified_at, created_by, last_modified_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         String statsSql = "INSERT INTO post_stats (post_id, view_count, like_count, hot_score, category, created_at) VALUES (?, ?, ?, ?, ?, ?)";
         String mapSql = "INSERT INTO post_file_map (post_id, file_id, media_role, sequence, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
 
@@ -220,7 +220,7 @@ public class DataInitializer implements CommandLineRunner {
             String s3ObjectKey = fileKeyMap.get(fileId);
             String thumbKey = ThumbnailUtils.getMediumThumbnailKey(s3ObjectKey);
 
-            postBatch.add(new Object[]{(long)i, "Post " + i, "Content...", category.name(), userId, thumbKey, ts, ts});
+            postBatch.add(new Object[]{(long)i, "Post " + i, "Content...", category.name(), userId, thumbKey, ts, ts, userId, userId});
             statsBatch.add(new Object[]{(long)i, view, like, hotScore, category.name(), ts});
             mapBatch.add(new Object[]{(long)i, fileId, "PREVIEW", 0, ts, ts});
         }
@@ -234,7 +234,7 @@ public class DataInitializer implements CommandLineRunner {
     private void createArchivesAndContents(AtomicLong fileCursor, LocalDateTime now) {
         log.info("👉 Step 5. Archives Setup");
 
-        String archiveSql = "INSERT INTO archive (id, user_id, title, visibility, badge, banner_file_id, thumbnail_key, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String archiveSql = "INSERT INTO archive (id, user_id, title, visibility, badge, banner_file_id, thumbnail_key, created_at, last_modified_at, created_by, last_modified_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         String statsSql = "INSERT INTO archive_stats (archive_id, view_count, like_count, hot_score, visibility, badge, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         String diaryBookSql = "INSERT INTO diary_book (archive_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?)";
@@ -304,7 +304,7 @@ public class DataInitializer implements CommandLineRunner {
             String s3ObjectKey = archiveFileKeyMap.get(fileId);
             String thumbKey = ThumbnailUtils.getMediumThumbnailKey(s3ObjectKey);
 
-            archiveBatch.add(new Object[]{archiveId, userId, "Archive " + i, vis.name(), Badge.NEWBIE.name(), fileId, thumbKey, ts, ts});
+            archiveBatch.add(new Object[]{archiveId, userId, "Archive " + i, vis.name(), Badge.NEWBIE.name(), fileId, thumbKey, ts, ts, userId, userId});
             statsBatch.add(new Object[]{archiveId, view, like, hotScore, vis.name(), Badge.NEWBIE.name(), ts});
 
             diaryBookBatch.add(new Object[]{archiveId, "DiaryBook", ts, ts});
