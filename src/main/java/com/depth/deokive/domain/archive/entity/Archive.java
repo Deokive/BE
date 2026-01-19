@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.archive.entity;
 
 import com.depth.deokive.common.auditor.TimeBaseEntity;
+import com.depth.deokive.common.auditor.UserBaseEntity;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.enums.Badge;
@@ -28,7 +29,7 @@ import lombok.experimental.SuperBuilder;
         @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC, id DESC"),
         @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC, id DESC"),
 })
-public class Archive extends TimeBaseEntity {
+public class Archive extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 

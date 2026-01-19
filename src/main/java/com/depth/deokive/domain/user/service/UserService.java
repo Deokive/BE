@@ -36,10 +36,18 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserDto.UserResponse retrieve(UserPrincipal userPrincipal) {
+    public UserDto.UserResponse retrieveMe(UserPrincipal userPrincipal) {
         log.info("💡 Called retrieve api");
 
         User foundUser = userRepository.findById(userPrincipal.getUserId())
+                .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
+
+        return UserDto.UserResponse.from(foundUser);
+    }
+
+    @Transactional(readOnly = true)
+    public UserDto.UserResponse retrieve(Long userId) {
+        User foundUser = userRepository.findById(userId)
                 .orElseThrow(() -> new RestException(ErrorCode.USER_NOT_FOUND));
 
         return UserDto.UserResponse.from(foundUser);

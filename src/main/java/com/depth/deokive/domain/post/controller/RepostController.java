@@ -141,4 +141,19 @@ public class RepostController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PatchMapping("repost-book/{archiveId}")
+    @Operation(summary = "리포스트북 타이틀 수정")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "리포스트북 타이틀 수정 성공"),
+            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<RepostDto.RepostBookUpdateResponse> updateRepostBook(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long archiveId,
+            @Valid @RequestBody RepostDto.UpdateRequest request
+    ) {
+        return ResponseEntity.ok(repostService.updateRepostBookTitle(userPrincipal, request, archiveId));
+    }
 }

@@ -2,6 +2,8 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.util.PageUtils;
+import com.depth.deokive.domain.archive.entity.Archive;
+import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.depth.deokive.domain.post.entity.*;
 import com.depth.deokive.domain.post.repository.*;
@@ -27,6 +29,7 @@ public class RepostService {
 
     private final PostRepository postRepository; // Post 정보 조회를 위한 Repository (검증 및 스냅샷 용도)
     private final RepostQueryRepository repostQueryRepository;
+    private final ArchiveRepository archiveRepository;
 
     @Transactional
     public RepostDto.Response createRepost(UserPrincipal userPrincipal, Long tabId, RepostDto.CreateRequest request) {
@@ -186,5 +189,21 @@ public class RepostService {
 
         // SEQ 6. 리턴
         return RepostDto.RepostListResponse.of(book.getTitle(), targetTabId, tabDtos, page);
+    }
+
+    @Transactional
+    public RepostDto.RepostBookUpdateResponse updateRepostBookTitle(UserPrincipal userPrincipal, RepostDto.UpdateRequest request, Long archiveId){
+        // SEQ 1. 아카이브 조회
+        Archive archive = archiveRepository.findByIdWithUser(archiveId)
+                .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND));
+
+        // SEQ 2. 소유권 검증
+        archiveGuard.checkOwner(archive.getUser().getId(), userPrincipal);
+
+        // SEQ 3. 리포스트 북 타이틀 수정
+        RepostBook repostBook = archive.getRepostBook();
+        repostBook.updateTitle(request.getTitle()); // Dirty Checking
+
+        return RepostDto.RepostBookUpdateResponse.of(repostBook);
     }
 }

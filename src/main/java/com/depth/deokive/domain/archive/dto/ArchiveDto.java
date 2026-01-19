@@ -79,6 +79,12 @@ public class ArchiveDto {
         @Schema(description = "작성자 닉네임", example = "홍길동")
         private String ownerNickname;
 
+        @Schema(description = "작성자 ID", example = "1")
+        private Long createdBy;
+
+        @Schema(description = "수성자 ID", example = "1")
+        private Long lastModifiedBy;
+
         @Schema(description = "생성 시간", example = "KST Datetime")
         private LocalDateTime createdAt; // 이게 day-N 데이터가 될거임
 
@@ -100,6 +106,8 @@ public class ArchiveDto {
                     .viewCount(viewCount)
                     .likeCount(likeCount)
                     .ownerNickname(archive.getUser().getNickname())
+                    .createdBy(archive.getCreatedBy())
+                    .lastModifiedBy(archive.getLastModifiedBy())
                     .createdAt(archive.getCreatedAt())
                     .isLiked(isLiked)
                     .isOwner(isOwner)

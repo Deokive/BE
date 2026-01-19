@@ -34,7 +34,7 @@ public class UserController {
     public UserDto.UserResponse retrieve(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return userService.retrieve(userPrincipal);
+        return userService.retrieveMe(userPrincipal);
     }
 
     @PatchMapping("/me")
@@ -49,5 +49,15 @@ public class UserController {
             @Valid @RequestBody UserDto.UserUpdateRequest request
     ) {
         return userService.update(userPrincipal, request);
+    }
+
+    @GetMapping("/{userId}")
+    @Operation(summary = "유저 정보 조회", description = "사용자의 정보를 조회합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "유저 정보 조회 성공"),
+            @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public UserDto.UserResponse retrieve(@PathVariable Long userId) {
+        return userService.retrieve(userId);
     }
 }
