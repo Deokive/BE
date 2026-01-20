@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.notification.controller;
 
+import com.depth.deokive.domain.notification.dto.event.NotificationEvent;
 import com.depth.deokive.domain.notification.service.NotificationService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,8 +27,20 @@ public class NotificationController {
     @Operation(summary = "알림 구독", description = "로그인한 유저가 알림을 받기 위해 SSE에 연결합니다.")
     @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "SSE 연결 성공 (실시간 스트림 시작)", content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE)),
-            @ApiResponse(responseCode = "401", description = "인증 실패 (토큰 누락 또는 만료)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "SSE 연결 성공 (스트림 시작)",
+                    content = @Content(
+                            mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+                            // 중요: SseEmitter가 반환되지만, 문서에는 실제 전송되는 데이터 객체를 보여줌
+                            schema = @Schema(implementation = NotificationEvent.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "인증 실패 (토큰 누락)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
     })
     public SseEmitter subscribe(@AuthenticationPrincipal UserPrincipal userPrincipal) {
         return notificationService.subscribe(userPrincipal.getUserId());
