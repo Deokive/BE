@@ -91,14 +91,31 @@ public class DiaryDto {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @Schema(name = "DiaryResponse", description = "일기 상세 응답 DTO")
     public static class Response {
+        @Schema(description = "일기 ID", example = "15")
         private Long id;
+
+        @Schema(description = "제목", example = "제주도 여행 1일차")
         private String title;
+
+        @Schema(description = "내용", example = "제주도는 제 친가입니당.")
         private String content;
+
+        @Schema(description = "기록 날짜", example = "2025-05-05", type = "string", format = "date")
         private LocalDate recordedAt;
+
+        @Schema(description = "테마 색상", example = "색깔")
         private String color;
+
+        @Schema(description = "공개 범위", example = "PUBLIC")
         private Visibility visibility;
+
+        @Schema(description = "소속 다이어리북 ID (Archive ID)", example = "1")
         private Long diaryBookId;
+
+        @Schema(description = "작성자 ID", example = "5")
         private Long createdBy;
+
+        @Schema(description = "첨부된 파일 정보 리스트")
         private List<FileDto.UploadFileResponse> files;
 
         public static Response of(Diary diary, List<DiaryFileMap> maps) {
