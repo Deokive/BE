@@ -41,7 +41,7 @@ public class PostDto {
         private String content;
 
         @NotNull(message = "게시글 카테고리 설정은 필수입니다.")
-        @Schema(description = "게시글 카테고리", example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
+        @Schema(description = "게시글 카테고리", example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION | ETC")
         private Category category;
 
         @Schema(description = "첨부된 파일 연결 정보 리스트")
@@ -85,7 +85,7 @@ public class PostDto {
         @Schema(description = "게시글 본문", example = "신형만의 회상씬은 정말 최고였다 ... (중략)")
         private String content;
 
-        @Schema(description = "게시글 카테고리", example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
+        @Schema(description = "게시글 카테고리", example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION | ETC")
         private Category category;
 
         @Schema(description = "게시글 생성 시간", example = "KST Datetime")
@@ -229,7 +229,7 @@ public class PostDto {
         private int size = 10;
 
         @Schema(description = "카테고리 필터 (없을 시 전체 조회)",
-                example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION")
+                example = "IDOL | ACTOR | MUSICIAN | SPORT | ARTIST | ANIMATION | ETC")
         private Category category;
 
         @Pattern(regexp = "^(createdAt|viewCount|likeCount|hotScore)$")

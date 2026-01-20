@@ -107,6 +107,10 @@ public class PostController {
 
     @PostMapping("/{postId}/like")
     @Operation(summary = "게시글 좋아요 토글", description = "좋아요를 처리합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "좋아요 토글 성공"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<PostDto.LikeResponse> toggleLike(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long postId

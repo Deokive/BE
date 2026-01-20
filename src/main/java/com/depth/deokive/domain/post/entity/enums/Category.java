@@ -6,5 +6,6 @@ public enum Category {
     MUSICIAN,
     SPORT,
     ARTIST,
-    ANIMATION
+    ANIMATION,
+    ETC
 }
