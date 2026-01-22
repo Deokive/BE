@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,9 +42,21 @@ public class AuthController {
     @Operation(summary = "회원가입", description = "새로운 사용자를 등록합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "회원가입 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "이메일 인증이 완료되지 않았습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "이미 존재하는 이메일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "유효성 검사 실패 (비밀번호 규칙 등)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"GLOBAL INVALID PARAMETER\", \"message\": \"비밀번호는 8~16자 사이에 영문, 숫자, 특수문자를 포함해야 합니다.\"}")
+                    )),
+            @ApiResponse(responseCode = "401", description = "이메일 인증 미완료",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"AUTH_EMAIL_NOT_VERIFIED\", \"message\": \"이메일 인증이 완료되지 않았습니다.\"}")
+                    )),
+            @ApiResponse(responseCode = "409", description = "이미 존재하는 이메일",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"CONFLICT\", \"error\": \"USER EMAIL ALREADY EXISTS\", \"message\": \"중복되는 이메일입니다.\"}")
+                    ))
     })
     public UserDto.UserResponse signUp(@RequestBody @Valid AuthDto.SignUpRequest request) {
         return authService.signUp(request);
@@ -53,9 +66,17 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "로그인", description = "사용자 아이디와 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "로그인 성공"),
-            @ApiResponse(responseCode = "401", description = "비밀번호가 일치하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "가입되지 않은 이메일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "200", description = "로그인 성공 (헤더/쿠키에 토큰 세팅됨)"),
+            @ApiResponse(responseCode = "401", description = "비밀번호 불일치",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"AUTH PASSWORD NOT MATCH\", \"message\": \"비밀번호가 올바르지 않습니다.\"}")
+                    )),
+            @ApiResponse(responseCode = "404", description = "가입되지 않은 이메일",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"AUTH USER NOT FOUND\", \"message\": \"등록된 유저를 찾을 수 없습니다.\"}")
+                    ))
     })
     public AuthDto.LoginResponse login(@RequestBody @Valid AuthDto.LoginRequest request, HttpServletResponse response) {
         return authService.login(request, response);
@@ -117,6 +138,7 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "유효하지 않거나 만료된 리프레시 토큰입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(
+            @Parameter(description = "로그인 유지(Remember-Me) 여부", example = "false")
             @RequestParam(value = "rememberMe", defaultValue = "false") boolean rememberMe,
             HttpServletRequest request,
             HttpServletResponse response

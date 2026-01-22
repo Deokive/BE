@@ -6,6 +6,7 @@ import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.ErrorResponse;
@@ -32,14 +34,21 @@ public class EventController {
     @Operation(summary = "일정 생성", description = "특정 아카이브(캘린더)에 일정을 생성합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "일정 생성 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "생성 권한 없음 (아카이브 소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "일정 개수 초과 (하루 최대 4개)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (날짜 포맷 오류 등)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "생성 권한 없음",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "일정 개수 초과 (하루 최대 4개)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"CONFLICT\", \"error\": \"EVENT_LIMIT_EXCEEDED\", \"message\": \"이벤트는 일정 당 최대 4개까지만 등록할 수 있습니다.\"}")
+                    ))
     })
     public ResponseEntity<EventDto.Response> createEvent(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
-            @PathVariable Long archiveId,
+            @Parameter(description = "아카이브 ID", example = "1") @PathVariable Long archiveId,
             @Valid @RequestBody EventDto.CreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -55,7 +64,7 @@ public class EventController {
     })
     public ResponseEntity<EventDto.Response> getEvent(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
-            @PathVariable Long eventId
+            @Parameter(description = "조회할 일정 ID", example = "10") @PathVariable Long eventId
     ) {
         return ResponseEntity.ok(eventService.getEvent(user, eventId));
     }
@@ -71,7 +80,7 @@ public class EventController {
     })
     public ResponseEntity<EventDto.Response> updateEvent(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
-            @PathVariable Long eventId,
+            @Parameter(description = "수정할 일정 ID", example = "10") @PathVariable Long eventId,
             @Valid @RequestBody EventDto.UpdateRequest request
     ) {
         return ResponseEntity.ok(eventService.updateEvent(user, eventId, request));
@@ -86,7 +95,7 @@ public class EventController {
     })
     public ResponseEntity<Void> deleteEvent(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
-            @PathVariable Long eventId
+            @Parameter(description = "삭제할 일정 ID", example = "10") @PathVariable Long eventId
     ) {
         eventService.deleteEvent(user, eventId);
         return ResponseEntity.noContent().build();
@@ -101,9 +110,9 @@ public class EventController {
     })
     public ResponseEntity<List<EventDto.Response>> getMonthlyEvents(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
-            @PathVariable Long archiveId,
-            @RequestParam int year,
-            @RequestParam int month
+            @Parameter(description = "아카이브 ID", example = "1") @PathVariable Long archiveId,
+            @Parameter(description = "조회할 연도", example = "2025") @RequestParam int year,
+            @Parameter(description = "조회할 월 (1~12)", example = "5") @RequestParam int month
     ) {
         return ResponseEntity.ok(eventService.getMonthlyEvents(user, archiveId, year, month));
     }

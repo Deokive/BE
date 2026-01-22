@@ -128,8 +128,10 @@ public class ArchiveDto {
         private int size = 10;
 
         @Pattern(regexp = "^(createdAt|viewCount|likeCount|hotScore)$", message = "정렬 기준이 올바르지 않습니다.")
-        @Schema(description = "정렬 기준 컬럼", defaultValue = "createdAt",
-                allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"}, example = "createdAt")
+        @Schema(description = "정렬 기준 컬럼(hotScore: 핫한순, createdAt: 최신순, viewCount: 조회순, likeCount: 좋아요순)",
+                defaultValue = "createdAt",
+                allowableValues = {"createdAt", "viewCount", "likeCount", "hotScore"},
+                example = "createdAt")
         private String sort = "createdAt";
 
         @Pattern(regexp = "^(ASC|DESC|asc|desc)$", message = "정렬 방향은 'ASC' 또는 'DESC' 여야 합니다.")

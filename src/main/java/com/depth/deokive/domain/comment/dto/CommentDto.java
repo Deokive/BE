@@ -17,31 +17,44 @@ public class CommentDto {
     @NoArgsConstructor
     @Schema(description = "댓글 생성 요청")
     public static class Request {
-        @Schema(description = "게시글 ID")
+        @Schema(description = "게시글 ID", example = "1")
         private Long postId;
 
-        @Schema(description = "댓글 내용")
+        @Schema(description = "댓글 내용", example = "ㅋㅋㅋㅋㅋ")
         private String content;
 
-        @Schema(description = "부모 댓글 ID")
+        @Schema(description = "부모 댓글 ID", example = "null")
         private Long parentId;
     }
 
     @Getter
     @Builder
     @AllArgsConstructor
-    @Schema(description = "댓글 응답")
+    @Schema(name = "CommentResponse", description = "댓글 응답 DTO (계층형 구조)")
     public static class Response {
+        @Schema(description = "댓글 ID", example = "10")
         private Long commentId;
+
+        @Schema(description = "댓글 내용", example = "개꿀!")
         private String content;
+
+        @Schema(description = "작성자 User ID", example = "5")
         private Long userId;
+
+        @Schema(description = "작성자 닉네임", example = "덕카이브 홧팅")
         private String nickname;
+
+        @Schema(description = "삭제 여부", example = "false")
         private boolean isDeleted;
+
+        @Schema(description = "작성 일시")
         private LocalDateTime createdAt;
 
         @JsonProperty("isOwner")
+        @Schema(description = "본인 작성 여부 (true면 삭제 버튼 노출)", example = "true")
         private boolean isOwner;
 
+        @Schema(description = "대댓글 리스트")
         private List<Response> children;
 
         public static Response from(Comment comment, Long currentUserId) {

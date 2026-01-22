@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.controller;
 
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.depth.deokive.domain.post.service.RepostService;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,7 +18,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -145,8 +145,8 @@ public class RepostController {
     @PatchMapping("repost-book/{archiveId}")
     @Operation(summary = "리포스트북 타이틀 수정")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "리포스트북 타이틀 수정 성공"),
-            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "200", description = "리포스트북 타이틀 수정 성공"),
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<RepostDto.RepostBookUpdateResponse> updateRepostBook(
