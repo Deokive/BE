@@ -171,8 +171,10 @@ public class PostService {
         // SEQ 5. 통계 테이블 삭제
         postStatsRepository.deleteById(postId);     // 통계 테이블 삭제
 
-        // SEQ 6 댓글 삭제 (Post FK 제약조건으로 인해 Post 삭제 전 필수)
-        commentRepository.deleteByPostId(postId);
+        // SEQ 6. 댓글 삭제 (Post FK 제약조건으로 인해 Post 삭제 전 필수)
+        // 대댓글(자식) 먼저 삭제 → 부모 댓글 삭제 (FK 제약조건 순서)
+        commentRepository.deleteRepliesByPostId(postId);
+        commentRepository.deleteParentsByPostId(postId);
 
         // SEQ 7. 게시글 삭제
         postRepository.delete(post);
