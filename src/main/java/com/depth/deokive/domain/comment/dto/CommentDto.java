@@ -8,11 +8,36 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import org.springframework.data.domain.Slice;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class CommentDto {
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    @Schema(name = "CommentSliceResponse", description = "댓글 목록 응답 (totalCount 포함)")
+    public static class SliceResponse {
+        @Schema(description = "댓글 목록")
+        private List<Response> content;
+
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
+        private boolean hasNext;
+
+        @Schema(description = "전체 댓글 수", example = "42")
+        private long totalCount;
+
+        public static SliceResponse of(Slice<Response> slice, long totalCount) {
+            return SliceResponse.builder()
+                    .content(slice.getContent())
+                    .hasNext(slice.hasNext())
+                    .totalCount(totalCount)
+                    .build();
+        }
+    }
     @Getter
     @NoArgsConstructor
     @Schema(description = "댓글 생성 요청")
