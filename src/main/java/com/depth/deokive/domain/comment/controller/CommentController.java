@@ -27,7 +27,11 @@ public class CommentController {
 
     private final CommentService commentService;
 
-    @Operation(summary = "댓글 생성", description = "게시글에 댓글(또는 대댓글)을 작성합니다.")
+    @Operation(
+            summary = "댓글 생성",
+            description = "게시글에 댓글(또는 대댓글)을 작성합니다.  \n" +
+                    "일반 댓글을 작성할 때는 parentId=null,  \n" +
+                    "대댓글 작성할 때는 Pagination 속의 commentId를 parentId에 기입하면 됩니다.")
     @PostMapping("/comments")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "댓글 작성 성공"),

@@ -90,7 +90,7 @@ public class CommentDto {
                     .nickname(comment.getUser().getNickname())
                     .isDeleted(comment.isDeleted())
                     .createdAt(comment.getCreatedAt())
-                    .isOwner(currentUserId != null & currentUserId.equals(comment.getUser().getId()))
+                    .isOwner(currentUserId != null && currentUserId.equals(comment.getUser().getId()))
                     .children(new ArrayList<>())
                     .build();
         }

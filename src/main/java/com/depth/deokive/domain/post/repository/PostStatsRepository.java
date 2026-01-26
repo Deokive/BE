@@ -27,4 +27,9 @@ public interface PostStatsRepository extends JpaRepository<PostStats, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE PostStats ps SET ps.likeCount = :count WHERE ps.id = :postId")
     void updateLikeCount(@Param("postId") Long postId, @Param("count") Long count);
+
+    // Post 삭제 시 통계 테이블 삭제 (@MapsId 사용으로 인해 deleteById가 제대로 작동하지 않을 수 있어 명시적 쿼리 사용)
+    @Modifying
+    @Query("DELETE FROM PostStats ps WHERE ps.id = :postId")
+    void deleteByPostId(@Param("postId") Long postId);
 }

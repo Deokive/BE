@@ -168,8 +168,8 @@ public class PostService {
         // SEQ 4. 좋아요 삭제
         postLikeRepository.deleteByPostId(postId);
 
-        // SEQ 5. 통계 테이블 삭제
-        postStatsRepository.deleteById(postId);     // 통계 테이블 삭제
+        // SEQ 5. 통계 테이블 삭제 (@MapsId 사용으로 인해 deleteById 대신 커스텀 쿼리 사용)
+        postStatsRepository.deleteByPostId(postId);
 
         // SEQ 6. 댓글 삭제 (Post FK 제약조건으로 인해 Post 삭제 전 필수)
         // 대댓글(자식) 먼저 삭제 → 부모 댓글 삭제 (FK 제약조건 순서)
