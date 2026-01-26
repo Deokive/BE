@@ -44,7 +44,7 @@ public class DataInitializer implements CommandLineRunner {
     // Constants
     private static final int USER_COUNT = 11;
     private static final int ARCHIVE_COUNT = 100;
-    private static final int POST_COUNT = 900;
+    private static final int POST_COUNT = 1050;
     private static final int FILE_POOL_SIZE = 10000;
 
     // Hot Score Config
@@ -199,7 +199,8 @@ public class DataInitializer implements CommandLineRunner {
             else if (i <= 450) category = Category.MUSICIAN;
             else if (i <= 600) category = Category.SPORT;
             else if (i <= 750) category = Category.ARTIST;
-            else category = Category.ANIMATION;
+            else if (i <= 900) category = Category.ANIMATION;
+            else category = Category.ETC; // 901~1050: ETC for Tester11
 
             // Date: (id-1)/2 days ago, 같은 날짜면 1초씩 차이
             long daysToSubtract = (i - 1) / 2;
