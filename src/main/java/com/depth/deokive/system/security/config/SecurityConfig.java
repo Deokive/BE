@@ -77,7 +77,8 @@ public class SecurityConfig {
                                 "/api/v1/tickets/book/{archiveId}",
                                 "/api/v1/repost/{archiveId}",
                                 "/api/v1/diary/book/{archiveId}",
-                                "/api/v1/posts/{postId}"
+                                "/api/v1/posts/{postId}",
+                                "/api/v1/posts/{postId}/comments"
                                 ).permitAll()
                         // .requestMatchers(requestMatcherHolder.getRequestMatchersForVisibilityByMinRole(null)).permitAll()
                         // 2. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요

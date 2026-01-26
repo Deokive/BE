@@ -58,3 +58,8 @@ frontend/
 ### Test resources  ###
 src/test/resources/application.yml
 mysql-data/
+
+### AI Agent
+docs/
+.claude/
+CLAUDE.md
