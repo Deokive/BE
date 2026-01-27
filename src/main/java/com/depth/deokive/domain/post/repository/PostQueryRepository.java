@@ -53,6 +53,7 @@ public class PostQueryRepository {
                         post.id,
                         post.title,
                         post.category,
+                        post.content,
                         post.thumbnailKey,
                         post.user.nickname,
                         postStats.likeCount,
