@@ -6,7 +6,7 @@ import com.depth.deokive.domain.oauth2.service.CustomOAuth2UserService;
 import com.depth.deokive.system.exception.dto.ErrorResponse;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.security.jwt.config.JwtAuthenticationFilter;
-import com.depth.deokive.system.security.util.OriginUtils;
+import com.depth.deokive.system.security.util.PropertiesParserUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -112,7 +112,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        List<String> origins = OriginUtils.originListParser(allowedOrigins);
+        List<String> origins = PropertiesParserUtils.propertiesParser(allowedOrigins);
 
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
