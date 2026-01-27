@@ -260,6 +260,9 @@ public class PostDto {
         @Schema(description = "카테고리", example = "IDOL")
         private Category category;
 
+        @Schema(description = "본문 요약", example = "게시글 본문의 내용 요약...")
+        private String summary;
+
         @Schema(description = "썸네일 URL",
                 example = "https://cdn.example.com/files/thumbnails/medium/thumbnail123.jpg")
         private String thumbnailUrl;
@@ -283,12 +286,16 @@ public class PostDto {
         private LocalDateTime lastModifiedAt;
 
         @QueryProjection // Q-Class 생성용
-        public PostPageResponse(Long postId, String title, Category category, String thumbnailKey,
+        public PostPageResponse(Long postId, String title, Category category, String content, String thumbnailKey,
                             String writerNickname, Long likeCount, Long viewCount, Double hotScore,
                             LocalDateTime createdAt, LocalDateTime lastModifiedAt) {
             this.postId = postId;
             this.title = title;
             this.category = category;
+            if(content != null) { // 본문 내용 25자로 요약
+                this.summary = content.length() > 25
+                        ? content.substring(0, 25) + "..." : content; // 25자 이상인 경우 맨 뒤에 ...으로 요약 표시.
+            }
             this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
             this.writerNickname = writerNickname;
             this.likeCount = likeCount;
