@@ -3,6 +3,7 @@ package com.depth.deokive.system.exception.handler;
 import com.depth.deokive.system.exception.dto.ErrorResponse;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
+import com.depth.deokive.system.ratelimit.exception.RateLimitExceededException;
 import com.depth.deokive.system.security.jwt.exception.*;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import io.lettuce.core.RedisCommandExecutionException;
@@ -33,6 +34,20 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     // TODO: Deprecated Exceptions->Deadlock, CannotSerializable...
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(RateLimitExceededException ex) {
+
+        ErrorResponse response = ErrorResponse.of(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "RATE_LIMIT_EXCEEDED",
+                ex.getMessage()
+        );
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds())) // 표준 헤더
+                .body(response);
+    }
 
     @ExceptionHandler(RestException.class)
     public ResponseEntity<ErrorResponse> handleBaseException(RestException e) {
