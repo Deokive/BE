@@ -123,7 +123,7 @@ public class RateLimitAspect {
                 long retryAfterSeconds = (long) Math.ceil(nanos / 1_000_000_000.0);
                 retryAfterSeconds = Math.max(1, retryAfterSeconds);
 
-                log.warn("Rate limit exceeded. key={}, retryAfter={}s", key, retryAfterSeconds);
+                log.warn("🚫 Rate limit exceeded. key={}, retryAfter={}s", key, retryAfterSeconds);
                 throw new RateLimitExceededException(retryAfterSeconds);
             }
 

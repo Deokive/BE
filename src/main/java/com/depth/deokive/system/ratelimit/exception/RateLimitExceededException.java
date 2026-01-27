@@ -21,7 +21,7 @@ public class RateLimitExceededException extends RuntimeException {
     private final long remainingTokens;
 
     public RateLimitExceededException(long retryAfterSeconds) {
-        super(String.format("Rate limit exceeded. Please retry after %d seconds.", retryAfterSeconds));
+        super(String.format("🚫Rate limit exceeded. Please retry after %d seconds.", retryAfterSeconds));
         this.retryAfterSeconds = retryAfterSeconds;
         this.remainingTokens = 0;
     }

@@ -109,6 +109,12 @@ public class RateLimitKeyResolver {
 
         if (!isTrustedProxy(remoteAddr)) {
             // 직통 호출(또는 신뢰되지 않은 프록시): XFF 무시
+            String xff = request.getHeader(XFF);
+            if (xff != null && !xff.isBlank()) {
+                // 신뢰되지 않은 프록시인데 XFF 헤더가 있음 → 의심스러운 요청
+                log.warn("X-Forwarded-For header from untrusted proxy. remoteAddr={}, xff={}",
+                        remoteAddr, xff);
+            }
             return remoteAddr;
         }
 
