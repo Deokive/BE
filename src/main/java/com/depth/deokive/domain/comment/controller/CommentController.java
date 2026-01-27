@@ -2,6 +2,8 @@ package com.depth.deokive.domain.comment.controller;
 
 import com.depth.deokive.domain.comment.dto.CommentDto;
 import com.depth.deokive.domain.comment.service.CommentService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -33,6 +35,7 @@ public class CommentController {
                     "일반 댓글을 작성할 때는 parentId=null,  \n" +
                     "대댓글 작성할 때는 Pagination 속의 commentId를 parentId에 기입하면 됩니다.")
     @PostMapping("/comments")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "댓글 작성 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (대댓글 깊이 초과 / 부모 댓글 불일치)",
@@ -56,6 +59,7 @@ public class CommentController {
 
     @Operation(summary = "댓글 조회", description = "특정 게시글의 댓글 목록을 무한 스크롤로 조회.")
     @GetMapping("/posts/{postId}/comments")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글",
@@ -78,6 +82,7 @@ public class CommentController {
 
     @Operation(summary = "댓글 삭제", description = "댓글을 삭제합니다.")
     @DeleteMapping("/comments/{commentId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "삭제 성공"),
             @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (본인 댓글 아님)",

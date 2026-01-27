@@ -2,6 +2,8 @@ package com.depth.deokive.domain.user.controller;
 
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.service.UserService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +28,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/me")
+    @RateLimit(type = RateLimitType.USER, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @Operation(summary = "내 정보 조회", description = "현재 로그인된 사용자의 정보를 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "내 정보 조회 성공"),
@@ -38,6 +41,7 @@ public class UserController {
     }
 
     @PatchMapping("/me")
+    @RateLimit(type = RateLimitType.USER, capacity = 20, refillTokens = 20, refillPeriodSeconds = 3600)
     @Operation(summary = "내 정보 수정", description = "현재 로그인된 사용자의 정보를 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "내 정보 수정 성공"),
@@ -52,6 +56,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "유저 정보 조회", description = "사용자의 정보를 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "유저 정보 조회 성공"),

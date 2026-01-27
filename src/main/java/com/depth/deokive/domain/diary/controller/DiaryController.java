@@ -3,6 +3,8 @@ package com.depth.deokive.domain.diary.controller;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.service.DiaryService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,6 +32,7 @@ public class DiaryController {
     private final DiaryService diaryService;
 
     @PostMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @Operation(summary = "일기 작성", description = "특정 아카이브에 일기를 작성합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "작성 성공"),
@@ -59,6 +62,7 @@ public class DiaryController {
     }
 
     @GetMapping("/{diaryId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @Operation(summary = "일기 상세 조회", description = "일기 상세 내용을 조회합니다. (공개 범위에 따라 접근이 제한될 수 있음)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -82,6 +86,7 @@ public class DiaryController {
     }
 
     @PatchMapping("/{diaryId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "일기 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "수정 성공"),
@@ -106,6 +111,7 @@ public class DiaryController {
     }
 
     @DeleteMapping("/{diaryId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @Operation(summary = "일기 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "일기 삭제 성공"),
@@ -121,6 +127,7 @@ public class DiaryController {
     }
 
     @PatchMapping("/book/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @Operation(summary = "다이어리북 제목 수정", description = "다이어리북(폴더)의 제목을 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "다이어리북 제목 수정 성공"),
@@ -138,6 +145,7 @@ public class DiaryController {
     }
 
     @GetMapping("/book/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "다이어리 목록 조회 (페이지네이션)", description = "아카이브 내의 다이어리 목록을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),

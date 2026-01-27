@@ -3,6 +3,8 @@ package com.depth.deokive.domain.ticket.controller;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.depth.deokive.domain.ticket.service.TicketService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +30,7 @@ public class TicketController {
     private final TicketService ticketService;
 
     @PostMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @Operation(summary = "티켓 생성")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "티켓 생성 성공"),
@@ -45,6 +48,7 @@ public class TicketController {
     }
 
     @GetMapping("/{ticketId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @Operation(summary = "티켓 상세 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "티켓 조회 성공"),
@@ -60,6 +64,7 @@ public class TicketController {
     }
 
     @PatchMapping("/{ticketId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "티켓 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "티켓 수정 성공"),
@@ -77,6 +82,7 @@ public class TicketController {
     }
 
     @DeleteMapping("/{ticketId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "티켓 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "티켓 삭제 성공"),
@@ -92,6 +98,7 @@ public class TicketController {
     }
 
     @PatchMapping("/book/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @Operation(summary = "티켓북 제목 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "티켓북 제목 수정 성공"),
@@ -109,6 +116,7 @@ public class TicketController {
     }
 
     @GetMapping("/book/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "티켓북 페이지네이션 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),

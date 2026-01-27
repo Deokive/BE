@@ -3,6 +3,8 @@ package com.depth.deokive.domain.post.controller;
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.depth.deokive.domain.post.service.RepostService;
 import com.depth.deokive.system.exception.dto.ErrorResponse;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ public class RepostController {
     private final RepostService repostService;
 
     @PostMapping("/tabs/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트 탭 생성", description = "최대 10개까지 생성 가능")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "리포스트 탭 생성 성공"),
@@ -45,6 +48,7 @@ public class RepostController {
     }
 
     @PatchMapping("/tabs/{tabId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트 탭 제목 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트 탭 제목 수정 성공"),
@@ -61,6 +65,7 @@ public class RepostController {
     }
 
     @DeleteMapping("/tabs/{tabId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트 탭 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "리포스트 탭 삭제 성공"),
@@ -76,6 +81,7 @@ public class RepostController {
     }
 
     @PostMapping("/{tabId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트 생성", description = "원본 Post를 내 보관함에 저장합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "리포스트 생성 성공"),
@@ -93,6 +99,7 @@ public class RepostController {
     }
 
     @PatchMapping("/{repostId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트 제목 수정", description = "내가 설정한 리포스트 제목만 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트 제목 수정 성공"),
@@ -108,6 +115,7 @@ public class RepostController {
     }
 
     @DeleteMapping("/{repostId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "리포스트 삭제 성공"),
@@ -123,6 +131,7 @@ public class RepostController {
     }
 
     @GetMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "리포스트 목록 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트 목록 조회 성공"),
@@ -143,6 +152,7 @@ public class RepostController {
     }
 
     @PatchMapping("repost-book/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @Operation(summary = "리포스트북 타이틀 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트북 타이틀 수정 성공"),

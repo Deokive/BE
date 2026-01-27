@@ -3,6 +3,8 @@ package com.depth.deokive.domain.friend.controller;
 
 import com.depth.deokive.domain.friend.dto.FriendDto;
 import com.depth.deokive.domain.friend.service.FriendService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -32,6 +34,7 @@ public class FriendController {
 
     @Operation(summary = "친구 요청 보내기", description = "특정 유저에게 친구 요청을 보냅니다.")
     @PostMapping("/request/{friendId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 전송 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신에게 요청 또는 이미 요청을 보냄)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -48,6 +51,7 @@ public class FriendController {
 
     @Operation(summary = "친구 요청 수락하기", description = "특정 유저의 친구 요청을 수락합니다.")
     @PostMapping("/{friendId}/accept")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 수락 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 등)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -64,6 +68,7 @@ public class FriendController {
 
     @Operation(summary = "친구 요청 거절하기", description = "특정 유저의 친구 요청을 거절합니다.")
     @PostMapping("/{friendId}/reject")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 거절 성공"),
             @ApiResponse(responseCode = "404", description = "받은 친구 요청이 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -79,6 +84,7 @@ public class FriendController {
 
     @Operation(summary = "친구 요청 취소하기", description = "특정 유저에게 보낸 친구 요청을 취소합니다.")
     @DeleteMapping("/request/{friendId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 취소 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (대기 상태가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -94,6 +100,7 @@ public class FriendController {
 
     @Operation(summary = "친구 끊기", description = "특정 유저와의 친구 관계를 끊습니다.")
     @DeleteMapping("/{friendId}/cancel")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 끊기 성공"),
             @ApiResponse(responseCode = "404", description = "친구 관계가 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -108,6 +115,7 @@ public class FriendController {
 
     @Operation(summary = "친구 끊기 취소", description = "특정 유저와의 친구 끊기를 취소합니다.")
     @PostMapping("/{friendId}/recover")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 복구 성공"),
             @ApiResponse(responseCode = "400", description = "복구할 수 없는 상태입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -123,6 +131,7 @@ public class FriendController {
 
     @Operation(summary = "내 친구 목록 조회", description = "현재 사용자와 친구(ACCEPTED)인 목록을 조회합니다.")
     @GetMapping
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @ApiResponse(responseCode = "200", description = "조회 성공")
     public ResponseEntity<FriendDto.FriendListResponse<FriendDto.Response>> getMyFriends(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -144,6 +153,7 @@ public class FriendController {
 
     @Operation(summary = "친구 요청 목록 조회", description = "보낸/받은 요청 목록을 조회합니다.")
     @GetMapping("/requests")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 타입 (type 파라미터 오류)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -170,6 +180,7 @@ public class FriendController {
 
     @Operation(summary = "특정 유저와 관계 조회", description = "특정 유저와의 친구 상태(PENDING, ACCEPTED, REJECTED, CANCELED)를 조회합니다. 관계가 없으면 404를 반환합니다.")
     @GetMapping("/{friendId}/status")
+    @RateLimit(type = RateLimitType.USER, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "상태 조회 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 조회)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),

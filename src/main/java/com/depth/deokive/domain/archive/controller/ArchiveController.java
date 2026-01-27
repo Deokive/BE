@@ -3,6 +3,8 @@ package com.depth.deokive.domain.archive.controller;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.service.ArchiveService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -31,6 +33,7 @@ public class ArchiveController {
     private final ArchiveService archiveService;
 
     @PostMapping
+    @RateLimit(type = RateLimitType.USER, capacity = 20, refillTokens = 20, refillPeriodSeconds = 3600)
     @Operation(summary = "아카이브 생성", description = "새로운 아카이브를 생성하며, 내부의 하위 도메인 북(다이어리, 갤러리 등)을 자동으로 생성합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "생성 성공"),
@@ -54,6 +57,7 @@ public class ArchiveController {
     }
 
     @GetMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @Operation(summary = "아카이브 상세 조회", description = "아카이브의 기본 정보(제목, 배너, 카운트 등)를 조회합니다. (공개 범위 권한 체크 포함)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -77,6 +81,7 @@ public class ArchiveController {
     }
 
     @PatchMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @Operation(summary = "아카이브 정보 수정", description = "제목, 공개 범위, 배너 이미지를 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "수정 성공"),
@@ -100,6 +105,7 @@ public class ArchiveController {
     }
 
     @DeleteMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 10, refillTokens = 10, refillPeriodSeconds = 3600)
     @Operation(summary = "아카이브 삭제", description = "아카이브와 내부에 포함된 모든 데이터(이벤트, 일기, 티켓 등)를 영구 삭제합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "삭제 성공 (No Content)"),
@@ -128,6 +134,7 @@ public class ArchiveController {
      * - 특징: 로그인 여부와 관계없이 PUBLIC 컨텐츠만 조회됨
      */
     @GetMapping("/feed")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "전역 아카이브 피드 조회", description = "공개 아카이브를 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -149,6 +156,7 @@ public class ArchiveController {
      * - 특징: PathVariable로 대상 유저를 지정하며, 로그인한 유저(UserPrincipal)와의 관계에 따라 공개 범위가 자동 필터링됨.
      */
     @GetMapping("/users/{userId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "유저별 아카이브 목록 조회", description = "특정 유저의 아카이브 목록을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -167,6 +175,7 @@ public class ArchiveController {
     }
 
     @PostMapping("/{archiveId}/like")
+    @RateLimit(type = RateLimitType.USER, capacity = 100, refillTokens = 100, refillPeriodSeconds = 60)
     @Operation(summary = "아카이브 좋아요 토글", description = "아카이브 좋아요를 처리합니다.")
     public ResponseEntity<ArchiveDto.LikeResponse> toggleLike(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,

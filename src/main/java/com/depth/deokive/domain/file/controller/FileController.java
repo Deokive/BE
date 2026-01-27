@@ -3,6 +3,8 @@ package com.depth.deokive.domain.file.controller;
 import com.depth.deokive.domain.file.dto.FileDto;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.service.FileService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -28,6 +30,7 @@ public class FileController {
      * 프론트엔드에서 파일 메타데이터를 보내면, S3 Upload ID와 Presigned URL들을 발급합니다.
      */
     @PostMapping("/multipart/initiate")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600, failClosed = true)
     @Operation(summary = "멀티파트 업로드 초기화", description = "파일 크기에 따른 Part 계산 및 Presigned URL 발급")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "초기화 성공 (Upload ID 발급)"),
@@ -45,6 +48,7 @@ public class FileController {
      * S3에 모든 Part 업로드가 끝난 후 호출. 서버가 S3에 병합 요청을 보내고 DB에 파일 정보를 저장합니다.
      */
     @PostMapping("/multipart/complete")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600, failClosed = true)
     @Operation(summary = "멀티파트 업로드 완료", description = "S3 병합 요청 및 DB 메타데이터 저장")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "업로드 완료 및 메타데이터 저장 성공"),
@@ -69,6 +73,7 @@ public class FileController {
      * 업로드 중 사용자가 취소하거나 실패했을 때, S3에 남아있는 조각(Parts)들을 정리합니다.
      */
     @PostMapping("/multipart/abort")
+    @RateLimit(type = RateLimitType.USER, capacity = 100, refillTokens = 100, refillPeriodSeconds = 3600)
     @Operation(summary = "멀티파트 업로드 취소", description = "업로드 중단 시 S3 잔여 조각 데이터 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "업로드 취소 성공"),
