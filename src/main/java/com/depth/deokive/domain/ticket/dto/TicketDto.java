@@ -1,6 +1,5 @@
 package com.depth.deokive.domain.ticket.dto;
 
-import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.util.FileUrlUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.domain.file.dto.FileDto;
@@ -14,13 +13,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 public class TicketDto {
 
@@ -31,7 +28,6 @@ public class TicketDto {
         @Schema(description = "공연명", example = "BTS 월드투어 2024")
         private String title;
 
-        @NotNull(message = "날짜는 필수입니다.")
         @Schema(description = "공연 날짜 및 시간", example = "KST DateTime")
         private LocalDateTime date;
 
@@ -46,9 +42,9 @@ public class TicketDto {
         @Schema(description = "출연진 정보", example = "BTS")
         private String casting;
 
-        @Min(0) @Max(5)
-        @Schema(description = "평점 (0~5)", example = "5")
-        private Integer score;
+        @DecimalMin(value = "0.0", inclusive = true) @DecimalMax(value = "5.0", inclusive = true)
+        @Schema(description = "평점 (0~5, 실수 가능)", example = "3.5")
+        private Double score;
 
         @Size(max = 100)
         @Schema(description = "후기", example = "정말 최고의 공연이었습니다!")
@@ -93,9 +89,9 @@ public class TicketDto {
         @Schema(description = "변경할 출연진 정보")
         private String casting;
 
-        @Min(0) @Max(5)
-        @Schema(description = "변경할 평점")
-        private Integer score;
+        @DecimalMin(value = "0.0", inclusive = true) @DecimalMax(value = "5.0", inclusive = true)
+        @Schema(description = "변경할 평점 (0~5, 실수 가능)")
+        private Double score;
 
         @Size(max = 100)
         @Schema(description = "변경할 후기")
@@ -129,8 +125,8 @@ public class TicketDto {
         @Schema(description = "출연진 정보", example = "BTS")
         private String casting;
         
-        @Schema(description = "평점 (0~5)", example = "5")
-        private Integer score;
+        @Schema(description = "평점 (0~5, 실수 가능)", example = "3.5")
+        private Double score;
         
         @Schema(description = "후기", example = "정말 최고의 공연이었습니다!")
         private String review;
@@ -217,11 +213,17 @@ public class TicketDto {
         @Schema(description = "수정 시간")
         private LocalDateTime lastModifiedAt;
 
+        @Schema(description = "평점 (0~5, 실수 가능)", example = "3.5")
+        private Double score;
+
+        @Schema(description = "후기", example = "정말 최고의 공연이었습니다!")
+        private String review;
+
         @QueryProjection
         public TicketPageResponse(Long id, String title, LocalDateTime date,
                                   String seat, String location, String casting,
                                   LocalDateTime createdAt, LocalDateTime lastModifiedAt,
-                                  String originalKey) {
+                                  String originalKey, Double score, String review) {
             this.id = id;
             this.title = title;
             this.date = date;
@@ -231,6 +233,8 @@ public class TicketDto {
             this.createdAt = createdAt;
             this.lastModifiedAt = lastModifiedAt;
             this.thumbnail = FileUrlUtils.buildCdnUrl(ThumbnailUtils.getMediumThumbnailKey(originalKey));
+            this.score = score;
+            this.review = review;
         }
 
         private String truncateCasting(String original) {

@@ -50,7 +50,9 @@ public class TicketQueryRepository {
                             ticket.casting,
                             ticket.createdAt,
                             ticket.lastModifiedAt,
-                            ticket.originalKey
+                            ticket.originalKey,
+                            ticket.score,
+                            ticket.review
                     ))
                     .from(ticket)
                     .where(ticket.id.in(ids))
