@@ -178,3 +178,20 @@ scheduler:
   archive-like-cron: "40 * * * * *"
 
   view-cooldown-minutes: 10
+
+ratelimit:
+  redis:
+    timeout-fail-open: 200ms     # limiter 장애 시 빠르게 통과
+    timeout-fail-closed: 500ms   # auth는 차단하되 짧게 실패
+  expiration:
+    refill-to-max-jitter: 10s
+  failure:
+    mode: FAIL_OPEN             # 기본은 FAIL_OPEN, auth는 애노테이션 failClosed=true로 닫는다
+  key:
+    namespace: ratelimit
+    user-prefix: user
+    ip-prefix: ip
+  logging:
+    backend-error-min-interval-ms: 1000
+  proxy:
+    trusted-cidrs: ${TRUSTED_CIDRS} # ex. 172.18.0.0/20,172.39.16.0/20, ...
