@@ -3,6 +3,8 @@ package com.depth.deokive.domain.gallery.controller;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.depth.deokive.domain.gallery.service.GalleryService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +30,7 @@ public class GalleryController {
     private final GalleryService galleryService;
 
     @GetMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "갤러리 목록 조회", description = "특정 아카이브의 갤러리 이미지들을 페이징하여 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "갤러리 목록 조회 성공"),
@@ -44,6 +47,7 @@ public class GalleryController {
     }
 
     @PostMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @Operation(summary = "갤러리 이미지 등록")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "갤러리 이미지 등록 성공"),
@@ -61,6 +65,7 @@ public class GalleryController {
     }
 
     @PatchMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "갤러리북 제목 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "갤러리북 제목 수정 성공"),
@@ -78,6 +83,7 @@ public class GalleryController {
     }
 
     @DeleteMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "갤러리 이미지 삭제", description = "선택한 갤러리 이미지들을 삭제합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "갤러리 이미지 삭제 성공"),

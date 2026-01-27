@@ -2,7 +2,7 @@ package com.depth.deokive.domain.comment.service;
 
 import com.depth.deokive.domain.comment.dto.CommentDto;
 import com.depth.deokive.domain.comment.entity.Comment;
-import com.depth.deokive.domain.comment.repository.CommentCountRepository;
+import com.depth.deokive.domain.comment.event.CommentCountEvent;
 import com.depth.deokive.domain.comment.repository.CommentQueryRepository;
 import com.depth.deokive.domain.comment.repository.CommentRepository;
 import com.depth.deokive.domain.post.entity.Post;
@@ -13,6 +13,7 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -30,7 +31,8 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final CommentQueryRepository commentQueryRepository;
-    private final CommentCountRepository commentCountRepository;
+    private final CommentCountRedisService commentCountRedisService;
+    private final ApplicationEventPublisher eventPublisher;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
 
@@ -69,15 +71,15 @@ public class CommentService {
 
         commentRepository.save(comment);
 
-        // 댓글 수 증가
-        commentCountRepository.increaseCount(post.getId());
+        // 댓글 수 증가 (After Commit 패턴)
+        eventPublisher.publishEvent(CommentCountEvent.of(post.getId(), 1L));
     }
 
     /**
      * 댓글 조회
      */
-    @Transactional
-    public Slice<CommentDto.Response> getComments(Long postId, Long lastCommentId, Pageable pageable, Long currentUserId) {
+    @Transactional(readOnly = true)
+    public CommentDto.SliceResponse getComments(Long postId, Long lastCommentId, Pageable pageable, Long currentUserId) {
         if (!postRepository.existsById(postId)) {
             throw new RestException(ErrorCode.POST_NOT_FOUND);
         }
@@ -88,8 +90,13 @@ public class CommentService {
         // SEQ 2. 조회된 Entity 리스트를 계층형 DTO 구조로 변환
         List<CommentDto.Response> responseList = convertToHierarchy(commentSlice.getContent(), currentUserId);
 
-        // 3. 변환된 DTO 리스트와 Slice 정보를 합쳐서 반환
-        return new SliceImpl<>(responseList, pageable, commentSlice.hasNext());
+        // SEQ 3. 변환된 DTO 리스트와 Slice 정보를 합쳐서 반환 (Refactoring 이전에는 SliceImpl 자체를 반환)
+        Slice<CommentDto.Response> responseSlice = new SliceImpl<>(responseList, pageable, commentSlice.hasNext());
+
+        // SEQ 4. 전체 댓글 수 조회 (Redis Cache-Aside)
+        long totalCount = commentCountRedisService.getCommentCount(postId);
+
+        return CommentDto.SliceResponse.of(responseSlice, totalCount); // Wrapping
     }
 
     /**
@@ -108,11 +115,14 @@ public class CommentService {
         // SEQ 2. 댓글 수 감소
         long deletedCount = 1 + comment.getChildren().size();
 
-        // SEQ 3. 댓글 삭제
+        // SEQ 3. 게시글 ID 미리 저장 (delete 후 엔티티 접근 불가)
+        Long postId = comment.getPost().getId();
+
+        // SEQ 4. 댓글 삭제
         commentRepository.delete(comment);
 
-        // SER 4. 게시글 댓글 수 감소
-        commentCountRepository.decreaseCount(comment.getPost().getId(), deletedCount);
+        // SEQ 5. 게시글 댓글 수 감소 (After Commit 패턴)
+        eventPublisher.publishEvent(CommentCountEvent.of(postId, -deletedCount));
     }
 
     // --- Helper Methods ---

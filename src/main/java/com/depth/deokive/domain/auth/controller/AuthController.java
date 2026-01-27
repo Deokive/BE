@@ -4,6 +4,8 @@ import com.depth.deokive.domain.auth.dto.AuthDto;
 import com.depth.deokive.domain.auth.service.AuthService;
 import com.depth.deokive.domain.auth.service.EmailService;
 import com.depth.deokive.domain.user.dto.UserDto;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.QueryParamValidator;
@@ -39,6 +41,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/register")
+    @RateLimit(type = RateLimitType.IP, capacity = 5, refillTokens = 5, refillPeriodSeconds = 3600, failClosed = true)
+    @RateLimit(type = RateLimitType.EMAIL, capacity = 3, refillTokens = 3, refillPeriodSeconds = 3600, failClosed = true)
     @Operation(summary = "회원가입", description = "새로운 사용자를 등록합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "회원가입 성공"),
@@ -64,6 +68,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/login")
+    @RateLimit(type = RateLimitType.IP, capacity = 10, refillTokens = 10, refillPeriodSeconds = 600, failClosed = true)
+    @RateLimit(type = RateLimitType.EMAIL, capacity = 5, refillTokens = 5, refillPeriodSeconds = 600, failClosed = true)
     @Operation(summary = "로그인", description = "사용자 아이디와 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "로그인 성공 (헤더/쿠키에 토큰 세팅됨)"),
@@ -84,6 +90,7 @@ public class AuthController {
 
     // NO AUTH
     @GetMapping("/email-exist")
+    @RateLimit(type = RateLimitType.IP, capacity = 30, refillTokens = 30, refillPeriodSeconds = 60)
     @Operation(summary = "이메일 중복 확인", description = "입력된 이메일의 사용 가능 여부를 확인합니다.")
     @ApiResponse(responseCode = "200", description = "이메일 확인 성공")
     public AuthDto.ExistResponse checkEmail(@RequestParam("email") String email)
@@ -95,6 +102,7 @@ public class AuthController {
     // NO AUTH
     @Hidden
     @GetMapping("/username-exist")
+    @RateLimit(type = RateLimitType.IP, capacity = 30, refillTokens = 30, refillPeriodSeconds = 60)
     @Operation(summary = "사용자 아이디 중복 확인", description = "입력된 사용자 아이디의 사용 가능 여부를 확인합니다.")
     @ApiResponse(responseCode = "200", description = "사용자 아이디 확인 성공")
     public AuthDto.ExistResponse checkUsername(@RequestParam("username") String username) {
@@ -103,6 +111,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @RateLimit(type = RateLimitType.USER, capacity = 10, refillTokens = 10, refillPeriodSeconds = 60)
     @Operation(summary = "로그아웃", description = "로그아웃 처리합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "로그아웃 성공", content = @Content(mediaType = "text/plain", examples = @ExampleObject(value = "Logout Successful"))),
@@ -115,6 +124,7 @@ public class AuthController {
     }
 
     @DeleteMapping("/delete")
+    @RateLimit(type = RateLimitType.USER, capacity = 3, refillTokens = 3, refillPeriodSeconds = 3600, failClosed = true)
     @Operation(summary = "회원 탈퇴", description = "현재 로그인된 사용자의 계정을 삭제합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "회원 탈퇴 성공", content = @Content(mediaType = "text/plain", examples = @ExampleObject(value = "Soft Delete User Successful"))),
@@ -132,6 +142,7 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/refresh")
+    @RateLimit(type = RateLimitType.IP, capacity = 20, refillTokens = 20, refillPeriodSeconds = 60)
     @Operation(summary = "리프레시 토큰", description = "리프레시 토큰으로 새로운 액세스 토큰과 리프레시 토큰을 발급받습니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리프레시 토큰 성공"),
@@ -149,6 +160,7 @@ public class AuthController {
     // NO AUTH
     @Hidden
     @PostMapping("/is-blacklisted-rtk")
+    @RateLimit(type = RateLimitType.IP, capacity = 30, refillTokens = 30, refillPeriodSeconds = 60)
     public boolean isRtkBlacklisted(@RequestParam("refreshToken") String refreshToken) {
         return authService.isRtkBlacklisted(refreshToken);
     }
@@ -156,11 +168,13 @@ public class AuthController {
     // NO AUTH
     @Hidden
     @PostMapping("/is-blacklisted-atk")
+    @RateLimit(type = RateLimitType.IP, capacity = 30, refillTokens = 30, refillPeriodSeconds = 60)
     public boolean isAtkBlacklisted(@RequestParam("accessToken") String accessToken) {
         return authService.isAtkBlacklisted(accessToken);
     }
 
     @PostMapping("/is-token-active")
+    @RateLimit(type = RateLimitType.IP, capacity = 30, refillTokens = 30, refillPeriodSeconds = 60)
     @Operation(summary = "TokenPair 유효성 검증", description = "ATK와 RTK의 유효성을 검증합니다.")
     @ApiResponse(responseCode = "200", description = "TokenPair 유효성 검증")
     public boolean isTokenActive(HttpServletRequest request) {
@@ -169,6 +183,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/reset-pw")
+    @RateLimit(type = RateLimitType.IP, capacity = 5, refillTokens = 5, refillPeriodSeconds = 3600, failClosed = true)
+    @RateLimit(type = RateLimitType.EMAIL, capacity = 3, refillTokens = 3, refillPeriodSeconds = 3600, failClosed = true)
     @Operation(summary = "비밀번호 재설정", description = "비밀번호를 재설정 합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "비밀번호 재설정 성공"),
@@ -183,6 +199,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/email/send")
+    @RateLimit(type = RateLimitType.IP, capacity = 10, refillTokens = 10, refillPeriodSeconds = 3600, failClosed = true)
+    @RateLimit(type = RateLimitType.EMAIL, capacity = 5, refillTokens = 5, refillPeriodSeconds = 3600, failClosed = true)
     @Operation(summary = "이메일 전송", description = "이메일을 전송합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "202", description = "이메일 전송 요청 접수됨"),
@@ -196,6 +214,8 @@ public class AuthController {
 
     // NO AUTH
     @PostMapping("/email/verify")
+    @RateLimit(type = RateLimitType.IP, capacity = 20, refillTokens = 20, refillPeriodSeconds = 600, failClosed = true)
+    @RateLimit(type = RateLimitType.EMAIL, capacity = 10, refillTokens = 10, refillPeriodSeconds = 600, failClosed = true)
     @Operation(summary = "이메일 검증", description = "이메일을 검증합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "이메일 검증 성공"),
@@ -208,6 +228,7 @@ public class AuthController {
     }
 
     @GetMapping("/social/me")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "소셜 유저 및 토큰 만료기간 정보 조회", description = "소셜 로그인된 사용자의 정보 및 토큰 만료기간을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "소셜 유저 및 토큰 만료기간 정보 조회 성공"),

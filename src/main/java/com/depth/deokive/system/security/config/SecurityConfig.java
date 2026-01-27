@@ -6,7 +6,7 @@ import com.depth.deokive.domain.oauth2.service.CustomOAuth2UserService;
 import com.depth.deokive.system.exception.dto.ErrorResponse;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.security.jwt.config.JwtAuthenticationFilter;
-import com.depth.deokive.system.security.util.OriginUtils;
+import com.depth.deokive.system.security.util.PropertiesParserUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -77,7 +77,8 @@ public class SecurityConfig {
                                 "/api/v1/tickets/book/{archiveId}",
                                 "/api/v1/repost/{archiveId}",
                                 "/api/v1/diary/book/{archiveId}",
-                                "/api/v1/posts/{postId}"
+                                "/api/v1/posts/{postId}",
+                                "/api/v1/posts/{postId}/comments"
                                 ).permitAll()
                         // .requestMatchers(requestMatcherHolder.getRequestMatchersForVisibilityByMinRole(null)).permitAll()
                         // 2. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
@@ -111,7 +112,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        List<String> origins = OriginUtils.originListParser(allowedOrigins);
+        List<String> origins = PropertiesParserUtils.propertiesParser(allowedOrigins);
 
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

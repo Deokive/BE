@@ -7,6 +7,8 @@ import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
+import com.depth.deokive.domain.comment.repository.CommentRepository;
+import com.depth.deokive.domain.comment.service.CommentCountRedisService;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.entity.enums.MediaRole;
 import com.depth.deokive.domain.file.service.FileService;
@@ -46,6 +48,8 @@ public class PostService {
     private final RedisViewService redisViewService;
     private final PostStatsRepository postStatsRepository;
     private final LikeRedisService likeRedisService;
+    private final CommentCountRedisService commentCountRedisService;
+    private final CommentRepository commentRepository;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -164,14 +168,20 @@ public class PostService {
         // SEQ 4. 좋아요 삭제
         postLikeRepository.deleteByPostId(postId);
 
-        // SEQ 5. 통계 테이블 삭제
-        postStatsRepository.deleteById(postId);     // 통계 테이블 삭제
+        // SEQ 5. 통계 테이블 삭제 (@MapsId 사용으로 인해 deleteById 대신 커스텀 쿼리 사용)
+        postStatsRepository.deleteByPostId(postId);
 
-        // SEQ 6. 게시글 삭제
+        // SEQ 6. 댓글 삭제 (Post FK 제약조건으로 인해 Post 삭제 전 필수)
+        // 대댓글(자식) 먼저 삭제 → 부모 댓글 삭제 (FK 제약조건 순서)
+        commentRepository.deleteRepliesByPostId(postId);
+        commentRepository.deleteParentsByPostId(postId);
+
+        // SEQ 7. 게시글 삭제
         postRepository.delete(post);
 
-        // SEQ 7. 캐시 삭제
+        // SEQ 8. 캐시 삭제 (좋아요 + 댓글 수)
         likeRedisService.deleteLikeData(ViewLikeDomain.POST, postId);
+        commentCountRedisService.deleteCache(postId);
     }
 
     @ExecutionTime

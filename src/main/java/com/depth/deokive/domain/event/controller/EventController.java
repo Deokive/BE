@@ -2,6 +2,8 @@ package com.depth.deokive.domain.event.controller;
 
 import com.depth.deokive.domain.event.dto.EventDto;
 import com.depth.deokive.domain.event.service.EventService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,6 +33,7 @@ public class EventController {
     private final EventService eventService;
 
     @PostMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @Operation(summary = "일정 생성", description = "특정 아카이브(캘린더)에 일정을 생성합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "일정 생성 성공"),
@@ -56,6 +59,7 @@ public class EventController {
     }
 
     @GetMapping("/{eventId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @Operation(summary = "일정 상세 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "일정 조회 성공"),
@@ -70,6 +74,7 @@ public class EventController {
     }
 
     @PatchMapping("/{eventId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "일정 수정", description = "일정 정보를 수정합니다. (스포츠 토글 변경 시 데이터 처리 포함)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "일정 수정 성공"),
@@ -87,6 +92,7 @@ public class EventController {
     }
 
     @DeleteMapping("/{eventId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "일정 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "일정 삭제 성공"),
@@ -102,6 +108,7 @@ public class EventController {
     }
 
     @GetMapping("/monthly/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "월별 일정 조회", description = "특정 연/월의 일정을 모두 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "월별 일정 조회 성공"),

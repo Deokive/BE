@@ -2,6 +2,8 @@ package com.depth.deokive.domain.sticker.controller;
 
 import com.depth.deokive.domain.sticker.dto.StickerDto;
 import com.depth.deokive.domain.sticker.service.StickerService;
+import com.depth.deokive.system.ratelimit.annotation.RateLimit;
+import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ public class StickerController {
     private final StickerService stickerService;
 
     @PostMapping("/{archiveId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @Operation(summary = "스티커 등록", description = "해당 날짜에 스티커를 등록합니다. (날짜당 1개 제한)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "등록 성공"),
@@ -47,6 +50,7 @@ public class StickerController {
     }
 
     @PatchMapping("/{stickerId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "스티커 수정", description = "스티커의 타입이나 날짜를 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "스티커 수정 성공"),
@@ -64,6 +68,7 @@ public class StickerController {
     }
 
     @DeleteMapping("/{stickerId}")
+    @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @Operation(summary = "스티커 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "삭제 성공"),
@@ -79,6 +84,7 @@ public class StickerController {
     }
 
     @GetMapping("/monthly/{archiveId}")
+    @RateLimit(type = RateLimitType.AUTO, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @Operation(summary = "월별 스티커 조회", description = "특정 연/월의 스티커 목록을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),

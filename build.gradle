@@ -91,6 +91,15 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
+    // Rate Limiter (Bucket4j)
+    implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
+    implementation("com.bucket4j:bucket4j_jdk17-redis-common:8.14.0")
+    implementation("com.bucket4j:bucket4j_jdk17-lettuce:8.14.0")
+
+    // Metrics (Micrometer + Prometheus)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     //testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
