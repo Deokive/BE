@@ -37,7 +37,7 @@ public class Ticket extends TimeBaseEntity {
 
     private String casting;
 
-    private Integer score; // 티켓 관련 평점
+    private Double score; // 티켓 관련 평점
 
     @Column(length = 100)
     private String review; // 티켓 관련 리뷰
