@@ -106,9 +106,10 @@ public class PostDto {
         @Schema(description = "좋아요 수", example = "25")
         private Long likeCount;
 
+        @Builder.Default
         @JsonProperty("isLiked")
         @Schema(description = "내가 좋아요 눌렀는지 여부", example = "true")
-        private boolean isLiked;
+        private Boolean isLiked = false;
 
         @Schema(description = "핫 스코어", example = "50.5")
         private Double hotScore;
@@ -312,9 +313,10 @@ public class PostDto {
         @Schema(description = "게시글 ID")
         private Long postId;
 
+        @Builder.Default
         @JsonProperty("isLiked")
         @Schema(description = "토글 후 좋아요 상태 (true: 좋아요 됨, false: 취소 됨)")
-        private boolean isLiked;
+        private Boolean isLiked = false;
 
         @Schema(description = "실시간 좋아요 개수")
         private Long likeCount;

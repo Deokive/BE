@@ -75,9 +75,10 @@ public class CommentDto {
         @Schema(description = "작성 일시")
         private LocalDateTime createdAt;
 
+        @Builder.Default
         @JsonProperty("isOwner")
         @Schema(description = "본인 작성 여부 (true면 삭제 버튼 노출)", example = "true")
-        private boolean isOwner;
+        private Boolean isOwner = false;
 
         @Schema(description = "대댓글 리스트")
         private List<Response> children;

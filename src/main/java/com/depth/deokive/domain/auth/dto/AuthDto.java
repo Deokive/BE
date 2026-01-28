@@ -108,9 +108,10 @@ public class AuthDto {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @Schema(description = "중복 확인 응답 DTO")
     public static class ExistResponse {
+        @Builder.Default
         @JsonProperty("isExist")
         @Schema(description = "중복 여부 (true: 이미 존재함/사용불가, false: 사용가능)", example = "false")
-        private boolean exist;
+        private Boolean exist = false;
 
         @Schema(description = "확인 대상 값 (이메일/닉네임/아이디)", example = "user123@example.com, nickname123, user_id123")
         private String value;
