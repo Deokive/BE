@@ -145,10 +145,11 @@ public class EventDto {
         
         @Schema(description = "이벤트 색상 코드", example = "#FF5733")
         private String color;
-        
+
+        @Builder.Default
         @JsonProperty("isSportType")
         @Schema(description = "스포츠 타입 여부", example = "false")
-        private boolean isSportType;
+        private Boolean isSportType = false;
 
         @Schema(description = "스포츠 경기 정보")
         private SportResponse sportInfo;
