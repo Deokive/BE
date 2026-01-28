@@ -8,10 +8,12 @@ import com.depth.deokive.system.ratelimit.annotation.RateLimitType;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +21,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.ErrorResponse;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -37,9 +39,18 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 50, refillTokens = 50, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 전송 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신에게 요청 또는 이미 요청을 보냄)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 유저입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "충돌 (이미 친구 관계이거나, 상대방이 이미 나에게 요청을 보냄)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신에게 요청 또는 이미 요청을 보냄)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"FRIEND_SELF_BAD_REQUEST\", \"message\": \"자기 자신에게 친구 요청을 보낼 수 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 유저입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"USER_NOT_FOUND\", \"message\": \"존재하지 않는 사용자입니다.\"}"))),
+            @ApiResponse(responseCode = "409", description = "충돌 (이미 친구 관계이거나, 상대방이 이미 나에게 요청을 보냄)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"CONFLICT\", \"error\": \"FRIEND_ALREADY_EXISTS\", \"message\": \"이미 친구 관계입니다.\"}")))
     })
     public ResponseEntity<Void> sendFriendRequest(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -54,9 +65,18 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 수락 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 등)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "받은 친구 요청이 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "이미 친구 관계입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 등)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"FRIEND_SELF_BAD_REQUEST\", \"message\": \"자기 자신에게 친구 요청을 보낼 수 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "받은 친구 요청이 존재하지 않습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FRIEND_REQUEST_NOT_FOUND\", \"message\": \"받은 친구 요청이 존재하지 않습니다.\"}"))),
+            @ApiResponse(responseCode = "409", description = "이미 친구 관계입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"CONFLICT\", \"error\": \"FRIEND_ALREADY_EXISTS\", \"message\": \"이미 친구 관계입니다.\"}")))
     })
     public ResponseEntity<Void> acceptFriendRequest(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -71,8 +91,14 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 거절 성공"),
-            @ApiResponse(responseCode = "404", description = "받은 친구 요청이 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "이미 친구 관계입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "404", description = "받은 친구 요청이 존재하지 않습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FRIEND_REQUEST_NOT_FOUND\", \"message\": \"받은 친구 요청이 존재하지 않습니다.\"}"))),
+            @ApiResponse(responseCode = "409", description = "이미 친구 관계입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"CONFLICT\", \"error\": \"FRIEND_ALREADY_EXISTS\", \"message\": \"이미 친구 관계입니다.\"}")))
     })
     public ResponseEntity<Void> rejectFriendRequest(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -87,8 +113,14 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 요청 취소 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (대기 상태가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "보낸 친구 요청이 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (대기 상태가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"FRIEND_REQUEST_NOT_PENDING\", \"message\": \"대기 상태의 친구 요청이 아닙니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "보낸 친구 요청이 존재하지 않습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FRIEND_SEND_REQUEST_NOT_FOUND\", \"message\": \"보낸 친구 요청이 존재하지 않습니다.\"}")))
     })
     public ResponseEntity<Void> friendRequest(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -103,7 +135,10 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 끊기 성공"),
-            @ApiResponse(responseCode = "404", description = "친구 관계가 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "404", description = "친구 관계가 존재하지 않습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FRIEND_NOT_FOUND\", \"message\": \"존재하지 않는 친구입니다.\"}")))
     })
     public ResponseEntity<Void> cancelFriendRequest(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -118,8 +153,14 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 30, refillTokens = 30, refillPeriodSeconds = 3600)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "친구 복구 성공"),
-            @ApiResponse(responseCode = "400", description = "복구할 수 없는 상태입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "끊은 친구 내역이 존재하지 않습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "복구할 수 없는 상태입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"FRIEND_CANNOT_RECOVER\", \"message\": \"친구 관계를 복구할 수 없는 상태입니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "끊은 친구 내역이 존재하지 않습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FRIEND_CANCELED_NOT_FOUND\", \"message\": \"끊은 친구가 존재하지 않습니다.\"}")))
     })
     public ResponseEntity<Void> recoverFriendRequest(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -156,7 +197,10 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 60, refillTokens = 60, refillPeriodSeconds = 60)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 타입 (type 파라미터 오류)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 타입 (type 파라미터 오류)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"FRIEND_INVALID_TYPE\", \"message\": \"유효하지 않은 친구 요청 타입입니다.\"}")))
     })
     public ResponseEntity<FriendDto.FriendListResponse<FriendDto.RequestResponse>> getFriendRequests(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -183,8 +227,14 @@ public class FriendController {
     @RateLimit(type = RateLimitType.USER, capacity = 120, refillTokens = 120, refillPeriodSeconds = 60)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "상태 조회 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 조회)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "관계 없음 (친구 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 조회)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"FRIEND_SELF_BAD_REQUEST\", \"message\": \"자기 자신에게 친구 요청을 보낼 수 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "관계 없음 (친구 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FRIEND_NOT_FOUND\", \"message\": \"존재하지 않는 친구입니다.\"}")))
     })
     public ResponseEntity<FriendDto.FriendStatusResponse> getFriendStatus(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
