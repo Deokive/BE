@@ -26,8 +26,8 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Table(name = "archive", indexes = {
         // 1. 마이/친구 아카이브용 (유저별 + 생성/수정일 정렬)
-        @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC, id DESC"),
-        @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC, id DESC"),
+        @Index(name = "idx_archive_user_created", columnList = "user_id, created_at DESC, id DESC, visibility"),
+        @Index(name = "idx_archive_user_modified", columnList = "user_id, last_modified_at DESC, id DESC, visibility"),
 })
 public class Archive extends UserBaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
