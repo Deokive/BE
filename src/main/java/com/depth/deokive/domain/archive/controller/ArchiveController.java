@@ -21,7 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.ErrorResponse;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

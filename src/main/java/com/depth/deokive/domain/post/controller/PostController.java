@@ -9,17 +9,19 @@ import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.ErrorResponse;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -35,9 +37,18 @@ public class PostController {
     @Operation(summary = "게시글 생성", description = "파일 선업로드 후 받은 fileId들을 포함하여 게시글을 생성합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "게시글 생성 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "파일 접근 권한 없음 (본인이 업로드한 파일이 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 유저 또는 파일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"GLOBAL_INVALID_PARAMETER\", \"message\": \"유효성 검사 실패: 필수 필드가 누락되었습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "파일 접근 권한 없음 (본인이 업로드한 파일이 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"FILE_ACCESS_DENIED\", \"message\": \"파일에 접근할 수 있는 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 유저 또는 파일입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"FILE_NOT_FOUND\", \"message\": \"파일을 찾을 수 없습니다.\"}")))
     })
     public ResponseEntity<PostDto.Response> createPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -52,7 +63,10 @@ public class PostController {
     @Operation(summary = "게시글 상세 조회", description = "게시글 ID로 상세 정보를 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "게시글 조회 성공"),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"POST_NOT_FOUND\", \"message\": \"존재하지 않는 게시글입니다.\"}")))
     })
     public ResponseEntity<PostDto.Response> getPost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -68,9 +82,18 @@ public class PostController {
     @Operation(summary = "게시글 수정", description = "게시글 제목, 내용, 카테고리 및 첨부파일 목록을 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "게시글 수정 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (작성자가 아님) 또는 파일 접근 권한 없음", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글 또는 파일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검사 실패)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"GLOBAL_INVALID_PARAMETER\", \"message\": \"유효성 검사 실패: 필수 필드가 누락되었습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (작성자가 아님) 또는 파일 접근 권한 없음",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글 또는 파일입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"POST_NOT_FOUND\", \"message\": \"존재하지 않는 게시글입니다.\"}")))
     })
     public ResponseEntity<PostDto.Response> updatePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -86,8 +109,14 @@ public class PostController {
     @Operation(summary = "게시글 삭제", description = "게시글을 삭제합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "게시글 삭제 성공"),
-            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (작성자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (작성자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"POST_NOT_FOUND\", \"message\": \"존재하지 않는 게시글입니다.\"}")))
     })
     public ResponseEntity<Void> deletePost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -104,7 +133,10 @@ public class PostController {
             description = "카테고리별 게시글을 페이징하여 조회합니다. (정렬: createdAt, viewCount, likeCount, hotScore)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 페이지 요청 (페이지 범위 초과)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 페이지 요청 (페이지 범위 초과)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"PAGE_NOT_FOUND\", \"message\": \"존재하지 않는 페이지입니다.\"}")))
     })
     public ResponseEntity<PageDto.PageListResponse<PostDto.PostPageResponse>> getPosts(
             @Valid @ModelAttribute PostDto.PostPageRequest request
@@ -117,7 +149,10 @@ public class PostController {
     @Operation(summary = "게시글 좋아요 토글", description = "좋아요를 처리합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "좋아요 토글 성공"),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 게시글입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"POST_NOT_FOUND\", \"message\": \"존재하지 않는 게시글입니다.\"}")))
     })
     public ResponseEntity<PostDto.LikeResponse> toggleLike(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,

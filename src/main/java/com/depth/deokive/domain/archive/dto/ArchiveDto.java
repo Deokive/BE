@@ -88,13 +88,15 @@ public class ArchiveDto {
         @Schema(description = "생성 시간", example = "KST Datetime")
         private LocalDateTime createdAt; // 이게 day-N 데이터가 될거임
 
+        @Builder.Default
         @JsonProperty("isLiked")
         @Schema(description = "내가 좋아요 눌렀는지 여부", example = "true")
-        private boolean isLiked;
+        private Boolean isLiked = false;
 
+        @Builder.Default
         @JsonProperty("isOwner")
         @Schema(description = "내가 주인인지 여부", example = "true")
-        private boolean isOwner;
+        private Boolean isOwner = false;
 
         public static Response of(Archive archive, String bannerUrl, long viewCount, long likeCount, boolean isLiked, boolean isOwner) {
             return Response.builder()
@@ -200,9 +202,10 @@ public class ArchiveDto {
         @Schema(description = "아카이브 ID")
         private Long archiveId;
 
+        @Builder.Default
         @JsonProperty("isLiked")
         @Schema(description = "토글 후 좋아요 상태 (true: 좋아요 됨, false: 취소 됨)")
-        private boolean isLiked;
+        private Boolean isLiked = false;
 
         @Schema(description = "실시간 좋아요 개수")
         private Long likeCount;

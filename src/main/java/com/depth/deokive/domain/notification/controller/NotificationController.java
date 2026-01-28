@@ -5,13 +5,14 @@ import com.depth.deokive.domain.notification.service.NotificationService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.ErrorResponse;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,7 +40,9 @@ public class NotificationController {
             @ApiResponse(
                     responseCode = "401",
                     description = "인증 실패 (토큰 누락)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"JWT_MISSING\", \"message\": \"토큰이 누락되었습니다.\"}"))
             )
     })
     public SseEmitter subscribe(@AuthenticationPrincipal UserPrincipal userPrincipal) {

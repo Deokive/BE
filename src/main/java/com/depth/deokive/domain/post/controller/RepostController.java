@@ -9,10 +9,12 @@ import com.depth.deokive.system.security.model.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -35,9 +37,18 @@ public class RepostController {
     @Operation(summary = "리포스트 탭 생성", description = "최대 10개까지 생성 가능")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "리포스트 탭 생성 성공"),
-            @ApiResponse(responseCode = "403", description = "생성 권한 없음 (아카이브 소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "탭 생성 개수 초과 (최대 10개)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "생성 권한 없음 (아카이브 소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"ARCHIVE_NOT_FOUND\", \"message\": \"존재하지 않는 아카이브입니다.\"}"))),
+            @ApiResponse(responseCode = "500", description = "탭 생성 개수 초과 (최대 10개)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"INTERNAL_SERVER_ERROR\", \"error\": \"REPOST_TAB_LIMIT_EXCEED\", \"message\": \"가능한 리포스트 탭 갯수를 초과했습니다.\"}")))
     })
     public ResponseEntity<RepostDto.TabResponse> createTab(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
@@ -52,9 +63,18 @@ public class RepostController {
     @Operation(summary = "리포스트 탭 제목 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트 탭 제목 수정 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (제목 누락 등)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 탭입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (제목 누락 등)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"GLOBAL_INVALID_PARAMETER\", \"message\": \"유효성 검사 실패: 필수 필드가 누락되었습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 탭입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"REPOST_TAB_NOT_FOUND\", \"message\": \"존재하지 않는 리포스트 탭입니다.\"}")))
     })
     public ResponseEntity<RepostDto.TabResponse> updateTab(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
@@ -69,8 +89,14 @@ public class RepostController {
     @Operation(summary = "리포스트 탭 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "리포스트 탭 삭제 성공"),
-            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 탭입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 탭입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"REPOST_TAB_NOT_FOUND\", \"message\": \"존재하지 않는 리포스트 탭입니다.\"}")))
     })
     public ResponseEntity<Void> deleteTab(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
@@ -85,9 +111,18 @@ public class RepostController {
     @Operation(summary = "리포스트 생성", description = "원본 Post를 내 보관함에 저장합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "리포스트 생성 성공"),
-            @ApiResponse(responseCode = "403", description = "생성 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 탭 또는 원본 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "이미 해당 탭에 저장된 게시글입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "생성 권한 없음 (소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 탭 또는 원본 게시글입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"REPOST_TAB_NOT_FOUND\", \"message\": \"존재하지 않는 리포스트 탭입니다.\"}"))),
+            @ApiResponse(responseCode = "409", description = "이미 해당 탭에 저장된 게시글입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"CONFLICT\", \"error\": \"REPOST_TAB_AND_POST_DUPLICATED\", \"message\": \"중복된 리포스트입니다.\"}")))
     })
     public ResponseEntity<RepostDto.Response> createRepost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
@@ -103,8 +138,14 @@ public class RepostController {
     @Operation(summary = "리포스트 제목 수정", description = "내가 설정한 리포스트 제목만 수정합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트 제목 수정 성공"),
-            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 리포스트입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 리포스트입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"REPOST_NOT_FOUND\", \"message\": \"존재하지 않는 리포스트입니다.\"}")))
     })
     public ResponseEntity<RepostDto.Response> updateRepost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
@@ -119,8 +160,14 @@ public class RepostController {
     @Operation(summary = "리포스트 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "리포스트 삭제 성공"),
-            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 리포스트입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "삭제 권한 없음 (소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 리포스트입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"REPOST_NOT_FOUND\", \"message\": \"존재하지 않는 리포스트입니다.\"}")))
     })
     public ResponseEntity<Void> deleteRepost(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal user,
@@ -135,9 +182,18 @@ public class RepostController {
     @Operation(summary = "리포스트 목록 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트 목록 조회 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 페이지 요청", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "조회 권한 없음 (비공개 아카이브)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브 또는 탭입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 페이지 요청",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"PAGE_NOT_FOUND\", \"message\": \"존재하지 않는 페이지입니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "조회 권한 없음 (비공개 아카이브)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브 또는 탭입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"ARCHIVE_NOT_FOUND\", \"message\": \"존재하지 않는 아카이브입니다.\"}")))
     })
     public ResponseEntity<RepostDto.RepostListResponse> getRepost(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -156,8 +212,14 @@ public class RepostController {
     @Operation(summary = "리포스트북 타이틀 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리포스트북 타이틀 수정 성공"),
-            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음 (소유자가 아님)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"FORBIDDEN\", \"error\": \"AUTH_FORBIDDEN\", \"message\": \"접근 권한이 없습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 아카이브입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"ARCHIVE_NOT_FOUND\", \"message\": \"존재하지 않는 아카이브입니다.\"}")))
     })
     public ResponseEntity<RepostDto.RepostBookUpdateResponse> updateRepostBook(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,

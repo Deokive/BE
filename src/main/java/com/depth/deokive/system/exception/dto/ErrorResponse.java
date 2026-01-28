@@ -1,15 +1,25 @@
 package com.depth.deokive.system.exception.dto;
 
 import com.depth.deokive.system.exception.model.ErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 @Getter
 @Builder
+@Schema(description = "에러 응답 DTO")
 public class ErrorResponse {
+    @Schema(description = "HTTP 상태 코드", example = "BAD_REQUEST", type = "string", allowableValues = {
+            "BAD_REQUEST", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "CONFLICT",
+            "TOO_MANY_REQUESTS", "INTERNAL_SERVER_ERROR"
+    })
     public final HttpStatus status;
+    
+    @Schema(description = "에러 코드", example = "GLOBAL_INVALID_PARAMETER")
     public final String error;
+    
+    @Schema(description = "에러 메시지", example = "유효성 검사 실패: 필수 필드가 누락되었습니다.")
     public final String message;
 
     private ErrorResponse(ErrorCode errorCode) {

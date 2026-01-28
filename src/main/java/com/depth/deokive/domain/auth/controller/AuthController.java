@@ -27,7 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.ErrorResponse;
+import com.depth.deokive.system.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -115,7 +115,10 @@ public class AuthController {
     @Operation(summary = "로그아웃", description = "로그아웃 처리합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "로그아웃 성공", content = @Content(mediaType = "text/plain", examples = @ExampleObject(value = "Logout Successful"))),
-            @ApiResponse(responseCode = "401", description = "인증 토큰(JWT)이 누락되었습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "401", description = "인증 토큰(JWT)이 누락되었습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"JWT_MISSING\", \"message\": \"토큰이 누락되었습니다.\"}")))
     })
     public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
         System.out.println("\n🔥 로그아웃 !\n");
@@ -128,8 +131,14 @@ public class AuthController {
     @Operation(summary = "회원 탈퇴", description = "현재 로그인된 사용자의 계정을 삭제합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "회원 탈퇴 성공", content = @Content(mediaType = "text/plain", examples = @ExampleObject(value = "Soft Delete User Successful"))),
-            @ApiResponse(responseCode = "401", description = "인증 토큰이 누락되었습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "401", description = "인증 토큰이 누락되었습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"JWT_MISSING\", \"message\": \"토큰이 누락되었습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"USER_NOT_FOUND\", \"message\": \"존재하지 않는 사용자입니다.\"}")))
     })
     public ResponseEntity<String> delete(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -146,7 +155,10 @@ public class AuthController {
     @Operation(summary = "리프레시 토큰", description = "리프레시 토큰으로 새로운 액세스 토큰과 리프레시 토큰을 발급받습니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "리프레시 토큰 성공"),
-            @ApiResponse(responseCode = "401", description = "유효하지 않거나 만료된 리프레시 토큰입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "401", description = "유효하지 않거나 만료된 리프레시 토큰입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"JWT_EXPIRED\", \"message\": \"만료된 토큰입니다.\"}")))
     })
     public ResponseEntity<JwtDto.TokenExpiresInfo> refresh(
             @Parameter(description = "로그인 유지(Remember-Me) 여부", example = "false")
@@ -188,8 +200,14 @@ public class AuthController {
     @Operation(summary = "비밀번호 재설정", description = "비밀번호를 재설정 합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "비밀번호 재설정 성공"),
-            @ApiResponse(responseCode = "401", description = "이메일 인증이 완료되지 않았습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "가입되지 않은 이메일입니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "401", description = "이메일 인증이 완료되지 않았습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"UNAUTHORIZED\", \"error\": \"AUTH_EMAIL_NOT_VERIFIED\", \"message\": \"이메일 인증이 완료되지 않았습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "가입되지 않은 이메일입니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"AUTH_USER_NOT_FOUND\", \"message\": \"등록된 유저를 찾을 수 없습니다.\"}")))
     })
     public ResponseEntity<String> resetPassword(@RequestBody @Valid AuthDto.ResetPasswordRequest request)
     {
@@ -204,8 +222,14 @@ public class AuthController {
     @Operation(summary = "이메일 전송", description = "이메일을 전송합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "202", description = "이메일 전송 요청 접수됨"),
-            @ApiResponse(responseCode = "500", description = "이메일 전송 실패 또는 Redis 오류", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "503", description = "메일 서버 또는 Redis 연결 실패", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "500", description = "이메일 전송 실패 또는 Redis 오류",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"INTERNAL_SERVER_ERROR\", \"error\": \"MAIL_SEND_FAILED\", \"message\": \"이메일 전송에 실패했습니다.\"}"))),
+            @ApiResponse(responseCode = "503", description = "메일 서버 또는 Redis 연결 실패",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"SERVICE_UNAVAILABLE\", \"error\": \"MAIL_CONNECTION_FAILED\", \"message\": \"메일 서버에 연결할 수 없습니다.\"}")))
     })
     public ResponseEntity<String> sendEmail(@RequestParam String email) {
         emailService.sendEmail(email);
@@ -219,8 +243,14 @@ public class AuthController {
     @Operation(summary = "이메일 검증", description = "이메일을 검증합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "이메일 검증 성공"),
-            @ApiResponse(responseCode = "400", description = "인증 코드가 일치하지 않거나 만료되었습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "503", description = "Redis 연결 실패", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "400", description = "인증 코드가 일치하지 않거나 만료되었습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"BAD_REQUEST\", \"error\": \"AUTH_EMAIL_CODE_INVALID\", \"message\": \"이메일 인증코드가 올바르지 않거나, 만료되었습니다.\"}"))),
+            @ApiResponse(responseCode = "503", description = "Redis 연결 실패",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"SERVICE_UNAVAILABLE\", \"error\": \"REDIS_CONNECTION_FAILED\", \"message\": \"Redis 서버에 연결할 수 없습니다.\"}")))
     })
     public ResponseEntity<String> verifyEmail(@RequestBody @Valid AuthDto.VerifyEmailRequest request) {
         emailService.verifyEmailCode(request.getEmail(), request.getCode(), request.getPurpose());
@@ -232,7 +262,10 @@ public class AuthController {
     @Operation(summary = "소셜 유저 및 토큰 만료기간 정보 조회", description = "소셜 로그인된 사용자의 정보 및 토큰 만료기간을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "소셜 유저 및 토큰 만료기간 정보 조회 성공"),
-            @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없습니다.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"status\": \"NOT_FOUND\", \"error\": \"USER_NOT_FOUND\", \"message\": \"존재하지 않는 사용자입니다.\"}")))
     })
     public AuthDto.LoginResponse socialRetrieve(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
