@@ -140,6 +140,8 @@ public class DiaryDto {
                         .fileId(file.getId())
                         .filename(file.getFilename())
                         .cdnUrl(FileUrlUtils.buildCdnUrl(file.getS3ObjectKey()))
+                        .fileSize(file.getFileSize())
+                        .mediaType(file.getMediaType().name())
                         .mediaRole(map.getMediaRole())
                         .sequence(map.getSequence())
                         .build();
