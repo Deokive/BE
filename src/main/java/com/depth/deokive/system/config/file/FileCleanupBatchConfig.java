@@ -129,12 +129,18 @@ public class FileCleanupBatchConfig {
             List<ObjectIdentifier> objectsToDelete = new ArrayList<>();
             objectsToDelete.add(ObjectIdentifier.builder().key(file.getS3ObjectKey()).build());
 
+            // 이미지: small + medium 썸네일 삭제
             if (file.getMediaType() == MediaType.IMAGE) {
                 // S3에 실제로 존재하는지 체크하지 않고 delete 요청 보내도 에러 안 남 (S3 특성) -> 과감하게 삭제 요청 목록에 추가
                 String smallKey = ThumbnailUtils.getSmallThumbnailKey(file.getS3ObjectKey());
                 String mediumKey = ThumbnailUtils.getMediumThumbnailKey(file.getS3ObjectKey());
 
                 if (smallKey != null) objectsToDelete.add(ObjectIdentifier.builder().key(smallKey).build());
+                if (mediumKey != null) objectsToDelete.add(ObjectIdentifier.builder().key(mediumKey).build());
+            }
+            // 동영상: medium 썸네일만 삭제 (small은 미지원)
+            else if (file.getMediaType() == MediaType.VIDEO) {
+                String mediumKey = ThumbnailUtils.getMediumThumbnailKey(file.getS3ObjectKey());
                 if (mediumKey != null) objectsToDelete.add(ObjectIdentifier.builder().key(mediumKey).build());
             }
 
