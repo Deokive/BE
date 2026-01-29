@@ -2,8 +2,15 @@ package com.depth.deokive.domain.sticker.entity.enums;
 
 public enum StickerType {
     HEART,
-    STAR,
-    CIRCLE,
-    RECTANGLE,
-    TRIANGLE
+    SHINING,
+    GIFTBOX,
+    CAKE,
+    COFFEE,
+    CAMERA,
+    LIGHT_STICK,
+    TICKET,
+    MUSICAL_NOTE,
+    MONEY,
+    DISPLAY_BOARD,
+    BASEBALL
 }
