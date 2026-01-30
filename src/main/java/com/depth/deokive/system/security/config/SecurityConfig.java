@@ -43,9 +43,10 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RequestMatcherHolder requestMatcherHolder;
     private final CustomFailureHandler customFailureHandler;
+    private final CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver;
 
     @Value("${app.front-base-url}")
-    private String frontBaseUrl;
+    private String frontBaseUrlConfig;
 
     @Value("${app.allowed-origins}")
     private String allowedOrigins;
@@ -59,7 +60,13 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2Login(oauth2 -> {
-                    oauth2.loginPage(frontBaseUrl + "/login"); // ✅ 기본 로그인 페이지 비활성화 + 프론트로 유도
+                    // front-base-url의 첫 번째 값을 기본값으로 사용 (동적 처리는 CustomFailureHandler에서 수행)
+                    List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
+                    String defaultBaseUrl = allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.get(0);
+                    oauth2.loginPage(defaultBaseUrl + "/login"); // ✅ 기본 로그인 페이지 비활성화 + 프론트로 유도
+                    oauth2.authorizationEndpoint(authorization -> 
+                        authorization.authorizationRequestResolver(customOAuth2AuthorizationRequestResolver)
+                    );
                     oauth2.userInfoEndpoint(user -> user.userService(customOAuth2UserService));
                     oauth2.successHandler(customSuccessHandler);
                     oauth2.failureHandler(customFailureHandler);

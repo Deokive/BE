@@ -1,5 +1,7 @@
 package com.depth.deokive.domain.oauth2.handler;
 
+import com.depth.deokive.system.security.util.FrontUrlResolver;
+import com.depth.deokive.system.security.util.PropertiesParserUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -20,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 public class CustomFailureHandler implements AuthenticationFailureHandler {
 
     @Value("${app.front-base-url}")
-    private String frontBaseUrl;
+    private String frontBaseUrlConfig;
 
     @Override
     public void onAuthenticationFailure(
@@ -38,8 +41,23 @@ public class CustomFailureHandler implements AuthenticationFailureHandler {
             code = oae.getError().getErrorCode();
         }
 
+        // 요청의 Origin/Referer에 따라 적절한 프론트엔드 URL 선택
+        log.info("🔍 [CustomFailureHandler] front-base-url 선택 시작");
+        log.info("   - 설정값 (front-base-url): {}", frontBaseUrlConfig);
+        
+        List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
+        log.info("   - 파싱된 허용 base URL 리스트: {}", allowedBaseUrls);
+        
+        String frontBaseUrl = FrontUrlResolver.resolveUrl(request, allowedBaseUrls, allowedBaseUrls.get(0));
+        
         String target = frontBaseUrl + "/login?error="
                 + URLEncoder.encode(code, StandardCharsets.UTF_8);
+
+        log.info("🟡 [CustomFailureHandler] 최종 선택된 에러 페이지 URL: {}", target);
+        log.info("   - 선택된 front-base-url: {}", frontBaseUrl);
+        log.info("   - 요청 Origin: {}", request.getHeader("Origin"));
+        log.info("   - 요청 Referer: {}", request.getHeader("Referer"));
+        log.info("   - 요청 State 파라미터: {}", request.getParameter("state"));
 
         response.sendRedirect(target);
     }
