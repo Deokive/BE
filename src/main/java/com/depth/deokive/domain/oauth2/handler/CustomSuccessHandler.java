@@ -5,6 +5,8 @@ import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.jwt.service.TokenService;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.CookieUtils;
+import com.depth.deokive.system.security.util.FrontUrlResolver;
+import com.depth.deokive.system.security.util.PropertiesParserUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,6 +18,7 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -24,7 +27,7 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final TokenService tokenService;
     private final CookieUtils cookieUtils;
 
-    @Value("${app.front-redirect-uri}") private String frontRedirectUri;
+    @Value("${app.front-redirect-uri}") private String frontRedirectUriConfig;
 
     @Override
     public void onAuthenticationSuccess(
@@ -52,7 +55,21 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         cookieUtils.addAccessTokenCookie(response, tokenInfo.getAccessToken(), tokenInfo.getRefreshTokenExpiresAt());
         cookieUtils.addRefreshTokenCookie(response, tokenInfo.getRefreshToken(), tokenInfo.getRefreshTokenExpiresAt());
 
-        // 4) FE로 리다이렉트 (토큰은 쿠키로 전달되므로 URL 노출 없음)
-        getRedirectStrategy().sendRedirect(request, response, frontRedirectUri);
+        // 5) 요청의 Origin/Referer에 따라 적절한 리다이렉트 URI 선택
+        log.info("🔍 [CustomSuccessHandler] front-redirect-uri 선택 시작");
+        log.info("   - 설정값 (front-redirect-uri): {}", frontRedirectUriConfig);
+        
+        List<String> allowedRedirectUris = PropertiesParserUtils.propertiesParser(frontRedirectUriConfig);
+        log.info("   - 파싱된 허용 리다이렉트 URI 리스트: {}", allowedRedirectUris);
+        
+        String redirectUri = FrontUrlResolver.resolveUrl(request, allowedRedirectUris, allowedRedirectUris.get(0));
+        
+        log.info("🟢 [CustomSuccessHandler] 최종 선택된 리다이렉트 URI: {}", redirectUri);
+        log.info("   - 요청 Origin: {}", request.getHeader("Origin"));
+        log.info("   - 요청 Referer: {}", request.getHeader("Referer"));
+        log.info("   - 요청 State 파라미터: {}", request.getParameter("state"));
+
+        // 6) FE로 리다이렉트 (토큰은 쿠키로 전달되므로 URL 노출 없음)
+        getRedirectStrategy().sendRedirect(request, response, redirectUri);
     }
 }
