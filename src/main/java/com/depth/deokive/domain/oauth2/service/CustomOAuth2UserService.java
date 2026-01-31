@@ -2,6 +2,9 @@ package com.depth.deokive.domain.oauth2.service;
 
 import com.depth.deokive.domain.oauth2.dto.*;
 import com.depth.deokive.domain.oauth2.entity.CustomOAuth2User;
+import com.depth.deokive.domain.oauth2.entity.OAuth2Account;
+import com.depth.deokive.domain.oauth2.entity.enums.ProviderType;
+import com.depth.deokive.domain.oauth2.repository.OAuth2AccountRepository;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private final UserRepository userRepository;
+    private final OAuth2AccountRepository oAuth2AccountRepository;
     private final HmacUtil hmacUtil;
 
     @Transactional
@@ -37,20 +41,41 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         // Response 할 DTO
         final OAuth2UserDto oAuth2UserDto = OAuth2UserDto.of(Role.USER, oAuth2Response, hmacUtil);
 
-        // 기존 OAuth2 유저 있으면 사용, 없으면 생성 -> 기존 회원이거나 새로 등록된 회원
-        log.info("⭐️ find or save OAuth2 user in loadUser");
-        User user = userRepository.findByUsername(oAuth2UserDto.getUsername())
-                .orElseGet(() -> {
-                    if(userRepository.existsByEmail(oAuth2UserDto.getEmail())) {
-                        throw new OAuth2AuthenticationException(ErrorCode.OAUTH_USER_ALREADY_EXIST.getMessage());
-                    }
+        User user = null;
 
-                    log.info("⭐️ save new OAuth2 user");
-                    return userRepository.save(oAuth2UserDto.toUser());
-                });
+        log.info("1️⃣. Check Whether if the user is already SocialUser");
+        // DB에는 해시된 providerId가 저장되어 있으므로, 비교 전에 해시 처리 필요
+        String hashedProviderId = hmacUtil.hmacSha256Base64(oAuth2Response.getProviderId());
+        ProviderType providerType = ProviderType.from(oAuth2Response.getProvider());
 
+        OAuth2Account oAuth2Account = oAuth2AccountRepository.findByProviderIdAndProviderType(
+                hashedProviderId,
+                providerType
+        ).orElse(null);
 
-        // 불러온 회원 정보로 Response DTO 업데이트 후 내보냄 (PK 가 있어야 Audit 이든 UserPrincipal 이든 뭐든 될 것이기 때문)
+        if (oAuth2Account != null) {
+            log.info("🟢 Find existing OAuth2User");
+            return new CustomOAuth2User(OAuth2UserDto.from(oAuth2Account.getUser()));
+        }
+
+        log.info("2️⃣. Not existing OAuth2User. Checking isEmailVerified field");
+        if (oAuth2UserDto.isEmailVerified()) {
+            // oAuth2UserDto 내부에서 Provider별 isEmailVerified 검사함
+            log.info("3️⃣. Email is Verified. Check whether if the user is existed");
+            user = userRepository.findByEmail(oAuth2UserDto.getEmail()).orElse(null);
+        } else {
+            throw new OAuth2AuthenticationException(ErrorCode.AUTH_EMAIL_NOT_VERIFIED.getMessage());
+        }
+
+        if (user != null) {
+            log.info("4️⃣. The same user is exist. Connecting a new SocialAccount with a existed user");
+            oAuth2AccountRepository.save(OAuth2Account.create(providerType, hashedProviderId, user));
+            return new CustomOAuth2User(OAuth2UserDto.from(user));
+        }
+
+        log.info("5️⃣. The same user is not exist. Considering you are new social user");
+        user = userRepository.save(oAuth2UserDto.toUser());
+        oAuth2AccountRepository.save(OAuth2Account.create(providerType, hashedProviderId, user));
 
         return new CustomOAuth2User(OAuth2UserDto.from(user));
     }
@@ -63,7 +88,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             case "google" -> oAuth2Response = new GoogleResponse(oAuth2User.getAttributes());
             case "naver" -> oAuth2Response = new NaverResponse(oAuth2User.getAttributes());
             case "kakao" -> oAuth2Response = new KaKaoResponse(oAuth2User.getAttributes());
-            default -> throw new OAuth2AuthenticationException("Invalid OAuth2 Provider");
+            default -> throw new OAuth2AuthenticationException(ErrorCode.OAUTH_BAD_REQUEST.getMessage());
         }
         return oAuth2Response;
     }

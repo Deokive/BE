@@ -12,4 +12,11 @@ public class GoogleResponse implements OAuth2Response {
     @Override public String getProviderId() { return attributes.get("sub").toString(); }
     @Override public String getEmail() { return attributes.get("email").toString(); }
     @Override public String getNickname() { return attributes.get("name").toString(); }
+
+    @Override
+    public Boolean isEmailVerified() {
+        Object verified = attributes.get("email_verified");
+        if (verified == null) return null;
+        return Boolean.parseBoolean(verified.toString());
+    }
 }

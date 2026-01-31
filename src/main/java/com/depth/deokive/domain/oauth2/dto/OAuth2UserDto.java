@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 @Builder @NoArgsConstructor @AllArgsConstructor @Data
 public class OAuth2UserDto {
@@ -16,6 +17,7 @@ public class OAuth2UserDto {
     private String nickname;
     private String username;
     private String email;
+    private boolean isEmailVerified;
 
     public static OAuth2UserDto of(Role role, OAuth2Response oAuth2Response, HmacUtil hmacUtil) {
         return OAuth2UserDto.builder()
@@ -24,6 +26,7 @@ public class OAuth2UserDto {
                 .nickname(suggestNickname(oAuth2Response, hmacUtil))
                 .username(generateUsername(oAuth2Response, hmacUtil))
                 .email(oAuth2Response.getEmail())
+                .isEmailVerified(checkEmailVerified(oAuth2Response))
                 .build();
     }
 
@@ -34,6 +37,7 @@ public class OAuth2UserDto {
                 .nickname(user.getNickname())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                .isEmailVerified(user.isEmailVerified())
                 .build();
     }
 
@@ -43,6 +47,7 @@ public class OAuth2UserDto {
                 .nickname(this.nickname)
                 .username(this.username)
                 .email(this.email)
+                .isEmailVerified(this.isEmailVerified)
                 .userType(UserType.SOCIAL)
                 .build();
     }
@@ -61,5 +66,18 @@ public class OAuth2UserDto {
         String hashedId = hmacUtil.hmacSha256Base64(oAuth2Response.getProviderId());
 
         return "user_" + oAuth2Response.getProvider() + "_" + hashedId;
+    }
+
+    private static boolean checkEmailVerified(OAuth2Response oAuth2Response) {
+        boolean isEmailVerified = false;
+
+        switch (oAuth2Response.getProvider()) {
+            case "google" -> isEmailVerified = oAuth2Response.isEmailVerified();
+            case "kakao" -> isEmailVerified = oAuth2Response.isEmailVerified() && oAuth2Response.isEmailValid();
+            case "naver" -> isEmailVerified = true; // Naver는 verified 필드가 없고, 네이버에서 이메일 수정 및 등록 시 검증 절차 존재
+            default -> throw new OAuth2AuthenticationException("Invalid OAuth2 Provider");
+        }
+
+        return isEmailVerified;
     }
 }

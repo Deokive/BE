@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.auth.service;
 
 import com.depth.deokive.domain.auth.dto.AuthDto;
+import com.depth.deokive.domain.oauth2.repository.OAuth2AccountRepository;
 import com.depth.deokive.domain.user.dto.UserDto;
 import com.depth.deokive.domain.user.entity.User;
 import com.depth.deokive.domain.user.repository.UserRepository;
@@ -24,6 +25,7 @@ public class AuthService {
     private final JwtTokenResolver jwtTokenResolver;
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final OAuth2AccountRepository oAuth2AccountRepository;
     private final TokenService tokenService;
     private final CookieUtils cookieUtils;
     private final EmailService emailService;
@@ -88,6 +90,9 @@ public class AuthService {
 
         // Soft Delete 처리
         foundUser.softDelete(AuthDto.SoftDeleteDto.of(foundUser));
+
+        // 연관된 소셜 계정은 Hard Delete (Soft Delete는 Cascade 기대하기 힘드므로, Bulk 연산으로 명시적으로 한번에 지운다.)
+        oAuth2AccountRepository.deleteByUserId(foundUser.getId());
 
         clearCookies(response);
     }
