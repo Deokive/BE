@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.oauth2.dto;
 
 import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
 import static com.depth.deokive.common.util.MapUtils.*;
@@ -26,5 +27,21 @@ public class KaKaoResponse implements OAuth2Response {
         Map<String, Object> acc = getMap(attributes, "kakao_account");
         Map<String, Object> profile = getMap(acc, "profile");
         return getString(profile, "nickname");
+    }
+
+    @Override
+    public Boolean isEmailVerified() {
+        Map<String, Object> acc = getMap(attributes, "kakao_account");
+        Object verified = acc.get("is_email_verified");
+        if (verified == null) return null;
+        return Boolean.parseBoolean(verified.toString());
+    }
+
+    @Override
+    public Boolean isEmailValid() {
+        Map<String, Object> acc = getMap(attributes, "kakao_account");
+        Object valid = acc.get("is_email_valid");
+        if (valid == null) return null;
+        return Boolean.parseBoolean(valid.toString());
     }
 }
