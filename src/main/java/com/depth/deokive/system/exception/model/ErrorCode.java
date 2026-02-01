@@ -82,6 +82,12 @@ public enum ErrorCode {
     REPOST_TAB_LIMIT_EXCEED(HttpStatus.INTERNAL_SERVER_ERROR, "REPOST TAB LIMIT EXCEED", "가능한 리포스트 탭 갯수를 초과했습니다."),
     REPOST_TAB_AND_POST_DUPLICATED(HttpStatus.CONFLICT, "REPOST_TAB_AND_POST_DUPLICATED", "중복된 리포스트입니다."),
 
+    // URL-specific Repost errors
+    REPOST_INVALID_URL(HttpStatus.BAD_REQUEST, "REPOST_INVALID_URL", "유효하지 않은 URL입니다."),
+    REPOST_URL_UNREACHABLE(HttpStatus.SERVICE_UNAVAILABLE, "REPOST_URL_UNREACHABLE", "URL에 접근할 수 없습니다."),
+    REPOST_URL_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "REPOST_URL_TIMEOUT", "URL 요청 시간이 초과되었습니다."),
+    REPOST_URL_DUPLICATED(HttpStatus.CONFLICT, "REPOST_URL_DUPLICATED", "이미 해당 탭에 저장된 URL입니다."),
+
     // PAGE Errors
     PAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "PAGE NOT FOUND", "존재하지 않는 페이지입니다."),
 
