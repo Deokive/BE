@@ -25,7 +25,10 @@ public class Event extends TimeBaseEntity {
     private Long id;
 
     @Column(nullable = false)
-    private LocalDateTime date;
+    private LocalDateTime startDate;
+
+    @Column(nullable = false)
+    private LocalDateTime endDate;
 
     @Column(nullable = false)
     private String title;
@@ -48,11 +51,12 @@ public class Event extends TimeBaseEntity {
     @OneToOne(mappedBy = "event", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private SportRecord sportRecord;
 
-    public void update(EventDto.UpdateRequest request, LocalDateTime recordAt) {
+    public void update(EventDto.UpdateRequest request, LocalDateTime startDateTime, LocalDateTime endDateTime) {
         if (request == null) return;
 
         this.title = nonBlankOrDefault(request.getTitle(), this.title);
-        this.date = nonBlankOrDefault(recordAt, this.date);
+        this.startDate = startDateTime; // 항상 업데이트 (Service에서 기존값 고려하여 전달)
+        this.endDate = endDateTime; // 항상 업데이트 (Service에서 기존값 고려하여 전달)
         this.hasTime = nonBlankOrDefault(request.getHasTime(), this.hasTime);
         this.color = nonBlankOrDefault(request.getColor(), this.color);
         this.isSportType = nonBlankOrDefault(request.getIsSportType(), this.isSportType);
