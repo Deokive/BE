@@ -44,13 +44,14 @@ public class EventService {
         archiveGuard.checkOwner(archive.getUser().getId(), user);
 
         // SEQ 3. 개수 제한 검증
-        validateEventCount(archiveId, request.getDate());
+        validateEventCount(archiveId, request.getStartDate());
 
         // SEQ 4. 날짜/시간 병합 로직
-        LocalDateTime recordAt = getRecordAt(request);
+        LocalDateTime startDateTime = mergeDateTime(request.getStartDate(), request.getStartTime(), request.getHasTime());
+        LocalDateTime endDateTime = mergeDateTime(request.getEndDate(), request.getEndTime(), request.getHasTime());
 
         // SEQ 5. Event 저장
-        Event event = request.toEntity(archive, recordAt);
+        Event event = request.toEntity(archive, startDateTime, endDateTime);
         eventRepository.save(event);
 
         // SEQ 6. 스포츠 기록 저장 (필요 시)
@@ -97,23 +98,38 @@ public class EventService {
         archiveGuard.checkOwner(event.getArchive().getUser().getId(), user);
 
         // SEQ 3. 날짜가 변경되는 경우에만 개수 제한 검증
-        if (request.getDate() != null && !request.getDate().equals(event.getDate().toLocalDate())) {
-            validateEventCount(event.getArchive().getId(), request.getDate());
+        if (request.getStartDate() != null && !request.getStartDate().equals(event.getStartDate().toLocalDate())) {
+            validateEventCount(event.getArchive().getId(), request.getStartDate());
         }
 
-        // SEQ 4. 업데이트
-        event.update(request, getRecordAt(request, event)); // Dirty Checking
+        // SEQ 4. 날짜/시간 병합 로직
+        LocalDateTime startDateTime = mergeDateTime(
+                request.getStartDate() != null ? request.getStartDate() : event.getStartDate().toLocalDate(),
+                request.getStartTime(),
+                request.getHasTime() != null ? request.getHasTime() : event.isHasTime(),
+                event.isHasTime() ? event.getStartDate().toLocalTime() : null
+        );
 
-        // SEQ 5. 스포츠 기록 처리
+        LocalDateTime endDateTime = mergeDateTime(
+                request.getEndDate() != null ? request.getEndDate() : event.getEndDate().toLocalDate(),
+                request.getEndTime(),
+                request.getHasTime() != null ? request.getHasTime() : event.isHasTime(),
+                event.isHasTime() ? event.getEndDate().toLocalTime() : null
+        );
+
+        // SEQ 5. 업데이트
+        event.update(request, startDateTime, endDateTime); // Dirty Checking
+
+        // SEQ 6. 스포츠 기록 처리
         SportRecord sportRecord = handleSportRecordUpdate(event, request);
 
-        // SEQ 6. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
+        // SEQ 7. 해시태그 업데이트 (기존 삭제 후 재등록 방식)
         if (request.getHashtags() != null) {
             eventHashtagMapRepository.deleteByEventId(eventId);
             saveHashtags(event, request.getHashtags());
         }
 
-        // SEQ 7. 현재 해시태그 조회 (업데이트 안하는 경우 고려)
+        // SEQ 8. 현재 해시태그 조회 (업데이트 안하는 경우 고려)
         List<String> currentHashtags = (request.getHashtags() != null)
                 ? request.getHashtags()
                 : eventHashtagMapRepository.findHashtagNamesByEventId(eventId);
@@ -149,11 +165,11 @@ public class EventService {
         archiveGuard.checkArchiveReadPermission(archive, user);
 
         // SEQ 3. 날짜 범위 계산 (해당 월의 1일 00:00 ~ 말일 23:59)
-        LocalDateTime startDateTime = LocalDateTime.of(year, month, 1, 0, 0);
-        LocalDateTime endDateTime = startDateTime.plusMonths(1);
+        LocalDateTime rangeStart = LocalDateTime.of(year, month, 1, 0, 0);
+        LocalDateTime rangeEnd = rangeStart.plusMonths(1);
 
         // SEQ 4. 이벤트 조회
-        List<Event> events = eventRepository.findAllByArchiveAndDateRange(archiveId, startDateTime, endDateTime);
+        List<Event> events = eventRepository.findAllByArchiveAndDateRange(archiveId, rangeStart, rangeEnd);
 
         if (events.isEmpty()) { return Collections.emptyList(); }
 
@@ -186,26 +202,34 @@ public class EventService {
         }
     }
 
-    private LocalDateTime getRecordAt(EventDto.CreateRequest r) {
-        LocalTime time = (Boolean.TRUE.equals(r.getHasTime()) && r.getTime() != null) ? r.getTime() : LocalTime.MIDNIGHT;
-        return LocalDateTime.of(r.getDate(), time);
+    /**
+     * 날짜와 시간을 병합하여 LocalDateTime 생성 (생성용)
+     * @param date 날짜
+     * @param time 시간 (nullable)
+     * @param hasTime 시간 사용 여부
+     * @return LocalDateTime
+     */
+    private LocalDateTime mergeDateTime(LocalDate date, LocalTime time, Boolean hasTime) {
+        if (Boolean.TRUE.equals(hasTime) && time != null) {
+            return LocalDateTime.of(date, time);
+        }
+        return LocalDateTime.of(date, LocalTime.MIDNIGHT);
     }
 
-    private LocalDateTime getRecordAt(EventDto.UpdateRequest r, Event event) {
-        LocalDate date = r.getDate() != null ? r.getDate() : event.getDate().toLocalDate();
-        LocalTime time;
-
-        boolean effectiveHasTime = r.getHasTime() != null ? r.getHasTime() : event.isHasTime();
-
-        if (effectiveHasTime) {
-            if (r.getTime() != null) time = r.getTime();
-            else if (event.isHasTime()) time = event.getDate().toLocalTime();
-            else time = LocalTime.of(0, 0);
-        } else {
-            time = LocalTime.of(0, 0);
+    /**
+     * 날짜와 시간을 병합하여 LocalDateTime 생성 (수정용 - 기존값 고려)
+     * @param date 날짜
+     * @param time 새로운 시간 (nullable)
+     * @param hasTime 시간 사용 여부
+     * @param existingTime 기존 시간 (nullable)
+     * @return LocalDateTime
+     */
+    private LocalDateTime mergeDateTime(LocalDate date, LocalTime time, Boolean hasTime, LocalTime existingTime) {
+        if (Boolean.TRUE.equals(hasTime)) {
+            LocalTime effectiveTime = (time != null) ? time : (existingTime != null ? existingTime : LocalTime.MIDNIGHT);
+            return LocalDateTime.of(date, effectiveTime);
         }
-
-        return LocalDateTime.of(date, time);
+        return LocalDateTime.of(date, LocalTime.MIDNIGHT);
     }
 
     private SportRecord handleSportRecordUpdate(Event event, EventDto.UpdateRequest request) {

@@ -3,6 +3,7 @@ package com.depth.deokive.domain.event.dto;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.event.entity.Event;
 import com.depth.deokive.domain.event.entity.SportRecord;
+import com.depth.deokive.system.validation.ValidEventDateRange;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,21 +20,30 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+
 public class EventDto {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @ValidEventDateRange
     @Schema(name = "EventCreateRequest", description = "이벤트 생성 요청")
     public static class CreateRequest {
         @NotBlank(message = "일정 이름은 필수입니다.")
         @Schema(description = "이벤트 제목", example = "콘서트 관람")
         private String title;
 
-        @NotNull(message = "날짜는 필수입니다.")
-        @Schema(description = "이벤트 날짜", example = "2024-12-25")
-        private LocalDate date;
+        @NotNull(message = "시작 날짜는 필수입니다.")
+        @Schema(description = "이벤트 시작날짜", example = "2024-12-25")
+        private LocalDate startDate;
 
-        @Schema(description = "이벤트 시간 (hasTime이 true일 때만 유효)", example = "19:00")
-        private LocalTime time; // 시간 설정이 꺼져있으면 null 가능
+        @NotNull(message = "종료 날짜는 필수입니다.")
+        @Schema(description = "이벤트 종료 날짜", example = "2024-12-25")
+        private LocalDate endDate;
+
+        @Schema(description = "이벤트 시작 시간 (hasTime이 true일 때만 유효)", example = "19:00")
+        private LocalTime startTime; // 시간 설정이 꺼져있으면 null 가능
+
+        @Schema(description = "이벤트 종료 시간 (hasTime이 true일 때만 유효)", example = "19:00")
+        private LocalTime endTime; // 시간 설정이 꺼져있으면 null 가능
 
         @Builder.Default
         @Schema(description = "시간 설정 여부", example = "true")
@@ -55,11 +65,12 @@ public class EventDto {
         @Schema(description = "해시태그 리스트", example = "[\"콘서트\", \"라이브\"]")
         private List<String> hashtags;
 
-        public Event toEntity(Archive archive, LocalDateTime recordAt) {
+        public Event toEntity(Archive archive, LocalDateTime startDateTime, LocalDateTime endDateTime) {
             return Event.builder()
                     .archive(archive)
                     .title(title)
-                    .date(recordAt)
+                    .startDate(startDateTime)
+                    .endDate(endDateTime)
                     .hasTime(hasTime)
                     .color(color)
                     .isSportType(isSportType)
@@ -68,16 +79,23 @@ public class EventDto {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @ValidEventDateRange
     @Schema(name = "EventUpdateRequest", description = "이벤트 수정 요청")
     public static class UpdateRequest {
         @Schema(description = "변경할 제목", example = "변경할 제목")
         private String title;
 
-        @Schema(description = "변경할 날짜", example = "변경할 날짜")
-        private LocalDate date;
+        @Schema(description = "변경할 시작 날짜", example = "변경할 날짜")
+        private LocalDate startDate;
 
-        @Schema(description = "변경할 시간", example = "변경할 시간")
-        private LocalTime time;
+        @Schema(description = "변경할 종료 날짜", example = "변경할 날짜")
+        private LocalDate endDate;
+
+        @Schema(description = "변경할 시작 시간", example = "변경할 시간")
+        private LocalTime startTime;
+
+        @Schema(description = "변경할 종료 시간", example = "변경할 시간")
+        private LocalTime endTime;
 
         @Schema(description = "시간 설정 여부 변경", example = "시간 설정 여부 변경")
         private Boolean hasTime;
@@ -133,12 +151,21 @@ public class EventDto {
         private String title;
 
         @JsonFormat(pattern = "yyyy-MM-dd")
-        @Schema(description = "이벤트 날짜", example = "2024-12-25")
-        private LocalDate date;
+        @Schema(description = "이벤트 시작 날짜", example = "2024-12-25")
+        private LocalDate startDate;
+
+        @JsonFormat(pattern = "yyyy-MM-dd")
+        @Schema(description = "이벤트 종료 날짜", example = "2024-12-25")
+        private LocalDate endDate;
 
         @JsonFormat(pattern = "HH:mm")
-        @Schema(description = "이벤트 시간", example = "19:00")
-        private LocalTime time;
+        @Schema(description = "이벤트 시작 시간", example = "19:00")
+        private LocalTime startTime;
+
+        @JsonFormat(pattern = "HH:mm")
+        @Schema(description = "이벤트 종료 시간", example = "19:00")
+        private LocalTime endTime;
+
 
         @Schema(description = "시간 설정 여부", example = "true")
         private boolean hasTime;
@@ -161,8 +188,10 @@ public class EventDto {
             return Response.builder()
                     .id(event.getId())
                     .title(event.getTitle())
-                    .date(event.getDate().toLocalDate())
-                    .time(event.isHasTime() ? event.getDate().toLocalTime() : null)
+                    .startDate(event.getStartDate().toLocalDate())
+                    .startTime(event.isHasTime() ? event.getStartDate().toLocalTime() : null)
+                    .endDate(event.getEndDate().toLocalDate())
+                    .endTime(event.isHasTime() ? event.getEndDate().toLocalTime() : null)
                     .hasTime(event.isHasTime())
                     .color(event.getColor())
                     .isSportType(event.isSportType())
