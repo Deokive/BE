@@ -15,25 +15,26 @@ import lombok.experimental.SuperBuilder;
 @Table(
     name = "repost",
     indexes = {
-        @Index(name = "idx_repost_tab_created", columnList = "repost_tab_id, created_at DESC, id DESC")
+        @Index(name = "idx_repost_tab_created", columnList = "repost_tab_id, created_at DESC, id DESC"),
+        @Index(name = "idx_repost_url", columnList = "url(255)")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_repost_tab_post", columnNames = {"repost_tab_id", "post_id"})
+        @UniqueConstraint(name = "uk_repost_tab_url", columnNames = {"repost_tab_id", "url"})
     }
 )
 public class Repost extends TimeBaseEntity {
     @Id @GeneratedValue(strategy= GenerationType.IDENTITY)
     private Long id;
 
-    // Post가 삭제되어도 이 값은 보존됨 -> 404 링크 유도 (UX 고려: post 삭제 시 해당 유저의 repost가 영문도 모른채 사라지는걸 방지)
-    @Column(name = "post_id", nullable = false) // loose coupling
-    private Long postId;
+    // 외부 SNS URL (Twitter, Instagram 등)
+    @Column(name = "url", nullable = false, length = 2048)
+    private String url;
 
     @Column(nullable = false)
-    private String title; // Default: 게시글 제목 -> Snapshot (삭제되면 못가져오니까. 그리고 이름 수정도 가능하라고)
+    private String title; // OG 메타데이터에서 추출된 제목 (수정 가능)
 
-    @Column(name = "thumbnail_key")
-    private String thumbnailKey; // 원본 썸네일 URL (조회용) -> Snapshot
+    @Column(name = "thumbnail_url", length = 2048)
+    private String thumbnailUrl; // OG 추출된 썸네일 URL (nullable)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repost_tab_id", nullable = false)
