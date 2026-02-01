@@ -43,4 +43,13 @@ public class Repost extends TimeBaseEntity {
     public void updateTitle(String title) {
         this.title = title;
     }
+
+    public void updateThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
+    }
+
+    public void updateMetadata(String title, String thumbnailUrl) {
+        this.title = title;
+        this.thumbnailUrl = thumbnailUrl;
+    }
 }
