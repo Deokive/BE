@@ -7,6 +7,8 @@ import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.depth.deokive.domain.post.entity.*;
 import com.depth.deokive.domain.post.repository.*;
+import com.depth.deokive.domain.post.util.OpenGraphExtractor;
+import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
@@ -16,6 +18,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.List;
 
 @Service
@@ -27,38 +35,68 @@ public class RepostService {
     private final RepostTabRepository repostTabRepository;
     private final RepostBookRepository repostBookRepository;
 
-    private final PostRepository postRepository; // Post 정보 조회를 위한 Repository (검증 및 스냅샷 용도)
     private final RepostQueryRepository repostQueryRepository;
     private final ArchiveRepository archiveRepository;
 
-    @Transactional
+    /**
+     * Repost 생성 - 동기 OG 추출 (Plan A Only)
+     * - 트랜잭션 밖에서 OG 추출 → DB 커넥션 점유 최소화
+     * - 완전한 데이터로 1번만 저장 → 이중 Write 방지
+     * - 201 Created 응답 (썸네일 + 타이틀 포함)
+     */
+    @ExecutionTime
     public RepostDto.Response createRepost(UserPrincipal userPrincipal, Long tabId, RepostDto.CreateRequest request) {
-        // SEQ 1. 탭 조회
+        // SEQ 1. 탭 조회 (READ ONLY - 트랜잭션 불필요)
         RepostTab tab = repostTabRepository.findById(tabId)
-                .orElseThrow(() -> new RestException(ErrorCode.ARCHIVE_NOT_FOUND)); // ErrorCode.TAB_NOT_FOUND 권장
+                .orElseThrow(() -> new RestException(ErrorCode.REPOST_TAB_NOT_FOUND));
 
         // SEQ 2. 소유권 확인
         archiveGuard.checkOwner(tab.getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
-        // SEQ 3. 원본 게시글 확인
-        Post post = postRepository.findById(request.getPostId())
-                .orElseThrow(() -> new RestException(ErrorCode.POST_NOT_FOUND));
-
-        // SEQ 4. 중복 체크
-        if (repostRepository.existsByRepostTabIdAndPostId(tabId, request.getPostId())) {
-            throw new RestException(ErrorCode.REPOST_TAB_AND_POST_DUPLICATED);
+        // SEQ 3. URL 유효성 검증
+        String url = request.getUrl();
+        if (!isValidUrl(url)) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
         }
 
-        // SEQ 5. 스냅샷 데이터 추출 (제목 & 썸네일)
-        String titleSnapshot = post.getTitle(); // 생성 시점에선 자동으로 원본 게시글의 제목을 저장
-        String thumbnailKeySnapshot = post.getThumbnailKey();
+        // SEQ 4. 중복 체크 (URL 기반)
+        if (repostRepository.existsByRepostTabIdAndUrl(tabId, url)) {
+            throw new RestException(ErrorCode.REPOST_URL_DUPLICATED);
+        }
 
-        // SEQ 6. 저장
+        // SEQ 5. OG 메타데이터 추출 (트랜잭션 밖에서 수행 - Plan A) ✅
+        String title;
+        String thumbnailUrl = null;
+
+        try {
+            OpenGraphExtractor.OgMetadata metadata = OpenGraphExtractor.extract(url);
+            title = metadata.getTitle();
+            thumbnailUrl = metadata.getImageUrl();
+
+            // Fallback: 제목이 없으면 도메인 이름 사용
+            if (title == null || title.isBlank()) {
+                title = extractDomainName(url);
+            }
+        } catch (SocketTimeoutException e) {
+            throw new RestException(ErrorCode.REPOST_URL_TIMEOUT);
+        } catch (IOException e) {
+            throw new RestException(ErrorCode.REPOST_URL_UNREACHABLE);
+        }
+
+        // SEQ 6. DB에 1번만 저장 (트랜잭션 최소화) ✅
+        return saveRepost(tab, url, title, thumbnailUrl);
+    }
+
+    /**
+     * Repost 저장 (트랜잭션 최소화)
+     */
+    @Transactional
+    public RepostDto.Response saveRepost(RepostTab tab, String url, String title, String thumbnailUrl) {
         Repost repost = Repost.builder()
                 .repostTab(tab)
-                .postId(post.getId())
-                .title(titleSnapshot)
-                .thumbnailKey(thumbnailKeySnapshot)
+                .url(url)
+                .title(title)
+                .thumbnailUrl(thumbnailUrl)
                 .build();
         repostRepository.save(repost);
 
@@ -205,5 +243,25 @@ public class RepostService {
         repostBook.updateTitle(request.getTitle()); // Dirty Checking
 
         return RepostDto.RepostBookUpdateResponse.of(repostBook);
+    }
+
+    // Helper methods
+    @SuppressWarnings("unused")
+    private boolean isValidUrl(String url) {
+        try {
+            URI uri = new URI(url);
+            URL urlObj = uri.toURL(); // Validate URL format
+            return url.startsWith("http://") || url.startsWith("https://");
+        } catch (URISyntaxException | MalformedURLException e) {
+            return false;
+        }
+    }
+
+    private String extractDomainName(String url) {
+        try {
+            return new URI(url).toURL().getHost();
+        } catch (URISyntaxException | MalformedURLException e) {
+            return "Unknown";
+        }
     }
 }
