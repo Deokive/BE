@@ -12,12 +12,16 @@ import java.net.SocketTimeoutException;
 @Slf4j
 public class OpenGraphExtractor {
     private static final int TIMEOUT_MS = 5000;
+    private static final int MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB (OOM 방지)
 
     public static OgMetadata extract(String url) throws IOException {
         try {
             Document doc = Jsoup.connect(url)
                     .timeout(TIMEOUT_MS)
                     .userAgent("Mozilla/5.0 (compatible; DeokiveBot/1.0)")
+                    .maxBodySize(MAX_BODY_SIZE)      // OOM 방지
+                    .followRedirects(true)            // 리다이렉트 허용 (Jsoup 기본 20회 제한)
+                    .ignoreHttpErrors(false)          // 4xx/5xx 에러 시 예외 발생
                     .get();
 
             String title = extractOgTag(doc, "og:title");

@@ -53,11 +53,9 @@ public class RepostService {
         // SEQ 2. 소유권 확인
         archiveGuard.checkOwner(tab.getRepostBook().getArchive().getUser().getId(), userPrincipal);
 
-        // SEQ 3. URL 유효성 검증
+        // SEQ 3. URL 유효성 검증 (SSRF 방어 포함)
         String url = request.getUrl();
-        if (!isValidUrl(url)) {
-            throw new RestException(ErrorCode.REPOST_INVALID_URL);
-        }
+        validateUrl(url);
 
         // SEQ 4. 중복 체크 (URL 기반)
         if (repostRepository.existsByRepostTabIdAndUrl(tabId, url)) {
@@ -246,13 +244,92 @@ public class RepostService {
     }
 
     // Helper methods
-    @SuppressWarnings("unused")
-    private boolean isValidUrl(String url) {
+
+    /**
+     * SSRF 방어를 포함한 URL 검증
+     * - 프로토콜: http/https만 허용
+     * - SSRF: localhost, 내부망 IP 차단
+     * - @ 기법: UserInfo 포함 URL 차단
+     * - 길이: 2048자 초과 차단 (DB 제약 준수)
+     */
+    private void validateUrl(String url) {
+        // SEQ 1. 길이 검증 (DB VARCHAR(2048) 제약)
+        if (url == null || url.length() > 2048) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+
+        // SEQ 2. 프로토콜 검증
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+
+        // SEQ 3. URI 파싱
+        URI uri;
         try {
-            URI uri = new URI(url);
-            URL urlObj = uri.toURL(); // Validate URL format
-            return url.startsWith("http://") || url.startsWith("https://");
-        } catch (URISyntaxException | MalformedURLException e) {
+            uri = new URI(url);
+        } catch (URISyntaxException e) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+
+        // SEQ 4. Host 존재 검증
+        String host = uri.getHost();
+        if (host == null || host.isBlank()) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+
+        // SEQ 5. SSRF 방어 - localhost 차단
+        String hostLower = host.toLowerCase();
+        if (isLocalhost(hostLower)) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+
+        // SEQ 6. SSRF 방어 - 내부망 IP 차단
+        if (isPrivateNetwork(hostLower)) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+
+        // SEQ 7. @ 기법 방어 - UserInfo 차단
+        if (uri.getUserInfo() != null) {
+            throw new RestException(ErrorCode.REPOST_INVALID_URL);
+        }
+    }
+
+    /**
+     * localhost 판별
+     */
+    private boolean isLocalhost(String host) {
+        return host.equals("localhost")
+                || host.equals("127.0.0.1")
+                || host.equals("0.0.0.0")
+                || host.equals("[::]")
+                || host.equals("[::1]");
+    }
+
+    /**
+     * 내부망 IP 판별 (RFC 1918 + Link-local)
+     */
+    private boolean isPrivateNetwork(String host) {
+        return host.startsWith("192.168.")      // Class C private
+                || host.startsWith("10.")        // Class A private
+                || isRFC1918ClassB(host)         // 172.16.0.0/12
+                || host.startsWith("169.254.");  // Link-local
+    }
+
+    /**
+     * RFC 1918 Class B (172.16.0.0 ~ 172.31.255.255)
+     */
+    private boolean isRFC1918ClassB(String host) {
+        if (!host.startsWith("172.")) {
+            return false;
+        }
+        String[] parts = host.split("\\.");
+        if (parts.length < 2) {
+            return false;
+        }
+        try {
+            int secondOctet = Integer.parseInt(parts[1]);
+            return secondOctet >= 16 && secondOctet <= 31;
+        } catch (NumberFormatException e) {
             return false;
         }
     }
