@@ -11,7 +11,7 @@ import java.net.SocketTimeoutException;
 
 @Slf4j
 public class OpenGraphExtractor {
-    private static final int TIMEOUT_MS = 5000;
+    private static final int TIMEOUT_MS = 15000;
     private static final int MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB (OOM 방지)
 
     public static OgMetadata extract(String url) throws IOException {
