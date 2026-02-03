@@ -1,5 +1,6 @@
 package com.depth.deokive.system.config.redis;
 
+import com.depth.deokive.domain.post.service.RepostSseSubscriber;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -10,6 +11,8 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.GenericToStringSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -109,5 +112,26 @@ public class RedisConfig {
         template.setValueSerializer(new GenericToStringSerializer<>(Long.class));
 
         return template;
+    }
+
+    /**
+     * Redis Pub/Sub 리스너 컨테이너
+     * - SSE 이벤트 전파에 사용
+     * - 스케일아웃 시 여러 인스턴스 간 이벤트 동기화
+     */
+    @Bean
+    public RedisMessageListenerContainer redisMessageListenerContainer(
+            RedisConnectionFactory connectionFactory,
+            RepostSseSubscriber repostSseSubscriber) {
+
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+
+        // Repost 완료 이벤트 채널 구독
+        container.addMessageListener(repostSseSubscriber,
+                new ChannelTopic(RepostSseSubscriber.CHANNEL));
+
+        log.info("[Redis Pub/Sub] Subscribed to channel: {}", RepostSseSubscriber.CHANNEL);
+        return container;
     }
 }
