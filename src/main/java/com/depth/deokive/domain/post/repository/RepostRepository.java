@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface RepostRepository extends JpaRepository<Repost, Long> {
-    boolean existsByRepostTabIdAndUrl(Long repostTabId, String url);
+    boolean existsByRepostTabIdAndUrlHash(Long repostTabId, String urlHash);
 
     // Bulk Delete -> 성능 최적화
     @Modifying(clearAutomatically = true)

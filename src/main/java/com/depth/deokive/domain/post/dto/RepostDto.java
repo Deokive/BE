@@ -58,6 +58,9 @@ public class RepostDto {
         @Schema(description = "소속 리포스트 탭 ID", example = "1")
         private Long repostTabId;
 
+        @Schema(description = "OG 메타데이터 추출 상태 (PENDING: 추출 중, COMPLETED: 완료, FAILED: 실패)", example = "PENDING")
+        private String status;
+
         public static Response of(Repost repost) {
             return Response.builder()
                     .id(repost.getId())
@@ -65,6 +68,7 @@ public class RepostDto {
                     .title(repost.getTitle())
                     .thumbnailUrl(repost.getThumbnailUrl()) // Direct URL, no CDN conversion
                     .repostTabId(repost.getRepostTab().getId())
+                    .status(repost.getStatus().name())
                     .build();
         }
     }
@@ -149,16 +153,20 @@ public class RepostDto {
         @Schema(description = "생성 시간")
         private LocalDateTime createdAt;
 
+        @Schema(description = "OG 메타데이터 추출 상태", example = "PENDING")
+        private String status;
+
         @QueryProjection
         public RepostElementResponse(
                 Long id, String url, String title,
-                String thumbnailUrl, Long repostTabId, LocalDateTime createdAt) {
+                String thumbnailUrl, Long repostTabId, LocalDateTime createdAt, String status) {
             this.id = id;
             this.url = url; // Changed from postId
             this.title = title;
             this.thumbnailUrl = thumbnailUrl; // Direct URL, no conversion
             this.repostTabId = repostTabId;
             this.createdAt = createdAt;
+            this.status = status;
         }
     }
 

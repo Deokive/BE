@@ -48,7 +48,8 @@ public class RepostQueryRepository {
                             repost.title,
                             repost.thumbnailUrl, // Changed from repost.thumbnailKey
                             repost.repostTab.id,
-                            repost.createdAt
+                            repost.createdAt,
+                            repost.status.stringValue()  // Enum → String
                     ))
                     .from(repost)
                     .where(repost.id.in(ids))
