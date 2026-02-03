@@ -28,6 +28,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.DispatcherType;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,6 +74,13 @@ public class SecurityConfig {
                     oauth2.failureHandler(customFailureHandler);
                 })
                 .authorizeHttpRequests((auth) -> auth
+                        // 0. SSE 엔드포인트의 ASYNC dispatch만 permitAll (타임아웃/완료 처리)
+                        // - ASYNC는 이미 인증된 REQUEST에서 파생되므로 안전
+                        // - SSE 경로에만 한정하여 최소 권한 원칙 적용
+                        .requestMatchers(request ->
+                            request.getDispatcherType() == DispatcherType.ASYNC
+                            && request.getRequestURI().startsWith("/api/v1/sse/")
+                        ).permitAll()
                         // 1. 비인증 경로들 (RequestMatcherHolder에서 관리)
                         .requestMatchers(requestMatcherHolder.getRequestMatchersByMinRole(null)).permitAll()
                         .requestMatchers(HttpMethod.GET,
