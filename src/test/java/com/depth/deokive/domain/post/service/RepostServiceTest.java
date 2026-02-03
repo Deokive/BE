@@ -27,6 +27,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -218,8 +221,9 @@ class RepostServiceTest extends IntegrationTestSupport {
             repostService.createRepost(UserPrincipal.from(userA), tab1.getId(), req);
             repostService.createRepost(UserPrincipal.from(userA), tab2.getId(), req);
 
-            assertThat(repostRepository.existsByRepostTabIdAndUrl(tab1.getId(), VALID_URL_TWITTER)).isTrue();
-            assertThat(repostRepository.existsByRepostTabIdAndUrl(tab2.getId(), VALID_URL_TWITTER)).isTrue();
+            String urlHash = generateUrlHash(VALID_URL_TWITTER);
+            assertThat(repostRepository.existsByRepostTabIdAndUrlHash(tab1.getId(), urlHash)).isTrue();
+            assertThat(repostRepository.existsByRepostTabIdAndUrlHash(tab2.getId(), urlHash)).isTrue();
         }
     }
 
@@ -562,6 +566,17 @@ class RepostServiceTest extends IntegrationTestSupport {
             assertThat(repostService.getReposts(UserPrincipal.from(userA), archiveAPublic.getId(), tab1.getId(), req.toPageable()).getContent()).hasSize(5);
             // Tab2: 3개
             assertThat(repostService.getReposts(UserPrincipal.from(userA), archiveAPublic.getId(), tab2.getId(), req.toPageable()).getContent()).hasSize(3);
+        }
+    }
+
+    // Helper methods
+    private String generateUrlHash(String url) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
         }
     }
 }
