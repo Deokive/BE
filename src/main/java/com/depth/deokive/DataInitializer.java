@@ -23,6 +23,9 @@ import org.springframework.util.StopWatch;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -351,7 +354,7 @@ public class DataInitializer implements CommandLineRunner {
         String gallerySql = "INSERT INTO gallery (archive_id, gallery_book_id, file_id, original_key, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
         String ticketSql = "INSERT INTO ticket (ticket_book_id, title, date, location, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
         String repostTabSql = "INSERT INTO repost_tab (id, repost_book_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?)";
-        String repostSql = "INSERT INTO repost (repost_tab_id, url, title, thumbnail_url, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
+        String repostSql = "INSERT INTO repost (repost_tab_id, url, url_hash, title, thumbnail_url, status, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         // Diaries: one archive has either 0 or 100 diaries.
         // Here we generate 100 diaries for every archive(=diary_book_id) to match visibility distribution spec:
@@ -489,12 +492,13 @@ public class DataInitializer implements CommandLineRunner {
             int videoIndex = (i - start) % videoCount;
             VideoData video = videos.get(videoIndex);
 
-            // SQL: INSERT INTO repost (repost_tab_id, url, title, thumbnail_url, created_at, last_modified_at)
             batch.add(new Object[]{
                     tabId,
                     video.getUrl(),
+                    generateUrlHash(video.getUrl()),
                     video.getTitle(),
                     video.getThumbnailUrl(),
+                    "COMPLETED",
                     now,
                     now
             });
@@ -556,6 +560,16 @@ public class DataInitializer implements CommandLineRunner {
             return 1;
         }
         return id;
+    }
+
+    private String generateUrlHash(String url) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(url.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
+        }
     }
 
     private double calculateHotScore(long view, long like, LocalDateTime createdAt, LocalDateTime nowTime) {
