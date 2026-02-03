@@ -34,10 +34,10 @@ spring:
         access-key: ${AWS_IAM_ACCESS_KEY} # // Only Local 환경에서만
         secret-key: ${AWS_IAM_SECRET_KEY} # // Only Local 환경에서만
 
-logging:
-  level:
-    org.hibernate.SQL: debug
-    org.hibernate.type: trace
+#logging:
+#  level:
+#    org.hibernate.SQL: debug
+#    org.hibernate.type: trace
 
 jwt:
   secret: ${JWT_SECRET_KEY:ZGVva2l2ZXNlcnZlcnRlYW1hbmRvdGhlcnNmaWdodGluZw==}

@@ -25,9 +25,11 @@ public class RepostDto {
     @Data @NoArgsConstructor
     @Schema(name = "RepostCreateRequest", description = "리포스트 생성 요청")
     public static class CreateRequest {
-        @NotNull(message = "원본 게시글 ID는 필수입니다.")
-        @Schema(description = "원본 게시글 ID", example = "1")
-        private Long postId;
+        @NotBlank(message = "URL은 필수입니다.")
+        @Pattern(regexp = "^https?://.*", message = "올바른 URL 형식이 아닙니다.")
+        @Size(max = 2048, message = "URL은 2048자를 초과할 수 없습니다.")
+        @Schema(description = "외부 SNS URL", example = "https://twitter.com/username/status/123")
+        private String url;
     }
 
     @Data @NoArgsConstructor
@@ -43,26 +45,30 @@ public class RepostDto {
     public static class Response {
         @Schema(description = "리포스트 아이디", example = "1")
         private Long id;
-        
-        @Schema(description = "원본 게시글 ID (프론트는 이 ID로 /posts/{postId} 호출)", example = "5")
-        private Long postId; // 프론트는 이 ID로 /posts/{postId} 호출 -> 404 체크
-        
+
+        @Schema(description = "외부 SNS URL", example = "https://twitter.com/username/status/123")
+        private String url;
+
         @Schema(description = "리포스트 제목", example = "내가 리포스트한 게시글")
         private String title;
 
-        @Schema(description = "썸네일 이미지 URL", example = "https://cdn.example.com/files/thumbnails/thumbnail/uuid_filename.jpg")
+        @Schema(description = "썸네일 이미지 URL (nullable)", nullable = true)
         private String thumbnailUrl;
-        
+
         @Schema(description = "소속 리포스트 탭 ID", example = "1")
         private Long repostTabId;
+
+        @Schema(description = "OG 메타데이터 추출 상태 (PENDING: 추출 중, COMPLETED: 완료, FAILED: 실패)", example = "PENDING")
+        private String status;
 
         public static Response of(Repost repost) {
             return Response.builder()
                     .id(repost.getId())
-                    .postId(repost.getPostId())
+                    .url(repost.getUrl())
                     .title(repost.getTitle())
-                    .thumbnailUrl(FileUrlUtils.buildCdnUrl(repost.getThumbnailKey()))
+                    .thumbnailUrl(repost.getThumbnailUrl()) // Direct URL, no CDN conversion
                     .repostTabId(repost.getRepostTab().getId())
+                    .status(repost.getStatus().name())
                     .build();
         }
     }
@@ -132,13 +138,13 @@ public class RepostDto {
         @Schema(description = "리포스트 아이디", example = "1")
         private Long id;
 
-        @Schema(description = "원본 게시글 ID", example = "5")
-        private Long postId;
+        @Schema(description = "외부 SNS URL", example = "https://twitter.com/username/status/123")
+        private String url;
 
         @Schema(description = "리포스트 제목", example = "제목")
         private String title;
 
-        @Schema(description = "썸네일 이미지 URL")
+        @Schema(description = "썸네일 이미지 URL (nullable)", nullable = true)
         private String thumbnailUrl;
 
         @Schema(description = "소속 탭 ID")
@@ -147,16 +153,20 @@ public class RepostDto {
         @Schema(description = "생성 시간")
         private LocalDateTime createdAt;
 
+        @Schema(description = "OG 메타데이터 추출 상태", example = "PENDING")
+        private String status;
+
         @QueryProjection
         public RepostElementResponse(
-                Long id, Long postId, String title,
-                String thumbnailKey, Long repostTabId, LocalDateTime createdAt) {
+                Long id, String url, String title,
+                String thumbnailUrl, Long repostTabId, LocalDateTime createdAt, String status) {
             this.id = id;
-            this.postId = postId;
+            this.url = url; // Changed from postId
             this.title = title;
-            this.thumbnailUrl = FileUrlUtils.buildCdnUrl(thumbnailKey);
+            this.thumbnailUrl = thumbnailUrl; // Direct URL, no conversion
             this.repostTabId = repostTabId;
             this.createdAt = createdAt;
+            this.status = status;
         }
     }
 

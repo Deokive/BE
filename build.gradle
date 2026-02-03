@@ -125,6 +125,9 @@ dependencies {
     testImplementation 'io.rest-assured:rest-assured:5.4.0'
     testImplementation 'io.rest-assured:json-path:5.4.0'
     testImplementation 'io.rest-assured:xml-path:5.4.0'
+
+    // HTML Parsing for Open Graph metadata extraction
+    implementation 'org.jsoup:jsoup:1.17.2'
 }
 
 tasks.named('test') {

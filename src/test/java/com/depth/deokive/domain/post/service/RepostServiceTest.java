@@ -1,26 +1,17 @@
 package com.depth.deokive.domain.post.service;
 
-import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.common.test.IntegrationTestSupport;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.archive.service.ArchiveService;
-import com.depth.deokive.domain.file.entity.File;
-import com.depth.deokive.domain.file.entity.enums.MediaRole;
-import com.depth.deokive.domain.file.entity.enums.MediaType;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
-import com.depth.deokive.domain.post.dto.PostDto;
 import com.depth.deokive.domain.post.dto.RepostDto;
-import com.depth.deokive.domain.post.entity.Post;
 import com.depth.deokive.domain.post.entity.Repost;
 import com.depth.deokive.domain.post.entity.RepostTab;
-import com.depth.deokive.domain.post.entity.enums.Category; // [수정] 올바른 Enum 사용
-import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.post.repository.RepostRepository;
 import com.depth.deokive.domain.post.repository.RepostTabRepository;
 import com.depth.deokive.domain.user.entity.User;
@@ -36,8 +27,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,19 +39,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RepostServiceTest extends IntegrationTestSupport {
 
     @Autowired RepostService repostService;
-    @Autowired PostService postService;
     @Autowired ArchiveService archiveService;
 
-    @Autowired PostRepository postRepository;
     @Autowired RepostRepository repostRepository;
     @Autowired RepostTabRepository repostTabRepository;
     @Autowired ArchiveRepository archiveRepository;
-    @Autowired FileRepository fileRepository;
     @Autowired FriendMapRepository friendMapRepository;
 
     private User userA, userB, userC;
     private Archive archiveAPublic, archiveARestricted, archiveAPrivate;
-    private List<Post> userAPosts, userBPosts;
+
+    // Test URL constants
+    private static final String VALID_URL_TWITTER = "https://twitter.com/test/status/123";
+    private static final String VALID_URL_INSTAGRAM = "https://instagram.com/p/test123";
+    private static final String VALID_URL_YOUTUBE = "https://youtube.com/watch?v=abc123";
+    private static final String INVALID_URL = "not-a-valid-url";
 
     @BeforeEach
     void setUp() {
@@ -77,10 +71,6 @@ class RepostServiceTest extends IntegrationTestSupport {
         archiveAPublic = createArchiveByService(userA, Visibility.PUBLIC);
         archiveARestricted = createArchiveByService(userA, Visibility.RESTRICTED);
         archiveAPrivate = createArchiveByService(userA, Visibility.PRIVATE);
-
-        // Posts Setup
-        userAPosts = createPosts(userA, 10);
-        userBPosts = createPosts(userB, 5);
 
         SecurityContextHolder.clearContext();
     }
@@ -101,31 +91,6 @@ class RepostServiceTest extends IntegrationTestSupport {
         return archiveRepository.findById(response.getId()).orElseThrow();
     }
 
-    private List<File> createFiles(User owner, int count) {
-        List<File> files = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            String uuid = UUID.randomUUID().toString();
-            File file = fileRepository.save(File.builder().filename("file_" + uuid + ".jpg").s3ObjectKey("files/" + owner.getNickname() + "/" + uuid + ".jpg").fileSize(100L).mediaType(MediaType.IMAGE).createdBy(owner.getId()).lastModifiedBy(owner.getId()).build());
-            files.add(file);
-        }
-        return files;
-    }
-
-    private List<Post> createPosts(User owner, int count) {
-        List<Post> posts = new ArrayList<>();
-        UserPrincipal principal = UserPrincipal.from(owner);
-        setupMockUser(owner);
-        for (int i = 0; i < count; i++) {
-            List<PostDto.AttachedFileRequest> files = List.of(new PostDto.AttachedFileRequest(createFiles(owner, 1).get(0).getId(), MediaRole.PREVIEW, 0));
-            // [수정] Category Enum 사용 (IDOL)
-            PostDto.CreateRequest req = PostDto.CreateRequest.builder().title("Post " + i).content("C").category(Category.IDOL).files(files).build();
-            PostDto.Response res = postService.createPost(principal, req);
-            posts.add(postRepository.findById(res.getId()).orElseThrow());
-        }
-        SecurityContextHolder.clearContext();
-        return posts;
-    }
-
     private RepostTab createTab(User owner, Long archiveId) {
         setupMockUser(owner);
         return repostTabRepository.findById(repostService.createRepostTab(UserPrincipal.from(owner), archiveId).getId()).orElseThrow();
@@ -141,121 +106,124 @@ class RepostServiceTest extends IntegrationTestSupport {
         @DisplayName("SCENE 1: 정상 케이스 (PUBLIC Archive)")
         void createRepost_Public() {
             RepostTab tab = createTab(userA, archiveAPublic.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
 
             RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
 
             Repost repost = repostRepository.findById(res.getId()).orElseThrow();
-            assertThat(repost.getTitle()).isEqualTo(post.getTitle());
-            assertThat(repost.getThumbnailKey()).isEqualTo(post.getThumbnailKey());
-            assertThat(repost.getPostId()).isEqualTo(post.getId());
+            assertThat(repost.getUrl()).isEqualTo(VALID_URL_TWITTER);
+            assertThat(repost.getTitle()).isNotNull();
+            // thumbnailUrl is nullable and comes from OG extraction
         }
 
         @Test
         @DisplayName("SCENE 2: 정상 케이스 (RESTRICTED Archive)")
         void createRepost_Restricted() {
             RepostTab tab = createTab(userA, archiveARestricted.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_INSTAGRAM);
 
             RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
             assertThat(repostRepository.existsById(res.getId())).isTrue();
+            assertThat(res.getUrl()).isEqualTo(VALID_URL_INSTAGRAM);
         }
 
         @Test
         @DisplayName("SCENE 3: 정상 케이스 (PRIVATE Archive)")
         void createRepost_Private() {
             RepostTab tab = createTab(userA, archiveAPrivate.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_YOUTUBE);
 
             RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
             assertThat(repostRepository.existsById(res.getId())).isTrue();
+            assertThat(res.getUrl()).isEqualTo(VALID_URL_YOUTUBE);
         }
 
         @Test
-        @DisplayName("SCENE 4: 정상 케이스 (다른 사용자의 Post)")
-        void createRepost_OtherUserPost() {
+        @DisplayName("SCENE 4: 정상 케이스 (여러 URL 형식)")
+        void createRepost_MultipleUrlFormats() {
             RepostTab tab = createTab(userA, archiveAPublic.getId());
-            Post post = userBPosts.get(0); // UserB's post
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+
+            String twitterUrl = "https://twitter.com/user/status/456";
+            RepostDto.CreateRequest req1 = new RepostDto.CreateRequest();
+            req1.setUrl(twitterUrl);
+            RepostDto.Response res1 = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req1);
+
+            assertThat(res1.getUrl()).isEqualTo(twitterUrl);
+            assertThat(res1.getTitle()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("SCENE 5: 정상 케이스 (OG 추출 - thumbnailUrl nullable)")
+        void createRepost_NullableThumbnail() {
+            RepostTab tab = createTab(userA, archiveAPublic.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
 
             RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
 
+            // thumbnailUrl is nullable - comes from OG extraction, may or may not exist
             Repost repost = repostRepository.findById(res.getId()).orElseThrow();
-            assertThat(repost.getPostId()).isEqualTo(post.getId());
-            assertThat(repost.getTitle()).isEqualTo(post.getTitle());
-        }
-
-        @Test
-        @DisplayName("SCENE 5: 정상 케이스 (썸네일 없는 Post)")
-        void createRepost_NoThumbnail() {
-            setupMockUser(userA);
-            PostDto.Response noThumbRes = postService.createPost(UserPrincipal.from(userA),
-                    PostDto.CreateRequest.builder().title("NoThumb").content("C").category(Category.IDOL).build());
-            Post noThumbPost = postRepository.findById(noThumbRes.getId()).orElseThrow();
-
-            RepostTab tab = createTab(userA, archiveAPublic.getId());
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(noThumbPost.getId());
-
-            RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
-            assertThat(repostRepository.findById(res.getId()).get().getThumbnailKey()).isNull();
+            assertThat(repost.getUrl()).isEqualTo(VALID_URL_TWITTER);
+            // No assertion on thumbnailUrl - it's nullable and depends on OG extraction
         }
 
         @Test
         @DisplayName("SCENE 6~11: 예외 케이스")
         void createRepost_Exceptions() {
             RepostTab tab = createTab(userA, archiveAPublic.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest validReq = new RepostDto.CreateRequest();
+            validReq.setUrl(VALID_URL_TWITTER);
 
-            // 6: Tab Not Found (Service throws ARCHIVE_NOT_FOUND or REPOST_TAB_NOT_FOUND depending on impl logic for Tab retrieval via ID)
-            // Implementation provided: repostTabRepository.findById(tabId).orElseThrow(ARCHIVE_NOT_FOUND) -> User wants TAB_NOT_FOUND generally but based on provided code: ARCHIVE_NOT_FOUND
-            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userA), 99999L, req))
+            // 6: Tab Not Found
+            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userA), 99999L, validReq))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.ARCHIVE_NOT_FOUND);
 
             // 7: Forbidden (Public) - Stranger
-            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userC), tab.getId(), req))
+            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userC), tab.getId(), validReq))
                     .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUTH_FORBIDDEN);
 
             // 8, 9, 10: Forbidden (Restricted) - Stranger/Friend
             RepostTab resTab = createTab(userA, archiveARestricted.getId());
-            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userC), resTab.getId(), req)).isInstanceOf(RestException.class);
-            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userB), resTab.getId(), req)).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userC), resTab.getId(), validReq)).isInstanceOf(RestException.class);
+            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userB), resTab.getId(), validReq)).isInstanceOf(RestException.class);
 
-            // 11: Post Not Found
-            req.setPostId(99999L);
-            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req))
-                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.POST_NOT_FOUND);
+            // 11: Invalid URL format
+            RepostDto.CreateRequest invalidReq = new RepostDto.CreateRequest();
+            invalidReq.setUrl(INVALID_URL);
+            assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userA), tab.getId(), invalidReq))
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPOST_INVALID_URL);
         }
 
         @Test
-        @DisplayName("SCENE 12: 중복 생성 시도")
+        @DisplayName("SCENE 12: URL 중복 생성 시도")
         void createRepost_Duplicate() {
             RepostTab tab = createTab(userA, archiveAPublic.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
 
             repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
 
             assertThatThrownBy(() -> repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req))
-                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPOST_TAB_AND_POST_DUPLICATED);
+                    .isInstanceOf(RestException.class).hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPOST_URL_DUPLICATED);
         }
 
         @Test
-        @DisplayName("SCENE 13: 같은 Post를 다른 Tab에 생성")
+        @DisplayName("SCENE 13: 같은 URL을 다른 Tab에 생성")
         void createRepost_DifferentTabs() {
             RepostTab tab1 = createTab(userA, archiveAPublic.getId());
             RepostTab tab2 = createTab(userA, archiveAPublic.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
 
             repostService.createRepost(UserPrincipal.from(userA), tab1.getId(), req);
             repostService.createRepost(UserPrincipal.from(userA), tab2.getId(), req);
 
-            assertThat(repostRepository.existsByRepostTabIdAndPostId(tab1.getId(), post.getId())).isTrue();
-            assertThat(repostRepository.existsByRepostTabIdAndPostId(tab2.getId(), post.getId())).isTrue();
+            String urlHash = generateUrlHash(VALID_URL_TWITTER);
+            assertThat(repostRepository.existsByRepostTabIdAndUrlHash(tab1.getId(), urlHash)).isTrue();
+            assertThat(repostRepository.existsByRepostTabIdAndUrlHash(tab2.getId(), urlHash)).isTrue();
         }
     }
 
@@ -270,15 +238,15 @@ class RepostServiceTest extends IntegrationTestSupport {
         @BeforeEach
         void init() {
             RepostTab tab = createTab(userA, archiveAPublic.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
             RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
             repost = repostRepository.findById(res.getId()).orElseThrow();
             flushAndClear();
         }
 
         @Test
-        @DisplayName("SCENE 14~17: 정상 수정 (제목 수정, 스냅샷 유지)")
+        @DisplayName("SCENE 14~17: 정상 수정 (제목 수정, URL 유지)")
         void updateRepost_Normal() {
             RepostDto.UpdateRequest req = new RepostDto.UpdateRequest();
             req.setTitle("New Title");
@@ -287,8 +255,8 @@ class RepostServiceTest extends IntegrationTestSupport {
 
             Repost updated = repostRepository.findById(repost.getId()).orElseThrow();
             assertThat(updated.getTitle()).isEqualTo("New Title");
-            assertThat(updated.getThumbnailKey()).isEqualTo(repost.getThumbnailKey()); // Thumbnail preserved
-            assertThat(updated.getPostId()).isEqualTo(repost.getPostId());
+            assertThat(updated.getUrl()).isEqualTo(repost.getUrl()); // URL preserved
+            // thumbnailUrl is nullable and preserved from original OG extraction
         }
 
         @Test
@@ -317,8 +285,8 @@ class RepostServiceTest extends IntegrationTestSupport {
         @BeforeEach
         void init() {
             RepostTab tab = createTab(userA, archiveAPublic.getId());
-            Post post = userAPosts.get(0);
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(post.getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
             RepostDto.Response res = repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
             repost = repostRepository.findById(res.getId()).orElseThrow();
             flushAndClear();
@@ -331,7 +299,7 @@ class RepostServiceTest extends IntegrationTestSupport {
             flushAndClear();
 
             assertThat(repostRepository.existsById(repost.getId())).isFalse();
-            assertThat(postRepository.existsById(repost.getPostId())).isTrue(); // Post remains
+            // URL-based Repost is independent - no external Post to verify
         }
 
         @Test
@@ -444,7 +412,8 @@ class RepostServiceTest extends IntegrationTestSupport {
         void init() {
             tab = createTab(userA, archiveAPublic.getId());
             // Create Repost inside tab
-            RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(userAPosts.get(0).getId());
+            RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+            req.setUrl(VALID_URL_TWITTER);
             repostService.createRepost(UserPrincipal.from(userA), tab.getId(), req);
             flushAndClear();
         }
@@ -488,12 +457,16 @@ class RepostServiceTest extends IntegrationTestSupport {
             tab2 = createTab(userA, archiveAPublic.getId());
 
             UserPrincipal principal = UserPrincipal.from(userA);
+            // Tab 1: 5 reposts with different URLs
             for(int i=0; i<5; i++) {
-                RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(userAPosts.get(i).getId());
+                RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+                req.setUrl("https://twitter.com/test/status/" + (100 + i));
                 repostService.createRepost(principal, tab1.getId(), req);
             }
+            // Tab 2: 3 reposts with different URLs
             for(int i=0; i<3; i++) {
-                RepostDto.CreateRequest req = new RepostDto.CreateRequest(); req.setPostId(userAPosts.get(i+5).getId());
+                RepostDto.CreateRequest req = new RepostDto.CreateRequest();
+                req.setUrl("https://instagram.com/p/test" + (200 + i));
                 repostService.createRepost(principal, tab2.getId(), req);
             }
             flushAndClear();
@@ -593,6 +566,17 @@ class RepostServiceTest extends IntegrationTestSupport {
             assertThat(repostService.getReposts(UserPrincipal.from(userA), archiveAPublic.getId(), tab1.getId(), req.toPageable()).getContent()).hasSize(5);
             // Tab2: 3개
             assertThat(repostService.getReposts(UserPrincipal.from(userA), archiveAPublic.getId(), tab2.getId(), req.toPageable()).getContent()).hasSize(3);
+        }
+    }
+
+    // Helper methods
+    private String generateUrlHash(String url) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
         }
     }
 }

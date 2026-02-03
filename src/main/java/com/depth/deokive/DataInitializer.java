@@ -8,15 +8,21 @@ import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.post.entity.enums.Category;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import com.depth.deokive.domain.user.entity.enums.UserType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Profile;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -40,6 +46,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
+    private final ResourceLoader resourceLoader;
 
     // Constants
     private static final int USER_COUNT = 11;
@@ -52,6 +59,19 @@ public class DataInitializer implements CommandLineRunner {
     private static final double W2 = 3.0;
     private static final double LAMBDA = 0.004;
     private static final long WINDOW_HOURS = 168;
+
+    // YouTube Playlist JSON Path (classpath resource)
+    private static final String YOUTUBE_PLAYLIST_JSON_PATH = "classpath:sample/sample.json";
+
+    // Video Data Cache
+    private List<VideoData> videoDataCache = null;
+
+    @Data
+    static class VideoData {
+        private String title;
+        private String url;
+        private String thumbnailUrl;
+    }
 
     @Override
     public void run(String... args) {
@@ -331,7 +351,7 @@ public class DataInitializer implements CommandLineRunner {
         String gallerySql = "INSERT INTO gallery (archive_id, gallery_book_id, file_id, original_key, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
         String ticketSql = "INSERT INTO ticket (ticket_book_id, title, date, location, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
         String repostTabSql = "INSERT INTO repost_tab (id, repost_book_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?)";
-        String repostSql = "INSERT INTO repost (repost_tab_id, post_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?)";
+        String repostSql = "INSERT INTO repost (repost_tab_id, url, title, thumbnail_url, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
 
         // Diaries: one archive has either 0 or 100 diaries.
         // Here we generate 100 diaries for every archive(=diary_book_id) to match visibility distribution spec:
@@ -453,11 +473,80 @@ public class DataInitializer implements CommandLineRunner {
         Timestamp now = getArchiveDate(bookId, baseTime);
         long tabId = bookId * 100;
         jdbcTemplate.update(tabSql, tabId, bookId, "My Tab", now, now);
+
+        // Load video data from JSON (cached)
+        List<VideoData> videos = loadYoutubePlaylistData();
+        if (videos.isEmpty()) {
+            log.warn("⚠️ YouTube playlist data is empty. Skipping repost creation for bookId={}", bookId);
+            return;
+        }
+
         List<Object[]> batch = new ArrayList<>();
+        int videoCount = videos.size();
+
         for (int i = start; i <= end; i++) {
-            batch.add(new Object[]{tabId, (long)i, "Repost of Post " + i, now, now});
+            // Circular indexing: if data runs out, loop back to index 0
+            int videoIndex = (i - start) % videoCount;
+            VideoData video = videos.get(videoIndex);
+
+            // SQL: INSERT INTO repost (repost_tab_id, url, title, thumbnail_url, created_at, last_modified_at)
+            batch.add(new Object[]{
+                    tabId,
+                    video.getUrl(),
+                    video.getTitle(),
+                    video.getThumbnailUrl(),
+                    now,
+                    now
+            });
         }
         jdbcTemplate.batchUpdate(repostSql, batch);
+    }
+
+    /**
+     * Load YouTube playlist data from JSON file (with caching)
+     * Uses classpath resource to work in both local and production environments
+     */
+    private List<VideoData> loadYoutubePlaylistData() {
+        // Return cached data if already loaded
+        if (videoDataCache != null) {
+            return videoDataCache;
+        }
+
+        List<VideoData> videos = new ArrayList<>();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            Resource resource = resourceLoader.getResource(YOUTUBE_PLAYLIST_JSON_PATH);
+            if (!resource.exists()) {
+                log.warn("⚠️ YouTube playlist JSON not found at: {}", YOUTUBE_PLAYLIST_JSON_PATH);
+                return videos;
+            }
+
+            JsonNode root;
+            try (InputStream inputStream = resource.getInputStream()) {
+                root = objectMapper.readTree(inputStream);
+            }
+
+            JsonNode videosNode = root.get("videos");
+
+            if (videosNode != null && videosNode.isArray()) {
+                for (JsonNode videoNode : videosNode) {
+                    VideoData video = new VideoData();
+                    video.setTitle(videoNode.get("title").asText());
+                    video.setUrl(videoNode.get("url").asText());
+                    video.setThumbnailUrl(videoNode.get("thumbnailUrl").asText());
+                    videos.add(video);
+                }
+            }
+
+            videoDataCache = videos; // Cache for reuse
+            log.info("✅ Loaded {} videos from YouTube playlist JSON", videos.size());
+
+        } catch (IOException e) {
+            log.error("❌ Failed to load YouTube playlist JSON: {}", e.getMessage(), e);
+        }
+
+        return videos;
     }
 
     private long getSafeFileId(AtomicLong fileCursor) {

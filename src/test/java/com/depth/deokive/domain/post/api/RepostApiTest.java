@@ -2,12 +2,10 @@ package com.depth.deokive.domain.post.api;
 
 import com.depth.deokive.common.test.ApiTestSupport;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
-import com.depth.deokive.domain.file.repository.FileRepository;
 import com.depth.deokive.domain.friend.entity.FriendMap;
 import com.depth.deokive.domain.friend.entity.enums.FriendStatus;
 import com.depth.deokive.domain.friend.repository.FriendMapRepository;
 import com.depth.deokive.domain.post.entity.Repost;
-import com.depth.deokive.domain.post.repository.PostRepository;
 import com.depth.deokive.domain.post.repository.RepostRepository;
 import com.depth.deokive.domain.post.repository.RepostTabRepository;
 import com.depth.deokive.domain.s3.dto.S3ServiceDto;
@@ -23,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,17 +38,20 @@ class RepostApiTest extends ApiTestSupport {
 
     @Autowired private RepostRepository repostRepository;
     @Autowired private RepostTabRepository repostTabRepository;
-    @Autowired private PostRepository postRepository;
     @Autowired private ArchiveRepository archiveRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private FriendMapRepository friendMapRepository;
-    @Autowired private FileRepository fileRepository;
 
     // --- Static Variables (Test Context Shared) ---
     private static String tokenUserA, tokenUserB, tokenUserC;
     private static Long userAId, userBId, userCId;
     private static Long publicArchiveId, restrictedArchiveId, privateArchiveId;
-    private static Long postAId, postBId, postCId;
+
+    // Test URL constants
+    private static final String VALID_URL_TWITTER = "https://twitter.com/test/status/123";
+    private static final String VALID_URL_INSTAGRAM = "https://instagram.com/p/test123";
+    private static final String VALID_URL_YOUTUBE = "https://youtube.com/watch?v=abc123";
+    private static final String INVALID_URL = "not-a-valid-url";
 
     @BeforeEach
     void setUp() {
@@ -67,11 +67,6 @@ class RepostApiTest extends ApiTestSupport {
         // 2. 아카이브가 없으면 아카이브 생성
         if (publicArchiveId == null) {
             initArchives();
-        }
-
-        // 3. 게시글이 없으면 게시글 생성 (여기가 NPE 원인이었음 -> 이제 안전함)
-        if (postBId == null) {
-            initPosts();
         }
     }
 
@@ -124,15 +119,6 @@ class RepostApiTest extends ApiTestSupport {
         publicArchiveId = ArchiveSteps.create(tokenUserA, "R_Public", "PUBLIC");
         restrictedArchiveId = ArchiveSteps.create(tokenUserA, "R_Restricted", "RESTRICTED");
         privateArchiveId = ArchiveSteps.create(tokenUserA, "R_Private", "PRIVATE");
-    }
-
-    private void initPosts() {
-        postAId = PostSteps.create(tokenUserA, "Post A", "IDOL", null);
-
-        Long fileId = FileSteps.uploadFile(tokenUserB);
-        postBId = PostSteps.create(tokenUserB, "Post B", "ACTOR", fileId);
-
-        postCId = PostSteps.create(tokenUserC, "Post C", "SPORT", null);
     }
 
     // ========================================================================================
@@ -207,62 +193,62 @@ class RepostApiTest extends ApiTestSupport {
             tabId = RepostSteps.createTab(tokenUserA, publicArchiveId);
         }
 
-        @Test @DisplayName("SCENE 7. 리포스트 생성 (썸네일 O)")
-        void createRepost_WithThumb() {
+        @Test @DisplayName("SCENE 7. 리포스트 생성 (유효한 Twitter URL)")
+        void createRepost_ValidTwitterUrl() {
             int repostId = given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
-                    .body(Map.of("postId", postBId))
+                    .body(Map.of("url", VALID_URL_TWITTER))
                     .post("/api/v1/repost/{tabId}", tabId).then().statusCode(201)
-                    .body("thumbnailUrl", containsString("http"))
+                    .body("url", equalTo(VALID_URL_TWITTER))
                     .extract().jsonPath().getInt("id");
 
             Repost repost = repostRepository.findById((long) repostId).orElseThrow();
-            assertThat(repost.getTitle()).isEqualTo("Post B");
+            assertThat(repost.getUrl()).isEqualTo(VALID_URL_TWITTER);
         }
 
-        @Test @DisplayName("SCENE 8. 리포스트 생성 (썸네일 X)")
-        void createRepost_NoThumb() {
+        @Test @DisplayName("SCENE 8. 리포스트 생성 (유효한 Instagram URL)")
+        void createRepost_ValidInstagramUrl() {
             int repostId = given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
-                    .body(Map.of("postId", postCId))
+                    .body(Map.of("url", VALID_URL_INSTAGRAM))
                     .post("/api/v1/repost/{tabId}", tabId).then().statusCode(201)
-                    .body("thumbnailUrl", nullValue())
+                    .body("url", equalTo(VALID_URL_INSTAGRAM))
                     .extract().jsonPath().getInt("id");
 
             Repost repost = repostRepository.findById((long) repostId).orElseThrow();
-            assertThat(repost.getThumbnailKey()).isNull();
+            assertThat(repost.getUrl()).isEqualTo(VALID_URL_INSTAGRAM);
         }
 
-        @Test @DisplayName("SCENE 9. 중복 생성 방지")
-        void createRepost_Duplicate() {
-            RepostSteps.createRepost(tokenUserA, tabId, postBId);
+        @Test @DisplayName("SCENE 9. 중복 URL 생성 방지")
+        void createRepost_DuplicateUrl() {
+            RepostSteps.createRepost(tokenUserA, tabId, VALID_URL_TWITTER);
             given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
-                    .body(Map.of("postId", postBId))
-                    .post("/api/v1/repost/{tabId}", tabId).then().statusCode(409);
+                    .body(Map.of("url", VALID_URL_TWITTER))
+                    .post("/api/v1/repost/{tabId}", tabId).then().statusCode(409); // REPOST_URL_DUPLICATED
         }
 
-        @Test @DisplayName("SCENE 10. 존재하지 않는 게시글")
-        void createRepost_NotFound() {
+        @Test @DisplayName("SCENE 10. 잘못된 URL 형식")
+        void createRepost_InvalidUrl() {
             given().cookie("ATK", tokenUserA).contentType(ContentType.JSON)
-                    .body(Map.of("postId", 99999))
-                    .post("/api/v1/repost/{tabId}", tabId).then().statusCode(404);
+                    .body(Map.of("url", INVALID_URL))
+                    .post("/api/v1/repost/{tabId}", tabId).then().statusCode(400); // REPOST_INVALID_URL
         }
 
         @Test @DisplayName("SCENE 11. 리포스트 수정")
         void updateRepost() {
-            Long repostId = RepostSteps.createRepost(tokenUserA, tabId, postBId);
-            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(Map.of("title", "New"))
-                    .patch("/api/v1/repost/{id}", repostId).then().statusCode(200).body("title", equalTo("New"));
+            Long repostId = RepostSteps.createRepost(tokenUserA, tabId, VALID_URL_TWITTER);
+            given().cookie("ATK", tokenUserA).contentType(ContentType.JSON).body(Map.of("title", "New Title"))
+                    .patch("/api/v1/repost/{id}", repostId).then().statusCode(200).body("title", equalTo("New Title"));
         }
 
         @Test @DisplayName("SCENE 12. 리포스트 삭제")
         void deleteRepost() {
-            Long repostId = RepostSteps.createRepost(tokenUserA, tabId, postBId);
+            Long repostId = RepostSteps.createRepost(tokenUserA, tabId, VALID_URL_YOUTUBE);
             given().cookie("ATK", tokenUserA).delete("/api/v1/repost/{id}", repostId).then().statusCode(204);
             assertThat(repostRepository.existsById(repostId)).isFalse();
         }
 
         @Test @DisplayName("SCENE 13. 타인 생성 시도")
         void createRepost_Forbidden() {
-            given().cookie("ATK", tokenUserC).contentType(ContentType.JSON).body(Map.of("postId", postBId))
+            given().cookie("ATK", tokenUserC).contentType(ContentType.JSON).body(Map.of("url", VALID_URL_TWITTER))
                     .post("/api/v1/repost/{tabId}", tabId).then().statusCode(403);
         }
     }
@@ -281,12 +267,8 @@ class RepostApiTest extends ApiTestSupport {
             repostTabRepository.deleteAll();
             Long tabId = RepostSteps.createTab(tokenUserA, publicArchiveId);
 
-            // Create temporary posts
-            Long p1 = PostSteps.create(tokenUserA, "T1", "IDOL", null);
-            Long p2 = PostSteps.create(tokenUserA, "T2", "IDOL", null);
-
-            RepostSteps.createRepost(tokenUserA, tabId, p1);
-            RepostSteps.createRepost(tokenUserA, tabId, p2);
+            RepostSteps.createRepost(tokenUserA, tabId, VALID_URL_TWITTER);
+            RepostSteps.createRepost(tokenUserA, tabId, VALID_URL_INSTAGRAM);
 
             given().cookie("ATK", tokenUserA).delete("/api/v1/repost/tabs/{id}", tabId).then().statusCode(204);
 
@@ -309,7 +291,7 @@ class RepostApiTest extends ApiTestSupport {
             repostTabRepository.deleteAll();
 
             tab1 = RepostSteps.createTab(tokenUserA, publicArchiveId);
-            RepostSteps.createRepost(tokenUserA, tab1, postAId);
+            RepostSteps.createRepost(tokenUserA, tab1, VALID_URL_TWITTER);
         }
 
         @Test @DisplayName("SCENE 15. PUBLIC 탭 조회")
@@ -402,7 +384,7 @@ class RepostApiTest extends ApiTestSupport {
         }
     }
 
-    // ArchiveSteps, FriendSteps, FileSteps, PostSteps, RepostSteps는 기존과 동일
+    // Helper classes for test operations
     static class ArchiveSteps {
         static Long create(String t, String n, String v) {
             return given().cookie("ATK", t).contentType(ContentType.JSON).body(Map.of("title", n, "visibility", v)).post("/api/v1/archives").then().statusCode(201).extract().jsonPath().getLong("id");
@@ -415,26 +397,12 @@ class RepostApiTest extends ApiTestSupport {
             fr.save(FriendMap.builder().user(ub).friend(ua).requestedBy(ua).friendStatus(FriendStatus.ACCEPTED).acceptedAt(LocalDateTime.now()).build());
         }
     }
-    static class FileSteps {
-        static Long uploadFile(String t) {
-            Response i = given().cookie("ATK", t).contentType(ContentType.JSON).body(Map.of("originalFileName", "f.jpg", "mimeType", "image/jpeg", "fileSize", 100, "mediaRole", "CONTENT")).post("/api/v1/files/multipart/initiate");
-            return given().cookie("ATK", t).contentType(ContentType.JSON).body(Map.of("key", i.jsonPath().getString("key"), "uploadId", i.jsonPath().getString("uploadId"), "parts", List.of(Map.of("partNumber", 1, "etag", "e")), "originalFileName", "f.jpg", "fileSize", 100, "mimeType", "image/jpeg", "mediaRole", "CONTENT", "sequence", 0)).post("/api/v1/files/multipart/complete").then().statusCode(200).extract().jsonPath().getLong("fileId");
-        }
-    }
-    static class PostSteps {
-        static Long create(String t, String title, String cat, Long fid) {
-            Map<String, Object> body = new HashMap<>(); body.put("title", title); body.put("content", "C"); body.put("category", cat);
-            if(fid != null) body.put("files", List.of(Map.of("fileId", fid, "mediaRole", "PREVIEW", "sequence", 0)));
-            else body.put("files", List.of());
-            return given().cookie("ATK", t).contentType(ContentType.JSON).body(body).post("/api/v1/posts").then().statusCode(201).extract().jsonPath().getLong("id");
-        }
-    }
     static class RepostSteps {
         static Long createTab(String t, Long aid) {
             return given().cookie("ATK", t).post("/api/v1/repost/tabs/{id}", aid).then().statusCode(201).extract().jsonPath().getLong("id");
         }
-        static Long createRepost(String t, Long tid, Long pid) {
-            return given().cookie("ATK", t).contentType(ContentType.JSON).body(Map.of("postId", pid)).post("/api/v1/repost/{id}", tid).then().statusCode(201).extract().jsonPath().getLong("id");
+        static Long createRepost(String t, Long tid, String url) {
+            return given().cookie("ATK", t).contentType(ContentType.JSON).body(Map.of("url", url)).post("/api/v1/repost/{id}", tid).then().statusCode(201).extract().jsonPath().getLong("id");
         }
     }
 }

@@ -44,11 +44,12 @@ public class RepostQueryRepository {
             content = queryFactory
                     .select(Projections.constructor(RepostDto.RepostElementResponse.class,
                             repost.id,
-                            repost.postId,
+                            repost.url,        // Changed from repost.postId
                             repost.title,
-                            repost.thumbnailKey,
+                            repost.thumbnailUrl, // Changed from repost.thumbnailKey
                             repost.repostTab.id,
-                            repost.createdAt
+                            repost.createdAt,
+                            repost.status.stringValue()  // Enum → String
                     ))
                     .from(repost)
                     .where(repost.id.in(ids))
