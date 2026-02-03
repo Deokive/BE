@@ -13,6 +13,7 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RepostService {
@@ -89,7 +91,7 @@ public class RepostService {
                 .repostTab(tab)
                 .url(url)
                 .urlHash(urlHash)
-                .title(url)  // 임시로 URL을 title로 사용
+                .title(truncateTitle(url))  // 임시로 URL을 title로 사용 (255자 제한)
                 .thumbnailUrl(null)
                 .status(RepostStatus.PENDING)
                 .build();
@@ -363,5 +365,19 @@ public class RepostService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
         }
+    }
+
+    /**
+     * 제목을 252자까지 자르고 "..."을 붙여서 총 255자로 제한
+     * DB 컬럼 제한(VARCHAR(255))을 준수하기 위함
+     */
+    private String truncateTitle(String title) {
+        if (title == null) {
+            return null;
+        }
+        if (title.length() <= 252) {
+            return title;
+        }
+        return title.substring(0, 252) + "...";
     }
 }

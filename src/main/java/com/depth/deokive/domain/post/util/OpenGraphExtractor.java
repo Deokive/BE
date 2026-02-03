@@ -18,16 +18,23 @@ public class OpenGraphExtractor {
         try {
             Document doc = Jsoup.connect(url)
                     .timeout(TIMEOUT_MS)
-                    .userAgent("Mozilla/5.0 (compatible; DeokiveBot/1.0)")
+                    .userAgent(UserAgentGenerator.getRandom())  // 실제 브라우저 User Agent 랜덤 선택
                     .maxBodySize(MAX_BODY_SIZE)      // OOM 방지
                     .followRedirects(true)            // 리다이렉트 허용 (Jsoup 기본 20회 제한)
                     .ignoreHttpErrors(false)          // 4xx/5xx 에러 시 예외 발생
                     .get();
 
+            // [임시 DEBUG] EC2에서 실제로 받은 <head> 내용 확인용 — 진단 후 제거
+            String headHtml = doc.head().html();
+            log.warn("[OG DEBUG] url={} | head-length={} | head={}",
+                    url, headHtml.length(), headHtml.substring(0, Math.min(headHtml.length(), 2000)));
+
             String title = extractOgTag(doc, "og:title");
             if (title == null || title.isBlank()) {
                 title = doc.title();
             }
+            // DB 컬럼 제한(VARCHAR(255)) 준수: 252자까지 자르고 "..." 붙여서 총 255자
+            title = truncateTitle(title);
 
             String imageUrl = extractOgTag(doc, "og:image");
             if (imageUrl == null || imageUrl.isBlank()) {
@@ -54,6 +61,20 @@ public class OpenGraphExtractor {
             element = doc.selectFirst("meta[name=" + property + "]");
         }
         return element != null ? element.attr("content") : null;
+    }
+
+    /**
+     * 제목을 252자까지 자르고 "..."을 붙여서 총 255자로 제한
+     * DB 컬럼 제한(VARCHAR(255))을 준수하기 위함
+     */
+    private static String truncateTitle(String title) {
+        if (title == null) {
+            return null;
+        }
+        if (title.length() <= 252) {
+            return title;
+        }
+        return title.substring(0, 252) + "...";
     }
 
     @Data
