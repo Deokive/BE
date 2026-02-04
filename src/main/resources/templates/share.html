@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Deokive">
+    <meta property="og:title" th:content="${ogTitle}">
+    <meta property="og:description" th:content="${ogDescription}">
+    <meta property="og:image" th:content="${ogImage}">
+    <meta property="og:url" th:content="${redirectUrl}">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" th:content="${ogTitle}">
+    <meta name="twitter:description" th:content="${ogDescription}">
+    <meta name="twitter:image" th:content="${ogImage}">
+
+    <title th:text="${ogTitle}">Deokive</title>
+
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="loader" style="margin: 0 auto 20px auto;"></div>
+    <p>Deokive 앱으로 이동 중입니다...</p>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    var targetUrl = /*[[${redirectUrl}]]*/ '';
+
+    // 봇이 아닌 경우에만 리다이렉트
+    setTimeout(function() {
+        window.location.replace(targetUrl);
+    }, 50);
+    /*]]>*/
+</script>
+</body>
+</html>

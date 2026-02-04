@@ -45,6 +45,10 @@ public class RequestMatcherHolder {
             // system
             new RequestInfo(null, "/api/system/**", null),
 
+            // metadata
+            new RequestInfo(HttpMethod.GET, "/oembed", null),      // oEmbed JSON Provider
+            new RequestInfo(HttpMethod.GET, "/share/**", null),    // Thymeleaf Share Page
+
             // static resources
             new RequestInfo(HttpMethod.GET,  "/docs/**", null),
             new RequestInfo(HttpMethod.GET,  "/*.ico", null),
