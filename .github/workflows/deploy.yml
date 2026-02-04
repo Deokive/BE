@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "DEOK-68-HOTFIX-EC2에서-크롤링-막힘" ]
 
   workflow_dispatch:
 

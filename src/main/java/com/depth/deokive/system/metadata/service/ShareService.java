@@ -98,7 +98,8 @@ public class ShareService {
 
     /**
      * 요청의 Origin/Referer를 확인하여 적절한 프론트엔드 base URL을 선택합니다.
-     * 매칭되지 않으면 첫 번째 URL을 기본값으로 사용합니다.
+     * 매칭되지 않으면 localhost가 아닌 프로덕션 URL을 우선적으로 기본값으로 사용합니다.
+     * 모두 localhost인 경우에만 첫 번째 URL을 사용합니다.
      */
     private String resolveFrontBaseUrl(HttpServletRequest request) {
         List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
@@ -108,6 +109,13 @@ public class ShareService {
             throw new RestException(ErrorCode.GLOBAL_INTERNAL_SERVER_ERROR, "프론트엔드 URL 설정이 없습니다.");
         }
 
-        return FrontUrlResolver.resolveUrl(request, allowedBaseUrls, allowedBaseUrls.get(0));
+        // localhost가 아닌 프로덕션 URL을 우선적으로 기본값으로 선택
+        // (소셜 미디어 링크 클릭 시 Origin/Referer가 없을 때 프로덕션 URL로 리다이렉트)
+        String defaultUrl = allowedBaseUrls.stream()
+                .filter(url -> !url.contains("localhost") && !url.contains("127.0.0.1"))
+                .findFirst()
+                .orElse(allowedBaseUrls.get(0)); // 모두 localhost이면 첫 번째 URL 사용
+
+        return FrontUrlResolver.resolveUrl(request, allowedBaseUrls, defaultUrl);
     }
 }
