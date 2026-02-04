@@ -350,7 +350,7 @@ public class DataInitializer implements CommandLineRunner {
     private void createSubContents(AtomicLong fileCursor, LocalDateTime now) {
         log.info("Creating Sub-Contents...");
 
-        String diarySql = "INSERT INTO diary (diary_book_id, title, content, recorded_at, color, visibility, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String diarySql = "INSERT INTO diary (diary_book_id, title, content, recorded_at, color, visibility, created_at, last_modified_at, created_by, last_modified_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         String gallerySql = "INSERT INTO gallery (archive_id, gallery_book_id, file_id, original_key, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
         String ticketSql = "INSERT INTO ticket (ticket_book_id, title, date, location, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)";
         String repostTabSql = "INSERT INTO repost_tab (id, repost_book_id, title, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?)";
@@ -422,6 +422,7 @@ public class DataInitializer implements CommandLineRunner {
     private void insertDiaries(String sql, Long bookId, int start, int end, LocalDateTime baseTime) {
         Timestamp now = getArchiveDate(bookId, baseTime);
         Visibility archiveVis = getArchiveVisibility(bookId);
+        long userId = (bookId - 1) / 10 + 1;
 
         List<Object[]> batch = new ArrayList<>();
 
@@ -448,7 +449,7 @@ public class DataInitializer implements CommandLineRunner {
                 diaryVis = Visibility.PRIVATE;
             }
 
-            batch.add(new Object[]{bookId, "Diary " + i, "Content...", Timestamp.valueOf(baseTime), "#FF5733", diaryVis.name(), now, now});
+            batch.add(new Object[]{bookId, "Diary " + i, "Content...", Timestamp.valueOf(baseTime), "#FF5733", diaryVis.name(), now, now, userId, userId});
         }
         jdbcTemplate.batchUpdate(sql, batch);
     }
