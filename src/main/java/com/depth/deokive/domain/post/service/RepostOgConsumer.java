@@ -4,7 +4,7 @@ import com.depth.deokive.domain.post.dto.MetadataProvider;
 import com.depth.deokive.domain.post.dto.OgMetadata;
 import com.depth.deokive.domain.post.dto.RepostCompletedEvent;
 import com.depth.deokive.domain.post.dto.RepostOgExtractionMessage;
-import com.depth.deokive.domain.post.util.strategy.MetadataProviderFactory;
+import com.depth.deokive.system.metadata.strategy.MetadataProviderFactory;
 import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.config.rabbitmq.RabbitMQConfig;
 import com.fasterxml.jackson.core.JsonProcessingException;

@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.post.util.strategy;
+package com.depth.deokive.system.metadata.strategy;
 
 import com.depth.deokive.domain.post.dto.MetadataProvider;
 import lombok.RequiredArgsConstructor;

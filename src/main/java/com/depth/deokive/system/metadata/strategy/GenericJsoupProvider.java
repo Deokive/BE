@@ -1,9 +1,8 @@
-package com.depth.deokive.domain.post.util.strategy;
+package com.depth.deokive.system.metadata.strategy;
 
 import com.depth.deokive.common.util.TextUtils;
 import com.depth.deokive.domain.post.dto.MetadataProvider;
 import com.depth.deokive.domain.post.dto.OgMetadata;
-import com.depth.deokive.domain.post.util.UserAgentGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;

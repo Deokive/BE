@@ -1,4 +1,4 @@
-package com.depth.deokive.domain.post.util;
+package com.depth.deokive.system.metadata.strategy;
 
 import lombok.extern.slf4j.Slf4j;
 
