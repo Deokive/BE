@@ -38,12 +38,6 @@ public class GenericJsoupProvider implements MetadataProvider {
                     .ignoreHttpErrors(false)                    // 4xx, 5xx 에러 시 예외 발생
                     .get();
 
-            // [DEBUG] EC2 환경 진단용 로그 (기존 로직 유지)
-            // 추후 안정화되면 제거 가능
-            String headHtml = doc.head().html();
-            log.warn("[GenericJsoup] url={} | head-length={} | head={}",
-                    url, headHtml.length(), headHtml.substring(0, Math.min(headHtml.length(), 2000)));
-
             // 1. Title 추출
             String title = extractOgTag(doc, "og:title");
             if (title == null || title.isBlank()) { title = doc.title(); }
