@@ -107,7 +107,6 @@ spring:
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - email
-              - profile_image
               - nickname
             provider: naver
 
