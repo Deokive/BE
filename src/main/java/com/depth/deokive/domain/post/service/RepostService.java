@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.util.PageUtils;
+import com.depth.deokive.common.util.TextUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.post.dto.RepostDto;
@@ -72,11 +73,14 @@ public class RepostService {
         String urlHash = generateUrlHash(url);
 
         // SEQ 5. PENDING 상태로 저장 (UNIQUE constraint가 중복 방어)
+
+        String safeTitle = TextUtils.truncate(url, 255);
+
         Repost repost = Repost.builder()
                 .repostTab(tab)
                 .url(url)
                 .urlHash(urlHash)
-                .title(truncateTitle(url))  // 임시로 URL을 title로 사용 (255자 제한)
+                .title(safeTitle)  // 임시로 URL을 title로 사용 (255자 제한)
                 .thumbnailUrl(null)
                 .status(RepostStatus.PENDING)
                 .build();
@@ -350,19 +354,5 @@ public class RepostService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
         }
-    }
-
-    /**
-     * 제목을 252자까지 자르고 "..."을 붙여서 총 255자로 제한
-     * DB 컬럼 제한(VARCHAR(255))을 준수하기 위함
-     */
-    private String truncateTitle(String title) {
-        if (title == null) {
-            return null;
-        }
-        if (title.length() <= 252) {
-            return title;
-        }
-        return title.substring(0, 252) + "...";
     }
 }

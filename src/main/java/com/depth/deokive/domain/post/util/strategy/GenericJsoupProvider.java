@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.util.strategy;
 
+import com.depth.deokive.common.util.TextUtils;
 import com.depth.deokive.domain.post.dto.MetadataProvider;
 import com.depth.deokive.domain.post.dto.OgMetadata;
 import com.depth.deokive.domain.post.util.UserAgentGenerator;
@@ -45,11 +46,9 @@ public class GenericJsoupProvider implements MetadataProvider {
 
             // 1. Title 추출
             String title = extractOgTag(doc, "og:title");
-            if (title == null || title.isBlank()) {
-                title = doc.title();
-            }
+            if (title == null || title.isBlank()) { title = doc.title(); }
             // DB 컬럼 제한(VARCHAR(255)) 준수
-            title = truncateTitle(title);
+            title = TextUtils.truncate(title, 255);
 
             // 2. Image 추출
             String imageUrl = extractOgTag(doc, "og:image");
@@ -78,19 +77,5 @@ public class GenericJsoupProvider implements MetadataProvider {
             element = doc.selectFirst("meta[name=" + property + "]");
         }
         return element != null ? element.attr("content") : null;
-    }
-
-    /**
-     * 제목을 252자까지 자르고 "..."을 붙여서 총 255자로 제한
-     * DB 컬럼 제한(VARCHAR(255))을 준수하기 위함
-     */
-    private String truncateTitle(String title) {
-        if (title == null) {
-            return null;
-        }
-        if (title.length() <= 252) {
-            return title;
-        }
-        return title.substring(0, 252) + "...";
     }
 }
