@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.util.PageUtils;
+import com.depth.deokive.common.util.TextUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
 import com.depth.deokive.domain.post.dto.RepostDto;
@@ -13,6 +14,7 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RepostService {
@@ -45,27 +48,12 @@ public class RepostService {
     /**
      * Repost 생성 - 비동기 OG 추출 (RabbitMQ)
      *
-     * [아키텍처 변경]
-     * - Before: 동기 OG 추출(1.5초) → Connection Pool 병목
-     * - After: 비동기 OG 추출 → 즉시 응답 (50ms 이내)
-     *
      * [처리 흐름]
      * 1. URL 검증 (SSRF 방어)
      * 2. PENDING 상태로 저장 (UNIQUE constraint가 중복 방어)
      * 3. RabbitMQ 메시지 발행 (비동기)
-     * 4. 201 Created 즉시 응답 ✅
+     * 4. 201 Created 즉시 응답
      * 5. Consumer가 백그라운드에서 OG 추출 (1.5초)
-     * 6. FE는 Exponential Backoff Polling (1초 → 2초 → 3초 → 5초)
-     *
-     * [성능 개선]
-     * - Before: 120 동시 요청 → 평균 13초, 최대 24초
-     * - After: 120 동시 요청 → 평균 50ms, Consumer 10개 병렬 처리로 12초 내 완료
-     * - 300 동시 요청: 평균 50ms, Consumer 30초 내 완료
-     *
-     * [트랜잭션 최적화]
-     * - SELECT(duplicate check) 제거 → UNIQUE constraint 의존
-     * - private 메서드 @Transactional 버그 수정 (프록시 패턴 한계)
-     * - 결과: 트랜잭션 시간 60ms → 30ms로 단축, Race Condition 해결
      */
     @ExecutionTime
     @Transactional
@@ -85,11 +73,14 @@ public class RepostService {
         String urlHash = generateUrlHash(url);
 
         // SEQ 5. PENDING 상태로 저장 (UNIQUE constraint가 중복 방어)
+
+        String safeTitle = TextUtils.truncate(url, 255);
+
         Repost repost = Repost.builder()
                 .repostTab(tab)
                 .url(url)
                 .urlHash(urlHash)
-                .title(url)  // 임시로 URL을 title로 사용
+                .title(safeTitle)  // 임시로 URL을 title로 사용 (255자 제한)
                 .thumbnailUrl(null)
                 .status(RepostStatus.PENDING)
                 .build();

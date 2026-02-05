@@ -1,8 +1,10 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.domain.post.dto.MetadataProvider;
+import com.depth.deokive.domain.post.dto.OgMetadata;
 import com.depth.deokive.domain.post.dto.RepostCompletedEvent;
 import com.depth.deokive.domain.post.dto.RepostOgExtractionMessage;
-import com.depth.deokive.domain.post.util.OpenGraphExtractor;
+import com.depth.deokive.system.metadata.strategy.MetadataProviderFactory;
 import com.depth.deokive.system.config.aop.ExecutionTime;
 import com.depth.deokive.system.config.rabbitmq.RabbitMQConfig;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -13,9 +15,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -47,6 +47,9 @@ public class RepostOgConsumer {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
 
+    // Factory 주입
+    private final MetadataProviderFactory metadataProviderFactory;
+
     /**
      * OG 메타데이터 추출 및 DB 업데이트
      *
@@ -73,9 +76,13 @@ public class RepostOgConsumer {
         log.info("[OG Consumer] Repost ID={} 처리 시작", repostId);
 
         try {
-            // SEQ 1. OG 메타데이터 추출 (네트워크 I/O, ~1.5초)
-            // DB 커넥션 없이 순수 HTTP 요청만 수행
-            OpenGraphExtractor.OgMetadata metadata = OpenGraphExtractor.extract(url);
+            // 1️⃣ Factory를 통해 적절한 Provider 선택 (Strategy Pattern)
+            MetadataProvider provider = metadataProviderFactory.getProvider(url);
+            log.info("👉 Selected Strategy: {}", provider.getClass().getSimpleName());
+
+            // 2️⃣ 메타데이터 추출 실행
+            OgMetadata metadata = provider.extract(url);
+
             String title = metadata.getTitle();
             String thumbnailUrl = metadata.getImageUrl();
 
@@ -94,18 +101,9 @@ public class RepostOgConsumer {
             log.info("[OG Consumer] Repost ID={} 완료 (title={}, thumbnail={})",
                     repostId, title != null, thumbnailUrl != null);
 
-        } catch (SocketTimeoutException e) {
-            // 타임아웃: FAILED 처리
-            repostOgUpdateService.markAsFailed(repostId, "OG 추출 타임아웃");
-            publishSseEvent(RepostCompletedEvent.failed(userId, repostId));
-        } catch (IOException e) {
-            // 네트워크 오류: FAILED 처리
-            repostOgUpdateService.markAsFailed(repostId, "OG 추출 실패 (네트워크 오류)");
-            publishSseEvent(RepostCompletedEvent.failed(userId, repostId));
         } catch (Exception e) {
-            // 기타 오류: FAILED 처리
-            log.error("[OG Consumer] Repost ID={} 예상치 못한 오류", repostId, e);
-            repostOgUpdateService.markAsFailed(repostId, "OG 추출 실패 (내부 오류)");
+            log.error("[OG Consumer] 실패: {}", e.getMessage());
+            repostOgUpdateService.markAsFailed(repostId, "OG 추출 실패: " + e.getMessage());
             publishSseEvent(RepostCompletedEvent.failed(userId, repostId));
         }
     }

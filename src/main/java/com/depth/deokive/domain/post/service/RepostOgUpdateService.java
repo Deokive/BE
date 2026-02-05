@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.service;
 
+import com.depth.deokive.common.util.TextUtils;
 import com.depth.deokive.domain.post.entity.Repost;
 import com.depth.deokive.domain.post.repository.RepostRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,8 @@ public class RepostOgUpdateService {
 
     private final RepostRepository repostRepository;
 
+    private static final int TITLE_LIMIT = 255;
+
     /**
      * Repost 메타데이터 완료 처리
      * - 트랜잭션 범위: DB 조회 + Dirty Checking (~50ms)
@@ -36,7 +39,11 @@ public class RepostOgUpdateService {
             log.warn("[OG UpdateService] Repost ID={} 존재하지 않음 (이미 삭제됨?)", repostId);
             return;
         }
-        repost.completeMetadata(title, thumbnailUrl);
+
+        // 유튜브, 틱톡, 인스타 등 어디서 왔든 무조건 안전하게 자르고 저장
+        String safeTitle = TextUtils.truncate(title, TITLE_LIMIT);
+
+        repost.completeMetadata(safeTitle, thumbnailUrl);
     }
 
     /**
