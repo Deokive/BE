@@ -169,4 +169,10 @@ public class AuthDto {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(combined.getBytes(StandardCharsets.UTF_8));
     }
 
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(description = "Provider 로그아웃 URL 응답 DTO")
+    public static class ProviderLogoutUrlResponse {
+        @Schema(description = "카카오 로그아웃 URL (리다이렉트 필요)", example = "https://kauth.kakao.com/oauth/logout?client_id=...&logout_redirect_uri=...")
+        private String kakaoLogoutUrl;
+    }
 }
