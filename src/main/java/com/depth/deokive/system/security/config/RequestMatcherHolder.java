@@ -32,6 +32,7 @@ public class RequestMatcherHolder {
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/reset-pw", null),
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/email/send", null),
             new RequestInfo(HttpMethod.POST, "/api/v1/auth/email/verify", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/auth/logout/callback", null),
 
             // posts
             // new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId}", null),
