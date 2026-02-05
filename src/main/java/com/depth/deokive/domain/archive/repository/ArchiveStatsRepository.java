@@ -28,8 +28,8 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
 
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.badge = :targetBadge " +
-            "WHERE s.createdAt <= :cutOffDate " +
-            "AND s.badge IN :targetBadges")
+            "WHERE FUNCTION('DATE', s.createdAt) <= FUNCTION('DATE', :cutOffDate) " +
+            "AND s.badge IN :targetBadges") // 일수만 비교
     int updateBadgesBulkInStats(
             @Param("targetBadge") Badge targetBadge,
             @Param("cutOffDate") LocalDateTime cutOffDate,

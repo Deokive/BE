@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.depth.deokive.system.exception.dto.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -272,5 +274,20 @@ public class AuthController {
             HttpServletRequest request
     ) {
         return authService.socialRetrieve(userPrincipal, request);
+    }
+
+    @GetMapping("/provider-logout-urls")
+    @RateLimit(type = RateLimitType.IP, capacity = 20, refillTokens = 20, refillPeriodSeconds = 60)
+    @Operation(summary = "소셜 로그아웃 URL 조회", description = "카카오 계정과 함께 로그아웃하기 위한 Provider별 URL을 반환합니다.")
+    public ResponseEntity<AuthDto.ProviderLogoutUrlResponse> getProviderLogoutUrls(HttpServletRequest request) {
+        return ResponseEntity.ok(authService.getProviderLogoutUrls(request));
+    }
+
+    // NO AUTH (PermitAll 필요)
+    @GetMapping("/logout/callback")
+    @Hidden // Swagger 문서 숨김 (브라우저 리다이렉트용)
+    @Operation(summary = "로그아웃 콜백", description = "Provider 로그아웃 후 백엔드로 돌아오는 콜백입니다. 프론트엔드로 리다이렉트합니다.")
+    public void logoutCallback(HttpServletResponse response) throws IOException {
+        authService.handleLogoutCallback(response);
     }
 }

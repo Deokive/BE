@@ -64,7 +64,7 @@ public class ArchiveDto {
         @Schema(description = "공개 범위", example = "PUBLIC | RESTRICTED | PRIVATE")
         private Visibility visibility;
 
-        @Schema(description = "아카이브 뱃지", example = "NEWBIE | BEGINNER | INTERMEDIATE | ADVANCED | EXPERT | MASTER")
+        @Schema(description = "아카이브 뱃지", example = "NEWBIE | FANS | SUPPORTER | STAN | MASTER")
         private Badge badge;
 
         @Schema(description = "배너 이미지 URL", example = "https://cdn.example.com/files/banner.jpg")

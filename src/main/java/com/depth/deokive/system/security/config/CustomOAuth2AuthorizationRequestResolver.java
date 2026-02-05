@@ -12,7 +12,9 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.stereotype.Component;
 
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * OAuth2 인증 요청 시 State 파라미터에 프론트엔드 URL을 포함시키는 커스텀 리졸버
@@ -64,27 +66,36 @@ public class CustomOAuth2AuthorizationRequestResolver implements OAuth2Authoriza
             return null;
         }
 
+        // 요청 커스터마이징 시작
+        OAuth2AuthorizationRequest.Builder builder = OAuth2AuthorizationRequest.from(defaultRequest);
+
         // 프론트엔드 URL 추출 (우선순위: 쿼리 파라미터 > Origin/Referer 헤더)
         List<String> allowedRedirectUris = PropertiesParserUtils.propertiesParser(frontRedirectUriConfig);
         String frontendUrl = extractFrontendUrl(request, allowedRedirectUris);
         
         log.info("🔍 [CustomOAuth2AuthorizationRequestResolver] OAuth2 인증 요청 처리");
-        log.info("   - Registration ID: {}", clientRegistrationId);
-        log.info("   - 추출된 프론트엔드 URL: {}", frontendUrl);
-        log.info("   - 쿼리 파라미터 redirect_uri: {}", request.getParameter("redirect_uri"));
-        log.info("   - 요청 Origin: {}", request.getHeader("Origin"));
-        log.info("   - 요청 Referer: {}", request.getHeader("Referer"));
 
         // State 파라미터에 프론트엔드 URL 포함
         String originalState = defaultRequest.getState();
         String stateWithFrontendUrl = encodeStateWithFrontendUrl(originalState, frontendUrl);
+        builder.state(stateWithFrontendUrl);
 
-        // OAuth2AuthorizationRequest 빌더로 state만 수정하여 새 요청 생성
-        OAuth2AuthorizationRequest customizedRequest = OAuth2AuthorizationRequest.from(defaultRequest)
-                .state(stateWithFrontendUrl)
-                .build();
+        Map<String, Object> additionalParameters = new HashMap<>(defaultRequest.getAdditionalParameters());
 
-        log.info("✅ [CustomOAuth2AuthorizationRequestResolver] State 생성 완료 (프론트엔드 URL 포함)");
+        if ("naver".equalsIgnoreCase(clientRegistrationId)) {
+            // 네이버 재인증 강제 로직 추가
+            additionalParameters.put("auth_type", "reauthenticate");
+            log.info("✅ [Naver] auth_type=reauthenticate 파라미터 추가 완료");
+        } else if ("google".equalsIgnoreCase(clientRegistrationId)) {
+            // 구글: 계정 선택 화면 강제 (자동 로그인 방지)
+            additionalParameters.put("prompt", "select_account");
+            log.info("✅ [Google] prompt=select_account 파라미터 추가");
+        }
+
+        builder.additionalParameters(additionalParameters);
+        OAuth2AuthorizationRequest customizedRequest = builder.build();
+
+        log.info("✅ [Final Request] State: {}, Auth URL: {}", customizedRequest.getState(), customizedRequest.getAuthorizationRequestUri());
         
         return customizedRequest;
     }

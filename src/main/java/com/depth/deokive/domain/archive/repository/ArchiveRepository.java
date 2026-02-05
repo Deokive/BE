@@ -57,9 +57,9 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long> {
 
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Archive a SET a.badge = :targetBadge " +
-            "WHERE a.createdAt <= :cutOffDate " +
+            "WHERE FUNCTION('DATE', a.createdAt) <= FUNCTION('DATE', :cutOffDate) " +
             "AND a.badge IN :targetBadges"
-    ) // 타겟보다 낮은 등급들만 골라서 업데이트
+    ) // 타겟보다 낮은 등급들만 골라서 업데이트 (일수만 비교)
     int updateBadgesBulk(
         @Param("targetBadge") Badge targetBadge,
         @Param("cutOffDate") LocalDateTime cutOffDate,

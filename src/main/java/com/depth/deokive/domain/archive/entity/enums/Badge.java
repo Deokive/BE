@@ -8,10 +8,9 @@ import lombok.RequiredArgsConstructor;
 public enum Badge {
     // 순서 중요: 낮은 등급 -> 높은 등급
     NEWBIE("뉴비", 0),             // 가입 즉시
-    BEGINNER("비기너", 7),         // 1주 (7일)
-    INTERMEDIATE("인터미디어트", 14), // 2주 (14일)
-    ADVANCED("어드밴스드", 30),     // 1달 (30일)
-    EXPERT("엑스퍼트", 120),        // 4달 (120일)
+    FANS("팬", 7),                 // 1주 (7일)
+    SUPPORTER("서포터", 30),        // 1달 (30일)
+    STAN("스탠", 120),             // 4달 (120일)
     MASTER("마스터", 365);         // 1년 (365일)
 
     private final String description;

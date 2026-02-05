@@ -12,13 +12,22 @@ import com.depth.deokive.system.security.jwt.service.TokenService;
 import com.depth.deokive.system.security.jwt.util.JwtTokenResolver;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.CookieUtils;
+import com.depth.deokive.system.security.util.PropertiesParserUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.io.IOException;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -29,6 +38,11 @@ public class AuthService {
     private final TokenService tokenService;
     private final CookieUtils cookieUtils;
     private final EmailService emailService;
+
+    private final ClientRegistrationRepository clientRegistrationRepository;
+
+    @Value("${app.front-base-url}")
+    private String frontBaseUrlConfig;
 
     @Transactional
     public UserDto.UserResponse signUp(AuthDto.SignUpRequest request) {
@@ -146,6 +160,46 @@ public class AuthService {
                 UserDto.UserResponse.from(foundUser),
                 tokenExpiresInfo
         );
+    }
+
+    /**
+     * Provider별 로그아웃 URL 생성
+     */
+    @Transactional(readOnly = true)
+    public AuthDto.ProviderLogoutUrlResponse getProviderLogoutUrls(HttpServletRequest request) {
+        // 1. Kakao URL 생성
+        ClientRegistration kakaoRegistration = clientRegistrationRepository.findByRegistrationId("kakao");
+        String kakaoClientId = kakaoRegistration.getClientId();
+
+        // Backend Callback URL 생성 (현재 요청의 도메인 기반)
+        // Ex: https://{{baseDomain}}/api/v1/auth/logout/callback
+        String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
+                .replacePath(null)
+                .build()
+                .toUriString();
+        String kakaoLogoutRedirectUri = baseUrl + "/api/v1/auth/logout/callback";
+
+        String kakaoUrl = "https://kauth.kakao.com/oauth/logout"
+                + "?client_id=" + kakaoClientId
+                + "&logout_redirect_uri=" + kakaoLogoutRedirectUri;
+
+        return AuthDto.ProviderLogoutUrlResponse.builder()
+                .kakaoLogoutUrl(kakaoUrl)
+                .build();
+    }
+
+    /**
+     * 카카오 로그아웃 Callback 처리 -> 프론트엔드로 최종 리다이렉트
+     */
+    public void handleLogoutCallback(HttpServletResponse response) throws IOException {
+
+        // 프론트엔드 URL 파싱 (여러 개일 경우 첫 번째 사용)
+        String frontendUrl = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig).getFirst();
+
+        // 최종적으로 FE의 /logged-out 페이지로 이동
+        String targetUrl = frontendUrl + "/logged-out";
+
+        response.sendRedirect(targetUrl);
     }
 
 
