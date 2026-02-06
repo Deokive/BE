@@ -28,6 +28,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 @Slf4j
@@ -177,19 +179,16 @@ public class AuthService {
         ClientRegistration kakaoRegistration = clientRegistrationRepository.findByRegistrationId("kakao");
         String kakaoClientId = kakaoRegistration.getClientId();
 
-        // Backend Callback URL 생성 (현재 요청의 도메인 기반)
-        // Ex: https://{{baseDomain}}/api/v1/auth/logout/callback
+        // 2. 백엔드 콜백 URL 생성
         String baseUrl;
-
-        // 1. 설정 파일에 백엔드 주소가 명시되어 있다면 그걸 최우선으로 사용 (배포 환경)
+        // 2-1. 설정 파일에 백엔드 주소가 명시되어 있다면 그걸 최우선으로 사용 (배포 환경)
         if (StringUtils.hasText(backendBaseUrlConfig)) {
             baseUrl = backendBaseUrlConfig;
             if (baseUrl.endsWith("/")) {
                 baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
             }
-        }
-        // 2. 없다면(로컬 개발 환경), 기존처럼 Request 정보를 사용
-        else {
+        // 2-2. 없다면(로컬 개발 환경), 기존처럼 Request 정보를 사용
+        } else {
             baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
                     .replacePath(null)
                     .build()
@@ -198,9 +197,20 @@ public class AuthService {
 
         String kakaoLogoutRedirectUri = baseUrl + "/api/v1/auth/logout/callback";
 
+        // 3. 현재 요청을 보낸 프론트엔드 URL 식별 (state 생성을 위해)
+        List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
+        // 기본값은 운영 도메인(또는 첫번째)이지만, 요청 헤더(Origin/Referer)가 있으면 그걸 우선함
+        String currentFrontUrl = FrontUrlResolver.resolveUrl(request, allowedBaseUrls,
+                allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.getFirst());
+
+        // 4. 프론트엔드 URL을 Base64로 인코딩하여 state 파라미터 생성
+        String state = Base64.getEncoder().encodeToString(currentFrontUrl.getBytes(StandardCharsets.UTF_8));
+
+        // 5. 카카오 URL 조립 (state 포함)
         String kakaoUrl = "https://kauth.kakao.com/oauth/logout"
                 + "?client_id=" + kakaoClientId
-                + "&logout_redirect_uri=" + kakaoLogoutRedirectUri;
+                + "&logout_redirect_uri=" + kakaoLogoutRedirectUri
+                + "&state=" + state;
 
         return AuthDto.ProviderLogoutUrlResponse.builder()
                 .kakaoLogoutUrl(kakaoUrl)
@@ -215,15 +225,51 @@ public class AuthService {
         // 프론트엔드 URL 파싱 (여러 개일 경우 첫 번째 사용)
         List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
 
-        String defaultUrl = allowedBaseUrls.stream()
-                .filter(url -> !url.contains("localhost") && !url.contains("127.0.0.1"))
-                .findFirst()
-                .orElse(allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.getFirst());
+        // 1. 우선순위: state 파라미터 확인 (카카오가 돌려준 값)
+        String state = request.getParameter("state");
+        String targetBaseUrl = null;
 
-        String frontendUrl = FrontUrlResolver.resolveUrl(request, allowedBaseUrls, defaultUrl);
+        if (StringUtils.hasText(state)) {
+            try {
+                String decodedUrl = new String(Base64.getDecoder().decode(state), StandardCharsets.UTF_8);
+
+                // 보안 검증: 디코딩된 URL이 우리 허용 목록에 있는가?
+                boolean isAllowed = allowedBaseUrls.stream().anyMatch(allowed ->
+                        decodedUrl.equals(allowed) || decodedUrl.startsWith(allowed));
+
+                if (isAllowed) {
+                    targetBaseUrl = decodedUrl;
+                    log.info("✅ [Logout Callback] Restore redirect URL from state: {}", targetBaseUrl);
+                } else {
+                    log.warn("⚠️ [Logout Callback] Invalid redirect URL in state: {}", decodedUrl);
+                }
+            } catch (IllegalArgumentException e) {
+                log.warn("⚠️ [Logout Callback] Invalid Base64 state: {}", state);
+            }
+        }
+
+        // 2. state가 없거나 유효하지 않으면 기존 로직(환경변수 기반 추론)으로 Fallback (문제 상황 방지용)
+        if (targetBaseUrl == null) {
+            // 현재 백엔드가 로컬 환경인지 배포 환경인지 판단
+            boolean isLocalBackend = backendBaseUrlConfig.contains("localhost") || backendBaseUrlConfig.contains("127.0.0.1");
+
+            if (isLocalBackend) {
+                // 로컬 환경 : localhost를 우선적으로 찾음
+                targetBaseUrl = allowedBaseUrls.stream()
+                        .filter(url -> url.contains("localhost") || url.contains("127.0.0.1"))
+                        .findFirst()
+                        .orElse(allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.get(0));
+            } else {
+                // 배포 환경 : localhost가 아닌 운영 도메인을 우선적으로 찾음
+                targetBaseUrl = allowedBaseUrls.stream()
+                        .filter(url -> !url.contains("localhost") && !url.contains("127.0.0.1"))
+                        .findFirst()
+                        .orElse(allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.get(0));
+            }
+        }
 
         // 최종적으로 FE의 /logged-out 페이지로 이동
-        String targetUrl = frontendUrl + "/logged-out";
+        String targetUrl = targetBaseUrl + "/logged-out";
 
         log.info("✅ [Logout Callback] Redirecting to Frontend: {}", targetUrl);
 
