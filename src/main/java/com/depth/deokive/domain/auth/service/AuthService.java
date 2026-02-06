@@ -215,7 +215,11 @@ public class AuthService {
         // 프론트엔드 URL 파싱 (여러 개일 경우 첫 번째 사용)
         List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
 
-        String defaultUrl = allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.get(0);
+        String defaultUrl = allowedBaseUrls.stream()
+                .filter(url -> !url.contains("localhost") && !url.contains("127.0.0.1"))
+                .findFirst()
+                .orElse(allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.getFirst());
+
         String frontendUrl = FrontUrlResolver.resolveUrl(request, allowedBaseUrls, defaultUrl);
 
         // 최종적으로 FE의 /logged-out 페이지로 이동
