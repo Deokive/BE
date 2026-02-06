@@ -150,6 +150,7 @@ app:
   # Ex: "http://localhost:5173,https://domain.com"
   front-base-url: "${FRONT_BASE_URL:http://localhost:5173}"
   allowed-origins: "${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}"
+  backend-base-url: "${BACKEND_BASE_URL:http://localhost:8080}"
 
 
 

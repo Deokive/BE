@@ -12,6 +12,7 @@ import com.depth.deokive.system.security.jwt.service.TokenService;
 import com.depth.deokive.system.security.jwt.util.JwtTokenResolver;
 import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.CookieUtils;
+import com.depth.deokive.system.security.util.FrontUrlResolver;
 import com.depth.deokive.system.security.util.PropertiesParserUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,9 +24,11 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -43,6 +46,9 @@ public class AuthService {
 
     @Value("${app.front-base-url}")
     private String frontBaseUrlConfig;
+
+    @Value("${app.backend-base-url:}")
+    private String backendBaseUrlConfig;
 
     @Transactional
     public UserDto.UserResponse signUp(AuthDto.SignUpRequest request) {
@@ -173,10 +179,23 @@ public class AuthService {
 
         // Backend Callback URL 생성 (현재 요청의 도메인 기반)
         // Ex: https://{{baseDomain}}/api/v1/auth/logout/callback
-        String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
-                .replacePath(null)
-                .build()
-                .toUriString();
+        String baseUrl;
+
+        // 1. 설정 파일에 백엔드 주소가 명시되어 있다면 그걸 최우선으로 사용 (배포 환경)
+        if (StringUtils.hasText(backendBaseUrlConfig)) {
+            baseUrl = backendBaseUrlConfig;
+            if (baseUrl.endsWith("/")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+            }
+        }
+        // 2. 없다면(로컬 개발 환경), 기존처럼 Request 정보를 사용
+        else {
+            baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
+                    .replacePath(null)
+                    .build()
+                    .toUriString();
+        }
+
         String kakaoLogoutRedirectUri = baseUrl + "/api/v1/auth/logout/callback";
 
         String kakaoUrl = "https://kauth.kakao.com/oauth/logout"
@@ -191,13 +210,18 @@ public class AuthService {
     /**
      * 카카오 로그아웃 Callback 처리 -> 프론트엔드로 최종 리다이렉트
      */
-    public void handleLogoutCallback(HttpServletResponse response) throws IOException {
+    public void handleLogoutCallback(HttpServletRequest request, HttpServletResponse response) throws IOException {
 
         // 프론트엔드 URL 파싱 (여러 개일 경우 첫 번째 사용)
-        String frontendUrl = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig).getFirst();
+        List<String> allowedBaseUrls = PropertiesParserUtils.propertiesParser(frontBaseUrlConfig);
+
+        String defaultUrl = allowedBaseUrls.isEmpty() ? "http://localhost:5173" : allowedBaseUrls.get(0);
+        String frontendUrl = FrontUrlResolver.resolveUrl(request, allowedBaseUrls, defaultUrl);
 
         // 최종적으로 FE의 /logged-out 페이지로 이동
         String targetUrl = frontendUrl + "/logged-out";
+
+        log.info("✅ [Logout Callback] Redirecting to Frontend: {}", targetUrl);
 
         response.sendRedirect(targetUrl);
     }
