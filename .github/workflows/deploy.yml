@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main", "DEOK-70-HOTFIX-Kakao-Redirection-Error" ]
+    branches: [ "main" ]
 
   workflow_dispatch:
 
