@@ -9,6 +9,7 @@ import com.depth.deokive.system.security.jwt.service.TokenService;
 import com.depth.deokive.system.security.jwt.util.JwtTokenResolver;
 import com.depth.deokive.system.security.jwt.util.JwtTokenValidator;
 import com.depth.deokive.system.security.model.UserPrincipal;
+import com.depth.deokive.system.security.util.CookieUtils;
 import com.depth.deokive.system.security.util.UserLoadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -39,6 +40,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final RequestMatcherHolder requestMatcherHolder;
     private final ObjectMapper objectMapper;
     private final TokenService tokenService;
+    private final CookieUtils cookieUtils;
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
@@ -143,14 +145,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (JwtExpiredException e) {
             log.warn("⚠️ JWT token has expired, checking refresh token for auto-login", e.getMessage());
 
+            // SecurityConfig에 직접 명시된 permitAll 엔드포인트인지 확인
+            boolean isPermitAll = requestMatcherHolder.getSecurityConfigPermitAllMatcher().matches(request);
+
             // TODO: Refactoring 필요 -> 별도의 Helper Methods 로 분리할 것
             // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
             try {
                 // 1. RTK 존재 여부 확인 (ATK는 없어도 RTK만 있으면 자동 Refresh 가능)
                 var nullableRtk = jwtTokenResolver.parseRefreshTokenFromRequest(request);
                 if (nullableRtk.isEmpty()) {
-                    log.debug("⚪ No refresh token found, cannot auto-refresh");
+                    log.warn("⚪ No refresh token found, cannot auto-refresh");
                     SecurityContextHolder.clearContext();
+
+                    clearCookies(response);
+
+                    // permitAll 엔드포인트면 에러 반환하지 않고 필터 통과 (비회원으로 처리)
+                    if (isPermitAll) {
+                        log.debug("🟢 PermitAll endpoint - allowing request without authentication");
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     writeErrorResponse(response, ErrorCode.JWT_MISSING);
                     return;
                 }
@@ -188,6 +203,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 } catch (Exception refreshException) {
                     log.error("⚠️ Auto-refresh failed: {}", refreshException.getMessage(), refreshException);
                     SecurityContextHolder.clearContext();
+
+                    clearCookies(response);
+
+                    // permitAll 엔드포인트면 에러 반환하지 않고 필터 통과 (비회원으로 처리)
+                    if (isPermitAll) {
+                        log.debug("🟢 PermitAll endpoint - allowing request without authentication after refresh failure");
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
                     return;
                 }
@@ -196,6 +221,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // RTK 검증 실패 또는 기타 예외
                 log.warn("⚠️ Refresh token validation failed: {}", rtkException.getMessage());
                 SecurityContextHolder.clearContext();
+
+                clearCookies(response);
+
+                // permitAll 엔드포인트면 에러 반환하지 않고 필터 통과 (비회원으로 처리)
+                if (isPermitAll) {
+                    log.debug("🟢 PermitAll endpoint - allowing request without authentication after RTK validation failure");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
                 return;
             }
@@ -232,6 +267,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         objectMapper.writeValue(response.getWriter(), errorResponse);
+    }
+
+    private void clearCookies(HttpServletResponse response) {
+        cookieUtils.clearAccessTokenCookie(response);
+        cookieUtils.clearRefreshTokenCookie(response);
     }
 }
 

@@ -84,17 +84,17 @@ public class SecurityConfig {
                         // 1. 비인증 경로들 (RequestMatcherHolder에서 관리)
                         .requestMatchers(requestMatcherHolder.getRequestMatchersByMinRole(null)).permitAll()
                         .requestMatchers(HttpMethod.GET,
-                                "/api/v1/diary/{diaryId}",
-                                "/api/v1/events/{eventId}",
-                                "/api/v1/events/monthly/{archiveId}",
-                                "/api/v1/archives/{archiveId}",
-                                "/api/v1/gallery/{archiveId}",
-                                "/api/v1/tickets/{ticketId}",
-                                "/api/v1/tickets/book/{archiveId}",
-                                "/api/v1/repost/{archiveId}",
-                                "/api/v1/diary/book/{archiveId}",
-                                "/api/v1/posts/{postId}",
-                                "/api/v1/posts/{postId}/comments"
+                                "/api/v1/diary/{diaryId:[0-9]+}",
+                                "/api/v1/events/{eventId:[0-9]+}",
+                                "/api/v1/events/monthly/{archiveId:[0-9]+}",
+                                "/api/v1/archives/{archiveId:[0-9]+}",
+                                "/api/v1/gallery/{archiveId:[0-9]+}",
+                                "/api/v1/tickets/{ticketId:[0-9]+}",
+                                "/api/v1/tickets/book/{archiveId:[0-9]+}",
+                                "/api/v1/repost/{archiveId:[0-9]+}",
+                                "/api/v1/diary/book/{archiveId:[0-9]+}",
+                                "/api/v1/posts/{postId:[0-9]+}",
+                                "/api/v1/posts/{postId:[0-9]+}/comments"
                                 ).permitAll()
                         // .requestMatchers(requestMatcherHolder.getRequestMatchersForVisibilityByMinRole(null)).permitAll()
                         // 2. /api/v1/**로 시작하는 경로 중 permitAll에 없는 것들은 인증 필요
