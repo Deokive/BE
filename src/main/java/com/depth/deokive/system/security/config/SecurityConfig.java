@@ -93,6 +93,7 @@ public class SecurityConfig {
                                 "/api/v1/tickets/book/{archiveId:[0-9]+}",
                                 "/api/v1/repost/{archiveId:[0-9]+}",
                                 "/api/v1/diary/book/{archiveId:[0-9]+}",
+                                "/api/v1/stickers/monthly/{archiveId:[0-9]+}",
                                 "/api/v1/posts/{postId:[0-9]+}",
                                 "/api/v1/posts/{postId:[0-9]+}/comments"
                                 ).permitAll()
