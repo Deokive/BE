@@ -197,3 +197,18 @@ ratelimit:
     backend-error-min-interval-ms: 1000
   proxy:
     trusted-cidrs: ${TRUSTED_CIDRS} # ex. 172.18.0.0/20,172.39.16.0/20, ...
+
+management:
+  endpoints:
+    web:
+      base-path: ${ACTUATOR_ENDPOINT} # 기본 경로 변경
+      exposure:
+        include: "health,prometheus" # health와 prometheus만 노출 (env, beans 등 차단)
+  endpoint:
+    health:
+      show-details: always # DB, Disk, Redis 연결 상태 상세 표시
+    prometheus:
+      enabled: true # Prometheus Scrape 활성화
+  metrics:
+    tags:
+      application: ${spring.application.name:deokive}
