@@ -3,6 +3,7 @@ package com.depth.deokive.system.security.config;
 import com.depth.deokive.domain.user.entity.enums.Role;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.PathContainer;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
@@ -17,6 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class RequestMatcherHolder {
+
+    @Value("${management.endpoints.web.base-path}")
+    private String actuatorBasePath;
 
     // PathPattern 파서를 한 번만 준비 (thread-safe)
     private static final PathPatternParser PARSER = new PathPatternParser();
@@ -94,7 +98,23 @@ public class RequestMatcherHolder {
                     .filter(req -> Objects.equals(req.minRole(), minRole))
                     .map(this::toRequestMatcher)     // ← PathPattern 기반 매처로 변환
                     .toArray(RequestMatcher[]::new);
-            return new OrRequestMatcher(matchers);
+
+            // actuator: 런타임에 주입된 basePath로 생성
+            String base = actuatorBasePath;
+            if (base == null || base.isBlank()) throw new IllegalStateException("actuatorBasePath is blank");
+            if (!base.startsWith("/")) base = "/" + base;
+            if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+            String actuatorPattern = base + "/**";
+            RequestMatcher actuatorMatcher = toRequestMatcher(
+                    new RequestInfo(HttpMethod.GET, actuatorPattern, null)
+            );
+
+            // 기존 + actuator 합치기
+            RequestMatcher[] merged = new RequestMatcher[matchers.length + 1];
+            System.arraycopy(matchers, 0, merged, 0, matchers.length);
+            merged[matchers.length] = actuatorMatcher;
+
+            return new OrRequestMatcher(merged);
         });
     }
 
