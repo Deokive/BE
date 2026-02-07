@@ -42,6 +42,9 @@ public class RequestMatcherHolder {
             // new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId}", null),
             new RequestInfo(HttpMethod.GET, "/api/v1/posts", null),
 
+            // archives (완전 비인증 - PUBLIC 컨텐츠만 조회)
+            new RequestInfo(HttpMethod.GET, "/api/v1/archives/feed", null),
+
             // test
             new RequestInfo(HttpMethod.POST, "/api/system/test/scheduler/**", null),
 
@@ -68,22 +71,19 @@ public class RequestMatcherHolder {
 
     );
 
-    private static final List<RequestInfo> VISIBILITY_REQUEST_INFO_LIST = List.of(
-            // diary
-            new RequestInfo(HttpMethod.GET, "/api/v1/diary/{diaryId}", null),
-
-            // event
-            new RequestInfo(HttpMethod.GET, "/api/v1/events/{eventId}", null),
-            new RequestInfo(HttpMethod.GET, "/api/v1/events/monthly/{archiveId}", null),
-
-            // archive
-            new RequestInfo(HttpMethod.GET, "/api/v1/archives/{archiveId}", null),
-
-            // gallery
-            new RequestInfo(HttpMethod.GET, "/api/v1/gallery/{archiveId}", null),
-
-    // ticket
-            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId}", null)
+    // SecurityConfig에 직접 명시된 permitAll 엔드포인트들 (비회원/회원 모두 접근 가능)
+    private static final List<RequestInfo> SECURITY_CONFIG_PERMIT_ALL_LIST = List.of(
+            new RequestInfo(HttpMethod.GET, "/api/v1/diary/{diaryId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/events/{eventId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/events/monthly/{archiveId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/archives/{archiveId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/gallery/{archiveId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/{ticketId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/tickets/book/{archiveId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/repost/{archiveId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/diary/book/{archiveId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId:[0-9]+}", null),
+            new RequestInfo(HttpMethod.GET, "/api/v1/posts/{postId:[0-9]+}/comments", null)
     );
 
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
@@ -118,12 +118,14 @@ public class RequestMatcherHolder {
         });
     }
 
-    public RequestMatcher getRequestMatchersForVisibilityByMinRole(@Nullable Role minRole) {
-        var key = (minRole == null ? "VISITOR" : minRole.name());
-        return reqMatcherCacheMap.computeIfAbsent(key, k -> {
-            var matchers = VISIBILITY_REQUEST_INFO_LIST.stream()
-                    .filter(req -> Objects.equals(req.minRole(), minRole))
-                    .map(this::toRequestMatcher)     // ← PathPattern 기반 매처로 변환
+    /**
+     * SecurityConfig에 직접 명시된 permitAll 엔드포인트들에 대한 RequestMatcher 반환 (캐시)
+     * @return SecurityConfig의 permitAll 엔드포인트면 true
+     */
+    public RequestMatcher getSecurityConfigPermitAllMatcher() {
+        return reqMatcherCacheMap.computeIfAbsent("SECURITY_CONFIG_PERMIT_ALL", k -> {
+            var matchers = SECURITY_CONFIG_PERMIT_ALL_LIST.stream()
+                    .map(this::toRequestMatcher)
                     .toArray(RequestMatcher[]::new);
             return new OrRequestMatcher(matchers);
         });

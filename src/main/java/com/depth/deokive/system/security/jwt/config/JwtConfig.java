@@ -87,8 +87,11 @@ public class JwtConfig {
             JwtTokenValidator jwtTokenValidator,
             RequestMatcherHolder requestMatcherHolder,
             ObjectMapper objectMapper,
-            TokenService tokenService
+            TokenService tokenService,
+            CookieUtils cookieUtils
     ) {
-        return new JwtAuthenticationFilter(jwtTokenResolver, userLoadService, jwtTokenValidator, requestMatcherHolder, objectMapper, tokenService);
+        return new JwtAuthenticationFilter(
+                jwtTokenResolver, userLoadService, jwtTokenValidator,
+                requestMatcherHolder, objectMapper, tokenService, cookieUtils);
     }
 }
