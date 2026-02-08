@@ -206,7 +206,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     log.error("⚠️ Auto-refresh failed: {}", refreshException.getMessage(), refreshException);
                     SecurityContextHolder.clearContext();
 
-                    clearCookies(response);
+                    // rotate 실행 중 실패 = race condition(동시 요청)이 대부분
+                    // RTK가 진짜 만료된 경우만 쿠키 삭제, 나머지는 유지 (FE 재시도 가능하도록)
+                    if (refreshException instanceof JwtExpiredException) {
+                        clearCookies(response);
+                    }
 
                     // permitAll 엔드포인트면 에러 반환하지 않고 필터 통과 (비회원으로 처리)
                     if (isPermitAll) {
@@ -224,7 +228,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 logDetailedRtkValidationFailure(rtkException);
                 SecurityContextHolder.clearContext();
 
-                clearCookies(response);
+                // RTK가 존재하지만 검증 실패한 경우 원인별 쿠키 처리:
+                // - JwtInvalidException(UUID 불일치), JwtBlacklistException(rotate로 인한 블랙리스트):
+                //   동시 요청으로 인한 race condition 가능성 → 쿠키 유지 (FE 재시도 시 새 쿠키로 성공)
+                // - JwtExpiredException(RTK 자체 만료): 진짜 세션 종료 → 쿠키 삭제
+                boolean isTransientFailure = rtkException instanceof JwtInvalidException
+                        || rtkException instanceof JwtBlacklistException;
+                if (!isTransientFailure) {
+                    clearCookies(response);
+                }
 
                 // permitAll 엔드포인트면 에러 반환하지 않고 필터 통과 (비회원으로 처리)
                 if (isPermitAll) {
