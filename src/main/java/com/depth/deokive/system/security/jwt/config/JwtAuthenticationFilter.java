@@ -31,6 +31,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -152,9 +153,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // TODO: Refactoring 필요 -> 별도의 Helper Methods 로 분리할 것
             // ATK 만료 시 RTK 확인 및 검증 (자동 로그인 지원)
+            Optional<String> nullableRtk = Optional.empty();
             try {
                 // 1. RTK 존재 여부 확인 (ATK는 없어도 RTK만 있으면 자동 Refresh 가능)
-                var nullableRtk = jwtTokenResolver.parseRefreshTokenFromRequest(request);
+                nullableRtk = jwtTokenResolver.parseRefreshTokenFromRequest(request);
                 if (nullableRtk.isEmpty()) {
                     log.warn("⚪ No refresh token found, cannot auto-refresh");
                     SecurityContextHolder.clearContext();
@@ -225,15 +227,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 
             } catch (Exception rtkException) {
                 // RTK 검증 실패 또는 기타 예외 - 구체적인 원인 파악을 위한 상세 로깅
-                logDetailedRtkValidationFailure(rtkException);
+                String rtkToken = nullableRtk.isPresent() ? nullableRtk.get() : null;
+                logDetailedRtkValidationFailure(rtkException, rtkToken, request);
                 SecurityContextHolder.clearContext();
 
                 // RTK가 존재하지만 검증 실패한 경우 원인별 쿠키 처리:
-                // - JwtInvalidException(UUID 불일치), JwtBlacklistException(rotate로 인한 블랙리스트):
-                //   동시 요청으로 인한 race condition 가능성 → 쿠키 유지 (FE 재시도 시 새 쿠키로 성공)
+                // - JwtInvalidException 중 UUID 불일치만: 동시 요청으로 인한 race condition 가능성 → 쿠키 유지
+                // - JwtBlacklistException: rotate로 인한 블랙리스트 → 쿠키 유지 (FE 재시도 시 새 쿠키로 성공)
+                // - 그 외 JwtInvalidException: 진짜 문제 (TokenType 불일치, Subject/RefreshUuid null, Redis 미존재 등) → 쿠키 삭제
                 // - JwtExpiredException(RTK 자체 만료): 진짜 세션 종료 → 쿠키 삭제
-                boolean isTransientFailure = rtkException instanceof JwtInvalidException
-                        || rtkException instanceof JwtBlacklistException;
+                boolean isTransientFailure = isTransientRtkFailure(rtkException);
                 if (!isTransientFailure) {
                     clearCookies(response);
                 }
@@ -290,39 +293,120 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * RTK 검증 실패 시 구체적인 원인을 파악하기 위한 상세 로깅
+     * @param rtkException 발생한 예외
+     * @param rtkToken RTK 토큰 문자열 (null 가능)
+     * @param request HTTP 요청 객체
      */
-    private void logDetailedRtkValidationFailure(Exception rtkException) {
+    private void logDetailedRtkValidationFailure(Exception rtkException, String rtkToken, HttpServletRequest request) {
         Throwable cause = rtkException.getCause();
         String causeInfo = cause != null ? 
             String.format(" (원인: %s - %s)", cause.getClass().getSimpleName(), cause.getMessage()) : "";
 
+        // RTK 토큰 정보 (일부만 마스킹)
+        String rtkTokenInfo = rtkToken != null ? 
+            String.format(" (토큰: %s...%s, 길이: %d)", 
+                rtkToken.substring(0, Math.min(20, rtkToken.length())),
+                rtkToken.length() > 20 ? rtkToken.substring(rtkToken.length() - 10) : "",
+                rtkToken.length()) : " (토큰: null)";
+
+        // 요청 정보
+        String requestInfo = String.format(" [URI: %s, Method: %s]", 
+            request.getRequestURI(), request.getMethod());
+
         if (rtkException instanceof JwtInvalidException) {
             if (cause instanceof SecurityException) {
-                log.warn("⚠️ Refresh token validation failed: 시크릿 키 불일치{}", causeInfo, rtkException);
+                log.warn("⚠️ Refresh token validation failed: 시크릿 키 불일치{}{}{}", 
+                    causeInfo, rtkTokenInfo, requestInfo, rtkException);
             } else if (cause instanceof UnsupportedJwtException) {
-                log.warn("⚠️ Refresh token validation failed: 지원하지 않는 JWT 형식{}", causeInfo, rtkException);
+                log.warn("⚠️ Refresh token validation failed: 지원하지 않는 JWT 형식{}{}{}", 
+                    causeInfo, rtkTokenInfo, requestInfo, rtkException);
             } else if (cause instanceof IllegalArgumentException) {
-                log.warn("⚠️ Refresh token validation failed: 잘못된 인자{}", causeInfo, rtkException);
+                log.warn("⚠️ Refresh token validation failed: 잘못된 인자{}{}{}", 
+                    causeInfo, rtkTokenInfo, requestInfo, rtkException);
             } else if (cause != null) {
-                log.warn("⚠️ Refresh token validation failed: 유효하지 않은 토큰 [원인: {}]{}", 
-                    cause.getClass().getSimpleName(), causeInfo, rtkException);
+                log.warn("⚠️ Refresh token validation failed: 유효하지 않은 토큰 [원인: {}]{}{}{}", 
+                    cause.getClass().getSimpleName(), causeInfo, rtkTokenInfo, requestInfo, rtkException);
             } else {
-                log.warn("⚠️ Refresh token validation failed: 유효하지 않은 토큰 - {}", 
-                    rtkException.getMessage(), rtkException);
+                // cause가 null인 경우 - validateRtk에서 던진 JwtInvalidException
+                // 로그 메시지에서 원인을 추론할 수 있도록 상세 정보 포함
+                String rtkPayloadInfo = "";
+                try {
+                    if (rtkToken != null) {
+                        // RTK 파싱 시도 (만료되지 않았다면)
+                        try {
+                            JwtDto.TokenPayload payload = jwtTokenResolver.resolveToken(rtkToken);
+                            rtkPayloadInfo = String.format(" [Payload: Subject=%s, TokenType=%s, RefreshUuid=%s]", 
+                                payload.getSubject(), 
+                                payload.getTokenType(), 
+                                payload.getRefreshUuid());
+                        } catch (JwtExpiredException e) {
+                            rtkPayloadInfo = " [RTK 파싱 실패: 만료됨]";
+                        } catch (Exception e) {
+                            rtkPayloadInfo = String.format(" [RTK 파싱 실패: %s]", e.getClass().getSimpleName());
+                        }
+                    }
+                } catch (Exception e) {
+                    // 파싱 실패는 무시 (이미 예외가 발생한 상태)
+                }
+
+                String exceptionMsg = String.format(" [예외 메시지: %s]", rtkException.getMessage());
+                log.error("🔥 Critical: Refresh token validation failed - 원인 불명 (cause=null){}{}{}{}", 
+                    rtkTokenInfo, rtkPayloadInfo, requestInfo, exceptionMsg, rtkException);
+                
+                // 추가 디버깅 정보
+                log.error("🔥 RTK 검증 실패 상세 정보 - 예외 스택 트레이스:", rtkException);
             }
         } else if (rtkException instanceof JwtMalformedException) {
-            log.warn("⚠️ Refresh token validation failed: 토큰 형식 오류{}", causeInfo, rtkException);
+            log.warn("⚠️ Refresh token validation failed: 토큰 형식 오류{}{}{}", 
+                causeInfo, rtkTokenInfo, requestInfo, rtkException);
         } else if (rtkException instanceof JwtExpiredException) {
-            log.warn("⚠️ Refresh token validation failed: 토큰 만료{}", causeInfo, rtkException);
+            log.warn("⚠️ Refresh token validation failed: 토큰 만료{}{}{}", 
+                causeInfo, rtkTokenInfo, requestInfo, rtkException);
         } else if (rtkException instanceof JwtBlacklistException) {
-            log.warn("⚠️ Refresh token validation failed: 블랙리스트 토큰{}", causeInfo, rtkException);
+            log.warn("⚠️ Refresh token validation failed: 블랙리스트 토큰{}{}{}", 
+                causeInfo, rtkTokenInfo, requestInfo, rtkException);
         } else {
-            log.warn("⚠️ Refresh token validation failed: 예상치 못한 예외 [{}] - {}{}", 
+            log.warn("⚠️ Refresh token validation failed: 예상치 못한 예외 [{}] - {}{}{}{}", 
                 rtkException.getClass().getSimpleName(), 
                 rtkException.getMessage(), 
-                causeInfo, 
-                rtkException);
+                causeInfo, rtkTokenInfo, requestInfo, rtkException);
         }
+    }
+
+    /**
+     * RTK 검증 실패가 일시적인 실패(transient failure)인지 판단
+     * - UUID 불일치: 동시 요청으로 인한 race condition 가능성 → transient
+     * - 블랙리스트: rotate로 인한 블랙리스트 → transient
+     * - 그 외: 진짜 문제 → non-transient
+     */
+    private boolean isTransientRtkFailure(Exception rtkException) {
+        if (rtkException instanceof JwtBlacklistException) {
+            // 블랙리스트는 rotate로 인한 것일 가능성이 높음
+            return true;
+        }
+        
+        if (rtkException instanceof JwtInvalidException) {
+            // JwtInvalidException의 원인을 확인
+            Throwable cause = rtkException.getCause();
+            
+            // cause가 null인 경우 - validateRtk에서 던진 예외
+            // 로그 메시지를 통해 원인을 추론해야 함
+            String message = rtkException.getMessage();
+            if (message != null) {
+                // UUID 불일치만 transient로 처리
+                if (message.contains("RTK UUID 불일치") || message.contains("UUID 불일치")) {
+                    return true;
+                }
+                // 그 외는 모두 non-transient (TokenType 불일치, Subject/RefreshUuid null, Redis 미존재 등)
+            }
+            
+            // cause가 있는 경우도 UUID 불일치가 아닌 이상 non-transient
+            // SecurityException, UnsupportedJwtException, IllegalArgumentException 등은 모두 non-transient
+            return false;
+        }
+        
+        // JwtExpiredException, JwtMalformedException 등은 모두 non-transient
+        return false;
     }
 }
 
