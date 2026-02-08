@@ -12,6 +12,8 @@ import com.depth.deokive.system.security.model.UserPrincipal;
 import com.depth.deokive.system.security.util.CookieUtils;
 import com.depth.deokive.system.security.util.UserLoadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.SecurityException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -218,8 +220,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 
             } catch (Exception rtkException) {
-                // RTK 검증 실패 또는 기타 예외
-                log.warn("⚠️ Refresh token validation failed: {}", rtkException.getMessage());
+                // RTK 검증 실패 또는 기타 예외 - 구체적인 원인 파악을 위한 상세 로깅
+                logDetailedRtkValidationFailure(rtkException);
                 SecurityContextHolder.clearContext();
 
                 clearCookies(response);
@@ -272,6 +274,43 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void clearCookies(HttpServletResponse response) {
         cookieUtils.clearAccessTokenCookie(response);
         cookieUtils.clearRefreshTokenCookie(response);
+    }
+
+    /**
+     * RTK 검증 실패 시 구체적인 원인을 파악하기 위한 상세 로깅
+     */
+    private void logDetailedRtkValidationFailure(Exception rtkException) {
+        Throwable cause = rtkException.getCause();
+        String causeInfo = cause != null ? 
+            String.format(" (원인: %s - %s)", cause.getClass().getSimpleName(), cause.getMessage()) : "";
+
+        if (rtkException instanceof JwtInvalidException) {
+            if (cause instanceof SecurityException) {
+                log.warn("⚠️ Refresh token validation failed: 시크릿 키 불일치{}", causeInfo, rtkException);
+            } else if (cause instanceof UnsupportedJwtException) {
+                log.warn("⚠️ Refresh token validation failed: 지원하지 않는 JWT 형식{}", causeInfo, rtkException);
+            } else if (cause instanceof IllegalArgumentException) {
+                log.warn("⚠️ Refresh token validation failed: 잘못된 인자{}", causeInfo, rtkException);
+            } else if (cause != null) {
+                log.warn("⚠️ Refresh token validation failed: 유효하지 않은 토큰 [원인: {}]{}", 
+                    cause.getClass().getSimpleName(), causeInfo, rtkException);
+            } else {
+                log.warn("⚠️ Refresh token validation failed: 유효하지 않은 토큰 - {}", 
+                    rtkException.getMessage(), rtkException);
+            }
+        } else if (rtkException instanceof JwtMalformedException) {
+            log.warn("⚠️ Refresh token validation failed: 토큰 형식 오류{}", causeInfo, rtkException);
+        } else if (rtkException instanceof JwtExpiredException) {
+            log.warn("⚠️ Refresh token validation failed: 토큰 만료{}", causeInfo, rtkException);
+        } else if (rtkException instanceof JwtBlacklistException) {
+            log.warn("⚠️ Refresh token validation failed: 블랙리스트 토큰{}", causeInfo, rtkException);
+        } else {
+            log.warn("⚠️ Refresh token validation failed: 예상치 못한 예외 [{}] - {}{}", 
+                rtkException.getClass().getSimpleName(), 
+                rtkException.getMessage(), 
+                causeInfo, 
+                rtkException);
+        }
     }
 }
 
