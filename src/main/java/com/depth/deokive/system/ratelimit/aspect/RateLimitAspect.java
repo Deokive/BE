@@ -19,6 +19,7 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -59,8 +60,16 @@ public class RateLimitAspect {
     private final ConcurrentMap<String, BucketConfiguration> configCache = new ConcurrentHashMap<>();
     private final AtomicLong lastBackendErrorLogAtMs = new AtomicLong(0);
 
+    @Value("${ratelimit.enabled:true}")
+    private boolean isRateLimitEnabled;
+
     @Around("@annotation(com.depth.deokive.system.ratelimit.annotation.RateLimit) || @annotation(com.depth.deokive.system.ratelimit.annotation.RateLimits)")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+
+        if (!isRateLimitEnabled) {
+            return joinPoint.proceed();
+        }
+
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method declaredMethod = signature.getMethod();
 
