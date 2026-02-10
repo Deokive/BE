@@ -55,7 +55,7 @@ spring:
           writetimeout: 15000           # 이메일 본문 전송 시 대기 시간 (Ms)
 
   datasource:
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?rewriteBatchedStatements=true
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?rewriteBatchedStatements=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
@@ -182,6 +182,7 @@ scheduler:
   view-cooldown-minutes: 10
 
 ratelimit:
+  enabled: false
   redis:
     timeout-fail-open: 200ms     # limiter 장애 시 빠르게 통과
     timeout-fail-closed: 500ms   # auth는 차단하되 짧게 실패

@@ -5,6 +5,9 @@ import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
 import com.depth.deokive.system.security.jwt.dto.JwtDto;
 import com.depth.deokive.system.security.jwt.dto.TokenType;
+import com.depth.deokive.system.security.jwt.exception.JwtExpiredException;
+import com.depth.deokive.system.security.jwt.exception.JwtInvalidException;
+import com.depth.deokive.system.security.jwt.exception.JwtMalformedException;
 import com.depth.deokive.system.security.util.CookieUtils;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -84,22 +87,36 @@ public class JwtTokenResolver {
     }
 
     public JwtDto.TokenPayload resolveToken(String token) {
-        Claims payload = jwtTokenValidator.parseClaimsWithValidation(token).getPayload();
+        Claims payload;
+        try {
+            payload = jwtTokenValidator.parseClaimsWithValidation(token).getPayload();
+        } catch (JwtInvalidException | JwtMalformedException | JwtExpiredException e) {
+            log.warn("⚠️ RTK resolveToken failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
+            throw e;
+        }
+
         LocalDateTime exp = payload.getExpiration().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
 
         String type = payload.get("type", String.class);
         String role = payload.get("role", String.class);
         Boolean rememberMe = payload.get("rememberMe", Boolean.class);
 
-        return JwtDto.TokenPayload.builder()
-                .subject(payload.getSubject())
-                .expiredAt(exp)
-                .tokenType(type == null ? null : TokenType.valueOf(type))
-                .role(role == null ? null : Role.valueOf(role))
-                .refreshUuid(payload.get("refreshUuid", String.class))
-                .jti(payload.getId())
-                .rememberMe(rememberMe)
-                .build();
+        try {
+            return JwtDto.TokenPayload.builder()
+                    .subject(payload.getSubject())
+                    .expiredAt(exp)
+                    .tokenType(type == null ? null : TokenType.valueOf(type))
+                    .role(role == null ? null : Role.valueOf(role))
+                    .refreshUuid(payload.get("refreshUuid", String.class))
+                    .jti(payload.getId())
+                    .rememberMe(rememberMe)
+                    .build();
+        } catch (IllegalArgumentException e) {
+            // TokenType.valueOf() 또는 Role.valueOf() 실패
+            log.warn("⚠️ RTK resolveToken failed: 잘못된 enum 값 - type: {}, role: {}, error: {}", 
+                type, role, e.getMessage());
+            throw new JwtInvalidException(e);
+        }
     }
 
     public JwtDto.TokenPayload resolveExpiredToken(String token) {

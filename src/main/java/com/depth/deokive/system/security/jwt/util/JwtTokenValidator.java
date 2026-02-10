@@ -21,15 +21,35 @@ public class JwtTokenValidator {
     private final SecretKey secretKey;
 
     public void validateRtk(JwtDto.TokenPayload payload) {
-        if (payload.getTokenType() != TokenType.REFRESH) throw new JwtInvalidException();
-        if (payload.getSubject() == null || payload.getSubject().isEmpty()) throw new JwtInvalidException();
-        if (payload.getRefreshUuid() == null || payload.getRefreshUuid().isEmpty()) throw new JwtInvalidException();
+        if (payload.getTokenType() != TokenType.REFRESH) {
+            log.warn("⚠️ RTK validation failed: TokenType이 REFRESH가 아님 - {}", payload.getTokenType());
+            throw new JwtInvalidException();
+        }
+        if (payload.getSubject() == null || payload.getSubject().isEmpty()) {
+            log.warn("⚠️ RTK validation failed: Subject가 null이거나 비어있음");
+            throw new JwtInvalidException();
+        }
+        if (payload.getRefreshUuid() == null || payload.getRefreshUuid().isEmpty()) {
+            log.warn("⚠️ RTK validation failed: RefreshUuid가 null이거나 비어있음");
+            throw new JwtInvalidException();
+        }
 
         String submittedUuid = payload.getRefreshUuid();
         String allowedRtk = tokenRedisRepository.getAllowedRtk(payload.getSubject());
 
-        if (allowedRtk == null || !allowedRtk.equals(submittedUuid)) throw new JwtInvalidException();
-        if (tokenRedisRepository.isRtkBlacklisted(submittedUuid)) throw new JwtBlacklistException();
+        if (allowedRtk == null) {
+            log.warn("⚠️ RTK validation failed: Redis에 허용된 RTK가 없음 - Subject: {}", payload.getSubject());
+            throw new JwtInvalidException();
+        }
+        if (!allowedRtk.equals(submittedUuid)) {
+            log.warn("⚠️ RTK validation failed: RTK UUID 불일치 - 제출된 UUID: {}, 허용된 UUID: {}", 
+                submittedUuid, allowedRtk);
+            throw new JwtInvalidException();
+        }
+        if (tokenRedisRepository.isRtkBlacklisted(submittedUuid)) {
+            log.warn("⚠️ RTK validation failed: 블랙리스트에 등록된 토큰 - UUID: {}", submittedUuid);
+            throw new JwtBlacklistException();
+        }
     }
 
     public void validateAtk(JwtDto.TokenPayload payload) {

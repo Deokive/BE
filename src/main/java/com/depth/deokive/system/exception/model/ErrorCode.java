@@ -18,6 +18,7 @@ public enum ErrorCode {
     // JWT Errors
     JWT_INVALID(HttpStatus.UNAUTHORIZED, "JWT INVALID", "유효하지 않은 토큰입니다."),
     JWT_EXPIRED(HttpStatus.UNAUTHORIZED, "JWT EXPIRED", "만료된 토큰입니다."),
+    JWT_SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "JWT SESSION EXPIRED", "세션이 만료되었습니다. 다시 로그인해주세요."),
     JWT_NOT_FOUND(HttpStatus.UNAUTHORIZED, "JWT NOT FOUND", "인증 토큰을 찾을 수 없습니다."),
     JWT_MALFORMED(HttpStatus.UNAUTHORIZED, "JWT MALFORMED", "토큰 형식이 올바르지 않습니다."),
     JWT_AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "JWT AUTHENTICATION FAILED", "토큰 인증에 실패했습니다."),

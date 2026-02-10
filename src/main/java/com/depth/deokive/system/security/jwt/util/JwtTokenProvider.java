@@ -81,6 +81,23 @@ public class JwtTokenProvider {
         return JwtDto.TokenPair.of(refreshToken, accessToken);
     }
 
+    /**
+     * 기존 RTK UUID를 재사용하여 새 토큰 페어 생성
+     * Race Condition 패배자를 위한 Graceful Fallback에서 사용
+     * @param tokenOption 토큰 생성 옵션
+     * @param refreshUuid 재사용할 RTK UUID (Redis에 이미 등록된 UUID)
+     * @return 새 토큰 페어 (동일한 refreshUuid로 생성됨)
+     */
+    public JwtDto.TokenPair createTokenPairWithUuid(
+            JwtDto.TokenOptionWrapper tokenOption,
+            String refreshUuid
+    ) {
+        JwtDto.TokenData accessToken = createAccessToken(tokenOption, refreshUuid);
+        JwtDto.TokenData refreshToken = createRefreshToken(tokenOption, refreshUuid);
+
+        return JwtDto.TokenPair.of(refreshToken, accessToken);
+    }
+
     private String getSubject(UserPrincipal userPrincipal) {
         // OAuth2 사용자의 경우 userId가 null이므로 username을 subject로 사용
         return userPrincipal.getUserId() != null
