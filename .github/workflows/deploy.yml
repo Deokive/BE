@@ -2,7 +2,7 @@ name: Deploy To EC2 (Compose)
 
 on:
   push:
-    branches: [ "main", "DEOK-73-HOTFIX-Refresh-Token-Validation-Fail-Issue" ]
+    branches: [ "main" ]
 
   workflow_dispatch:
 
