@@ -1,10 +1,10 @@
 package com.depth.deokive.domain.diary.repository;
 
 import com.depth.deokive.common.enums.Visibility;
+import com.depth.deokive.common.service.PaginationCountCacheService;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.dto.QDiaryDto_DiaryPageResponse;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +22,7 @@ import static com.depth.deokive.domain.diary.entity.QDiary.diary;
 public class DiaryQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+    private final PaginationCountCacheService paginationCountCacheService;
 
     public Page<DiaryDto.DiaryPageResponse> findDiaries(
             Long bookId,
@@ -59,16 +60,23 @@ public class DiaryQueryRepository {
                     .fetch();
         }
 
-        // SEQ 3. Count Query
-        JPAQuery<Long> countQuery = queryFactory
-                .select(diary.count())
-                .from(diary)
-                .where(
-                        diary.diaryBook.id.eq(bookId),
-                        eqVisibility(allowedVisibilities)
-                );
+        // SEQ 3. Count Query - Redis 캐싱
+        String visKey = allowedVisibilities.stream()
+                .map(Visibility::name)
+                .sorted()
+                .collect(java.util.stream.Collectors.joining(","));
+        String countCacheKey = "diary:" + bookId + ":" + visKey;
 
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+        return PageableExecutionUtils.getPage(content, pageable,
+                () -> paginationCountCacheService.getCount(countCacheKey, () ->
+                        queryFactory.select(diary.count())
+                                .from(diary)
+                                .where(
+                                        diary.diaryBook.id.eq(bookId),
+                                        eqVisibility(allowedVisibilities)
+                                )
+                                .fetchOne()
+                ));
     }
 
     private BooleanExpression eqVisibility(List<Visibility> allowedVisibilities) {

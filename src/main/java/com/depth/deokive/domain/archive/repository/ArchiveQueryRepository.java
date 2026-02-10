@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.archive.repository;
 
+import com.depth.deokive.common.service.PaginationCountCacheService;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.dto.QArchiveDto_ArchivePageResponse;
 import com.depth.deokive.common.enums.Visibility;
@@ -29,6 +30,7 @@ import static com.depth.deokive.domain.archive.entity.QArchiveStats.archiveStats
 public class ArchiveQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+    private final PaginationCountCacheService paginationCountCacheService;
 
     public Page<ArchiveDto.ArchivePageResponse> searchArchiveFeed(
             Long filterUserId,
@@ -42,9 +44,18 @@ public class ArchiveQueryRepository {
         List<Long> ids;
         JPAQuery<Long> countQuery;
 
+        // Count 캐시 키 구성 (visibility 조합 포함)
+        String visKey = allowedVisibilities.stream()
+                .map(Visibility::name)
+                .sorted()
+                .collect(Collectors.joining(","));
+        String countCacheKey;
+
         // STEP 2. 커버링 인덱스 활용 (ID만 조회) && 정렬 조건 분기 : My Archives vs Global Archives
         if (isOptimizedPath) {
             // Case 1. My Archives(Me or Friends) -> Archive Table Scan
+            countCacheKey = "archive:opt:" + filterUserId + ":" + visKey;
+
             ids = queryFactory
                     .select(archive.id)
                     .from(archive)
@@ -66,6 +77,8 @@ public class ArchiveQueryRepository {
                     );
         } else {
             // Case 2. Global Archives -> ArchiveStats 기반 조회
+            countCacheKey = "archive:global:" + (filterUserId != null ? filterUserId : "all") + ":" + visKey;
+
             JPAQuery<Long> idsQuery = queryFactory
                     .select(archiveStats.id)
                     .from(archiveStats)
@@ -131,7 +144,10 @@ public class ArchiveQueryRepository {
                     .collect(Collectors.toList());
         }
 
-        return PageableExecutionUtils.getPage(sortedContent, pageable, countQuery::fetchOne);
+        // Count Query - Redis 캐싱으로 동시 요청 시 DB 부하 제거
+        final JPAQuery<Long> finalCountQuery = countQuery;
+        return PageableExecutionUtils.getPage(sortedContent, pageable,
+                () -> paginationCountCacheService.getCount(countCacheKey, finalCountQuery::fetchOne));
     }
 
     // --- Dynamic Filters ---
