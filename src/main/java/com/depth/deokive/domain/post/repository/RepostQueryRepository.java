@@ -1,11 +1,11 @@
 package com.depth.deokive.domain.post.repository;
 
 
+import com.depth.deokive.common.service.PaginationCountCacheService;
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
-import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +24,7 @@ import static com.depth.deokive.domain.post.entity.QRepost.repost;
 public class RepostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+    private final PaginationCountCacheService paginationCountCacheService;
 
     public Page<RepostDto.RepostElementResponse> findByTabId(Long tabId, Pageable pageable) {
 
@@ -57,12 +58,15 @@ public class RepostQueryRepository {
                     .fetch();
         }
 
-        // SEQ 4. Count Query
-        JPAQuery<Long> countQuery = queryFactory
-                .select(repost.count())
-                .from(repost)
-                .where(repost.repostTab.id.eq(tabId));
+        // SEQ 4. Count Query - Redis 캐싱 (탭별 캐시)
+        String countCacheKey = "repost:" + tabId;
 
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+        return PageableExecutionUtils.getPage(content, pageable,
+                () -> paginationCountCacheService.getCount(countCacheKey, () ->
+                        queryFactory.select(repost.count())
+                                .from(repost)
+                                .where(repost.repostTab.id.eq(tabId))
+                                .fetchOne()
+                ));
     }
 }

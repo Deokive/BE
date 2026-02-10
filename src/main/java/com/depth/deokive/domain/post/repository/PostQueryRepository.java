@@ -1,5 +1,6 @@
 package com.depth.deokive.domain.post.repository;
 
+import com.depth.deokive.common.service.PaginationCountCacheService;
 import com.depth.deokive.domain.post.dto.PostDto;
 
 
@@ -8,7 +9,6 @@ import com.depth.deokive.domain.post.entity.enums.Category;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +31,7 @@ import static com.depth.deokive.domain.post.entity.QPostStats.postStats;
 public class PostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+    private final PaginationCountCacheService paginationCountCacheService;
 
     public Page<PostDto.PostPageResponse> searchPostFeed(Category category, Pageable pageable) {
 
@@ -74,13 +75,16 @@ public class PostQueryRepository {
             sortedContent = ids.stream().map(contentMap::get).toList();
         }
 
-        // Count Query (PostStats 기준)
-        JPAQuery<Long> countQuery = queryFactory
-                .select(postStats.count())
-                .from(postStats)
-                .where(eqCategory(category));
+        // Count Query (PostStats 기준) - Caffeine L1 캐싱으로 동시 요청 시 DB 부하 제거
+        String countCacheKey = "post:feed:" + (category != null ? category.name() : "ALL");
 
-        return PageableExecutionUtils.getPage(sortedContent, pageable, countQuery::fetchOne);
+        return PageableExecutionUtils.getPage(sortedContent, pageable,
+                () -> paginationCountCacheService.getCount(countCacheKey, () ->
+                        queryFactory.select(postStats.count())
+                                .from(postStats)
+                                .where(eqCategory(category))
+                                .fetchOne()
+                ));
     }
 
     private BooleanExpression eqCategory(Category category) {
