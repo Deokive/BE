@@ -174,17 +174,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 
-                // 2. RTK 파싱 및 검증
+                // 2. RTK 파싱 및 기본 검증 (UUID/블랙리스트 검증은 TokenService의 Lock 내부에서 수행)
                 JwtDto.TokenPayload rtkPayload = jwtTokenResolver.resolveToken(nullableRtk.get());
-                jwtTokenValidator.validateRtk(rtkPayload);
-                
-                // 3. RTK가 유효하면 자동 Refresh 처리
+
+                // 기본 검증만 수행 (Race Condition 대응을 위해 UUID 검증은 제외)
+                if (rtkPayload.getTokenType() != com.depth.deokive.system.security.jwt.dto.TokenType.REFRESH) {
+                    log.warn("⚠️ RTK validation failed: TokenType이 REFRESH가 아님 - {}", rtkPayload.getTokenType());
+                    throw new JwtInvalidException();
+                }
+                if (rtkPayload.getSubject() == null || rtkPayload.getSubject().isEmpty()) {
+                    log.warn("⚠️ RTK validation failed: Subject가 null이거나 비어있음");
+                    throw new JwtInvalidException();
+                }
+                if (rtkPayload.getRefreshUuid() == null || rtkPayload.getRefreshUuid().isEmpty()) {
+                    log.warn("⚠️ RTK validation failed: RefreshUuid가 null이거나 비어있음");
+                    throw new JwtInvalidException();
+                }
+
+                // 3. RTK가 유효하면 자동 Refresh 처리 (UUID 검증은 TokenService의 Lock 내부에서 수행)
                 log.info("🟢 Valid refresh token found, performing auto-refresh");
                 try {
                     boolean rememberMe = rtkPayload.getRememberMe() != null && rtkPayload.getRememberMe();
                     
-                    // TokenService를 통해 자동 Refresh
-                    JwtDto.TokenOptionWrapper tokenOption = JwtDto.TokenOptionWrapper.of(request, response, rememberMe);
+                    // TokenService를 통해 자동 Refresh (Filter에서 검증된 rtkPayload 전달 → 이중 파싱 방지)
+                    JwtDto.TokenOptionWrapper tokenOption = JwtDto.TokenOptionWrapper.builder()
+                            .httpServletRequest(request)
+                            .httpServletResponse(response)
+                            .rememberMe(rememberMe)
+                            .rtkPayload(rtkPayload)
+                            .build();
                     JwtDto.TokenInfo tokenInfo = tokenService.rotateByRtkWithValidation(tokenOption);
                     
                     // 새로 발급된 RTK를 request attribute에 저장 (같은 요청에서 사용하기 위해)
@@ -208,20 +226,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     log.error("⚠️ Auto-refresh failed: {}", refreshException.getMessage(), refreshException);
                     SecurityContextHolder.clearContext();
 
-                    // rotate 실행 중 실패 = race condition(동시 요청)이 대부분
-                    // RTK가 진짜 만료된 경우만 쿠키 삭제, 나머지는 유지 (FE 재시도 가능하도록)
+                    // RTK 만료 = 세션 종료 → 쿠키 삭제 + JWT_SESSION_EXPIRED
                     if (refreshException instanceof JwtExpiredException) {
+                        clearCookies(response);
+                        log.warn("⚠️ Refresh token expired - session terminated, redirecting to login");
+
+                        if (isPermitAll) {
+                            log.debug("🟢 PermitAll endpoint - allowing request without authentication after RTK expiration");
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
+
+                        writeErrorResponse(response, ErrorCode.JWT_SESSION_EXPIRED);
+                        return;
+                    }
+
+                    // Transient failure (race condition) → 쿠키 유지 (FE 재시도 가능)
+                    // Non-transient failure (세션 종료, 토큰 무효 등) → 쿠키 삭제
+                    boolean isTransient = isTransientRtkFailure(refreshException);
+                    if (!isTransient) {
                         clearCookies(response);
                     }
 
-                    // permitAll 엔드포인트면 에러 반환하지 않고 필터 통과 (비회원으로 처리)
                     if (isPermitAll) {
                         log.debug("🟢 PermitAll endpoint - allowing request without authentication after refresh failure");
                         filterChain.doFilter(request, response);
                         return;
                     }
 
-                    writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
+                    // transient → JWT_EXPIRED (FE 재시도 가능), non-transient → JWT_INVALID (FE 로그인 유도)
+                    writeErrorResponse(response, isTransient ? ErrorCode.JWT_EXPIRED : ErrorCode.JWT_INVALID);
                     return;
                 }
                 
@@ -231,11 +265,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 logDetailedRtkValidationFailure(rtkException, rtkToken, request);
                 SecurityContextHolder.clearContext();
 
+                // RTK 자체가 만료된 경우 → 세션 종료 (JWT_SESSION_EXPIRED)
+                if (rtkException instanceof JwtExpiredException) {
+                    clearCookies(response);
+                    log.warn("⚠️ Refresh token expired - session terminated, redirecting to login");
+
+                    if (isPermitAll) {
+                        log.debug("🟢 PermitAll endpoint - allowing request without authentication after RTK expiration");
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
+                    writeErrorResponse(response, ErrorCode.JWT_SESSION_EXPIRED);
+                    return;
+                }
+
                 // RTK가 존재하지만 검증 실패한 경우 원인별 쿠키 처리:
                 // - JwtInvalidException 중 UUID 불일치만: 동시 요청으로 인한 race condition 가능성 → 쿠키 유지
                 // - JwtBlacklistException: rotate로 인한 블랙리스트 → 쿠키 유지 (FE 재시도 시 새 쿠키로 성공)
                 // - 그 외 JwtInvalidException: 진짜 문제 (TokenType 불일치, Subject/RefreshUuid null, Redis 미존재 등) → 쿠키 삭제
-                // - JwtExpiredException(RTK 자체 만료): 진짜 세션 종료 → 쿠키 삭제
                 boolean isTransientFailure = isTransientRtkFailure(rtkException);
                 if (!isTransientFailure) {
                     clearCookies(response);
@@ -248,7 +296,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                writeErrorResponse(response, ErrorCode.JWT_EXPIRED);
+                // transient → JWT_EXPIRED (FE 재시도 가능), non-transient → JWT_INVALID (FE 로그인 유도)
+                writeErrorResponse(response, isTransientFailure ? ErrorCode.JWT_EXPIRED : ErrorCode.JWT_INVALID);
                 return;
             }
         } catch (JwtMalformedException e) {

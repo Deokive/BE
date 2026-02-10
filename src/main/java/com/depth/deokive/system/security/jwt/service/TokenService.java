@@ -55,31 +55,32 @@ public class TokenService {
     public JwtDto.TokenInfo rotateByRtkWithValidation(JwtDto.TokenOptionWrapper tokenOption) {
         log.info("✅ Rotate Tokens - START");
 
-        // 1) RTK 파싱 (ATK는 없어도 가능)
+        // 1) RTK raw string 추출 (clearTokensByAtkWithValidation에서 필요)
         String refreshToken = jwtTokenResolver.parseRefreshTokenFromRequest(tokenOption.getHttpServletRequest())
                 .orElseThrow(() -> new RestException(ErrorCode.JWT_MISSING));
 
-        // 2) RTK 파싱 및 만료 검증 (만료된 RTK는 refresh 불가)
-        JwtDto.TokenPayload rtkPayload;
-        try {
-            rtkPayload = jwtTokenResolver.resolveToken(refreshToken);
-        } catch (JwtExpiredException e) {
-            log.warn("⚠️ Refresh token has expired, cannot rotate tokens");
-            throw new RestException(ErrorCode.JWT_EXPIRED);
-        }
+        // 2) rtkPayload: Filter에서 이미 검증된 것이 있으면 재사용, 없으면 직접 파싱
+        JwtDto.TokenPayload rtkPayload = tokenOption.getRtkPayload();
+        if (rtkPayload == null) {
+            try {
+                rtkPayload = jwtTokenResolver.resolveToken(refreshToken);
+            } catch (JwtExpiredException e) {
+                log.warn("⚠️ Refresh token has expired, cannot rotate tokens");
+                throw e;
+            }
 
-        // 3) RTK 기본 유효성 검증 (타입 체크만 - 블랙리스트/UUID는 Lock 내부에서 재검증)
-        if (rtkPayload.getTokenType() != TokenType.REFRESH) {
-            log.warn("⚠️ RTK validation failed: TokenType이 REFRESH가 아님 - {}", rtkPayload.getTokenType());
-            throw new JwtInvalidException();
-        }
-        if (rtkPayload.getSubject() == null || rtkPayload.getSubject().isEmpty()) {
-            log.warn("⚠️ RTK validation failed: Subject가 null이거나 비어있음");
-            throw new JwtInvalidException();
-        }
-        if (rtkPayload.getRefreshUuid() == null || rtkPayload.getRefreshUuid().isEmpty()) {
-            log.warn("⚠️ RTK validation failed: RefreshUuid가 null이거나 비어있음");
-            throw new JwtInvalidException();
+            if (rtkPayload.getTokenType() != TokenType.REFRESH) {
+                log.warn("⚠️ RTK validation failed: TokenType이 REFRESH가 아님 - {}", rtkPayload.getTokenType());
+                throw new JwtInvalidException();
+            }
+            if (rtkPayload.getSubject() == null || rtkPayload.getSubject().isEmpty()) {
+                log.warn("⚠️ RTK validation failed: Subject가 null이거나 비어있음");
+                throw new JwtInvalidException();
+            }
+            if (rtkPayload.getRefreshUuid() == null || rtkPayload.getRefreshUuid().isEmpty()) {
+                log.warn("⚠️ RTK validation failed: RefreshUuid가 null이거나 비어있음");
+                throw new JwtInvalidException();
+            }
         }
 
         String subject = rtkPayload.getSubject();
@@ -90,11 +91,15 @@ public class TokenService {
 
         try {
             // 4) 분산 락 획득 (Race Condition 방지)
-            // - waitTime: 1초 (토큰 갱신은 보통 500ms 이내, Graceful Fallback으로 실패 시에도 성공)
-            // - leaseTime: 3초 (데드락 방지)
-            if (!lock.tryLock(1, 3, TimeUnit.SECONDS)) {
-                log.error("⚠️ Failed to acquire lock for RTK rotation (timeout) - Subject: {}", subject);
-                throw new RestException(ErrorCode.GLOBAL_INTERNAL_SERVER_ERROR);
+            // - waitTime: 2초 (동시 5개 요청 기준 ~800ms 소요, 여유분 포함)
+            // - leaseTime 미지정 → Redisson Watchdog 활성화 (기본 30초, 자동 갱신)
+            //   → DB 지연 시에도 Lock이 조기 해제되지 않음 (finally에서 명시적 unlock)
+            if (!lock.tryLock(2, TimeUnit.SECONDS)) {
+                // Lock 타임아웃 = 다른 요청이 갱신 중 = Race Condition
+                // JwtInvalidException + "UUID 불일치" 메시지로 isTransientFailure에서 감지되도록
+                log.warn("⚠️ Lock timeout for RTK rotation (Race Condition suspected) - Subject: {}, IP: {}",
+                        subject, ClientUtils.getClientIp(tokenOption.getHttpServletRequest()));
+                throw new JwtInvalidException("RTK rotation lock timeout - UUID 불일치 가능성 (Race Condition)");
             }
 
             log.debug("🔒 Lock acquired for RTK rotation - Subject: {}", subject);
@@ -120,7 +125,8 @@ public class TokenService {
                     // 블랙리스트에 없는데 UUID 불일치 → 비정상 (탈취 의심)
                     log.error("🚨 SECURITY ALERT: RTK UUID 불일치 but NOT blacklisted - Subject: {}, UUID: {}, IP: {}",
                             subject, submittedUuid, clientIp);
-                    throw new JwtInvalidException();
+                    // 쿠키 삭제되지 않도록 "UUID 불일치" 메시지 포함 (보안 위협이지만 정상 쿠키는 보존)
+                    throw new JwtInvalidException("RTK UUID 불일치 - 블랙리스트 없음 (보안 위협)");
                 }
 
                 // 2. Grace Period 체크: 블랙리스트 등록 후 30초 이내만 허용
@@ -133,7 +139,8 @@ public class TokenService {
                     // Grace Period 초과 → 의심스러운 요청
                     log.error("🚨 SECURITY ALERT: Old RTK 사용 (Grace Period 초과) - Elapsed: {}s, IP: {}",
                             elapsed.getSeconds(), clientIp);
-                    throw new JwtInvalidException();
+                    // 쿠키 삭제되지 않도록 "UUID 불일치" 메시지 포함
+                    throw new JwtInvalidException("RTK UUID 불일치 - Grace Period 초과 (보안 위협)");
                 }
 
                 // 3. Retry Counter 증가 및 체크 (동일 old RTK로 3번까지만 허용)
@@ -145,7 +152,8 @@ public class TokenService {
                 final long MAX_RETRY_COUNT = 3;
                 if (retryCount > MAX_RETRY_COUNT) {
                     log.error("🚨 SECURITY ALERT: Old RTK 과도한 재시도 - Count: {}, IP: {}", retryCount, clientIp);
-                    throw new JwtInvalidException();
+                    // 쿠키 삭제되지 않도록 "UUID 불일치" 메시지 포함
+                    throw new JwtInvalidException("RTK UUID 불일치 - 재시도 횟수 초과 (보안 위협)");
                 }
 
                 // 4. Graceful Fallback: 현재 허용된 RTK로 새 토큰 발급 (갱신하지 않음!)
@@ -314,7 +322,7 @@ public class TokenService {
     }
 
     /**
-     * 현재 허용된 RTK로 새 토큰 발급 (갱신하지 않음)
+     * 현재 허용된 RTK UUID로 새 토큰 발급 (갱신하지 않음)
      * Race Condition 패배자를 위한 Graceful Fallback
      */
     private JwtDto.TokenInfo issueTokensWithCurrentRtk(
@@ -324,15 +332,27 @@ public class TokenService {
         // 1) 사용자 로드
         UserPrincipal principal = resolveUser(subject);
 
-        // 2) 새 토큰 페어 생성 (현재 허용된 RTK 기준)
+        // 2) 현재 Redis에 등록된 UUID 조회 (r1이 생성한 UUID)
+        String currentAllowedUuid = tokenRedisRepository.getAllowedRtk(subject);
+        if (currentAllowedUuid == null) {
+            // Redis에 UUID 없음 = 세션 종료 (로그아웃됨)
+            // "UUID 불일치" 메시지를 포함하지 않아야 쿠키가 삭제됨
+            log.error("⚠️ Graceful Fallback failed: 허용된 RTK UUID가 없음 (세션 종료) - Subject: {}", subject);
+            throw new JwtInvalidException("Redis에 허용된 RTK가 없음 - 세션 종료");
+        }
+
+        // 3) 동일한 UUID로 새 토큰 페어 생성 (UUID 재사용!)
         JwtDto.TokenOptionWrapper newTokenOption
                 = JwtDto.TokenOptionWrapper.of(principal, tokenOption.isRememberMe());
-        JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPair(newTokenOption);
+        JwtDto.TokenPair tokenPair = jwtTokenProvider.createTokenPairWithUuid(
+                newTokenOption,
+                currentAllowedUuid  // r1이 생성한 UUID 재사용!
+        );
 
-        // 3) RTK는 이미 Redis에 등록되어 있음 (req1이 갱신함)
-        // 따라서 allowRtk 호출 불필요 → 중복 갱신 방지
+        // 4) RTK는 이미 Redis에 등록되어 있음 (r1이 갱신함)
+        // 동일한 UUID를 사용하므로 allowRtk 호출 불필요 → 중복 갱신 방지
 
-        // 4) 쿠키 설정
+        // 5) 쿠키 설정
         cookieUtils.addAccessTokenCookie(
                 tokenOption.getHttpServletResponse(),
                 tokenPair.getAccessToken().getToken(),
@@ -343,6 +363,8 @@ public class TokenService {
                 tokenPair.getRefreshToken().getToken(),
                 tokenPair.getRefreshToken().getExpiredAt()
         );
+
+        log.debug("✅ Graceful Fallback - 동일 UUID로 토큰 발급 완료 - UUID: {}", currentAllowedUuid);
 
         return JwtDto.TokenInfo.from(tokenPair);
     }
