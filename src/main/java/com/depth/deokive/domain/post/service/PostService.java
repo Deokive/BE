@@ -3,6 +3,7 @@ package com.depth.deokive.domain.post.service;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.LikeRedisService;
+import com.depth.deokive.common.service.PaginationCountCacheService;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.PageUtils;
@@ -50,6 +51,7 @@ public class PostService {
     private final LikeRedisService likeRedisService;
     private final CommentCountRedisService commentCountRedisService;
     private final CommentRepository commentRepository;
+    private final PaginationCountCacheService paginationCountCacheService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -68,7 +70,10 @@ public class PostService {
         // SEQ 4. 파일 연결
         List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 5. Response (생성 시점에는 좋아요 없음)
+        // SEQ 5. 페이지네이션 COUNT 캐시 무효화
+        paginationCountCacheService.evictByPrefix("post");
+
+        // SEQ 6. Response (생성 시점에는 좋아요 없음)
         return PostDto.Response.of(post, stats, maps, false);
     }
 
@@ -179,9 +184,10 @@ public class PostService {
         // SEQ 7. 게시글 삭제
         postRepository.delete(post);
 
-        // SEQ 8. 캐시 삭제 (좋아요 + 댓글 수)
+        // SEQ 8. 캐시 삭제 (좋아요 + 댓글 수 + 페이지네이션 COUNT)
         likeRedisService.deleteLikeData(ViewLikeDomain.POST, postId);
         commentCountRedisService.deleteCache(postId);
+        paginationCountCacheService.evictByPrefix("post");
     }
 
     @ExecutionTime
