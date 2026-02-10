@@ -1,10 +1,10 @@
 package com.depth.deokive.domain.gallery.repository;
 
+import com.depth.deokive.common.service.PaginationCountCacheService;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
-import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +25,7 @@ import static com.depth.deokive.domain.gallery.entity.QGallery.gallery;
 public class GalleryQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+    private final PaginationCountCacheService paginationCountCacheService;
 
     public Page<GalleryDto.Response> searchGalleriesByArchive(Long archiveId, Pageable pageable) {
 
@@ -57,13 +58,16 @@ public class GalleryQueryRepository {
                     .fetch();
         }
 
-        // Count Query (최적화)
-        JPAQuery<Long> countQuery = queryFactory
-                .select(gallery.count())
-                .from(gallery)
-                .where(gallery.archiveId.eq(archiveId));
+        // Count Query - Redis 캐싱
+        String countCacheKey = "gallery:" + archiveId;
 
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+        return PageableExecutionUtils.getPage(content, pageable,
+                () -> paginationCountCacheService.getCount(countCacheKey, () ->
+                        queryFactory.select(gallery.count())
+                                .from(gallery)
+                                .where(gallery.archiveId.eq(archiveId))
+                                .fetchOne()
+                ));
     }
 
     private OrderSpecifier<?>[] getOrderSpecifiers(Pageable pageable) {
