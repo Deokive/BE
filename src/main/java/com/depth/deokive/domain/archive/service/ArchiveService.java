@@ -337,7 +337,6 @@ public class ArchiveService {
     /**
      * 아카이브 좋아요 토글 (Redis + RabbitMQ)
      */
-    @Transactional
     public ArchiveDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long archiveId) {
         // 1. 아카이브 존재 확인 (불필요한 Redis 연산 방지)
         // if (!archiveRepository.existsById(archiveId)) {

@@ -213,7 +213,6 @@ public class PostService {
         return PageDto.PageListResponse.of(title, page);
     }
 
-    @Transactional
     public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
         boolean isLiked = likeRedisService.toggleLike(
                 ViewLikeDomain.POST,
