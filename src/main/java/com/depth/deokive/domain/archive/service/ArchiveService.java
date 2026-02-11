@@ -5,6 +5,7 @@ import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.service.LikeRedisService;
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.FileUrlUtils;
@@ -62,6 +63,7 @@ public class ArchiveService {
     private final ArchiveQueryRepository archiveQueryRepository;
     private final LikeRedisService likeRedisService;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     // --- Sub-Domain Content Repositories (For Bulk Delete) ---
     private final EventRepository eventRepository;
@@ -108,8 +110,9 @@ public class ArchiveService {
         ArchiveStats stats = ArchiveStats.create(archive);
         archiveStatsRepository.save(stats);
 
-        // SEQ 7. 페이지네이션 COUNT 캐시 무효화
+        // SEQ 7. 페이지네이션 캐시 무효화
         paginationCountCacheService.evictByPrefix("archive");
+        paginationIdCacheService.evictByPrefix("archive");
 
         // SEQ 8. Response
         String bannerUrl = (archive.getBannerFile() != null)
@@ -191,9 +194,10 @@ public class ArchiveService {
         // SEQ 4. 배너 수정
         String bannerUrl = updateBannerImage(archive, request.getBannerImageId(), user.getUserId());
 
-        // SEQ 5. 공개 범위(Visibility) 변경 시 Stats 테이블 동기화
+        // SEQ 5. 공개 범위(Visibility) 변경 시 Stats 테이블 동기화 + 캐시 무효화
         if (request.getVisibility() != null) {
             archiveStatsRepository.syncVisibility(archive.getId(), request.getVisibility());
+            paginationIdCacheService.evictByPrefix("archive");
         }
 
         // SEQ 6. 리턴용 조회
@@ -268,6 +272,7 @@ public class ArchiveService {
         // Step 4. Redis 캐시 삭제 (좋아요 + 페이지네이션 COUNT)
         likeRedisService.deleteLikeData(ViewLikeDomain.ARCHIVE, archiveId);
         paginationCountCacheService.evictByPrefix("archive");
+        paginationIdCacheService.evictByPrefix("archive");
 
         log.info("🟢 Archive Delete Completed.");
     }
