@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.ticket.repository;
 
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.depth.deokive.domain.ticket.entity.QTicket.ticket;
 
@@ -24,18 +26,28 @@ public class TicketQueryRepository {
 
     private final JPAQueryFactory queryFactory;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<TicketDto.TicketPageResponse> searchTicketsByBook(Long ticketBookId, Pageable pageable) {
 
-        // SEQ 1. 커버링 인덱스 활용
-        List<Long> ids = queryFactory
-                .select(ticket.id)
-                .from(ticket)
-                .where(ticket.ticketBook.id.eq(ticketBookId))
-                .orderBy(getOrderSpecifiers(pageable))
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        // SEQ 1. 커버링 인덱스 활용 - Redis 캐싱
+        String sortKey = pageable.getSort().stream()
+                .map(o -> o.getProperty() + "_" + o.getDirection())
+                .collect(Collectors.joining(","));
+        String idsCacheKey = "ticket:" + ticketBookId
+                + ":" + (sortKey.isEmpty() ? "default" : sortKey)
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
+        List<Long> ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                queryFactory
+                        .select(ticket.id)
+                        .from(ticket)
+                        .where(ticket.ticketBook.id.eq(ticketBookId))
+                        .orderBy(getOrderSpecifiers(pageable))
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize())
+                        .fetch()
+        );
 
         // SEQ 2. 데이터 조회
         List<TicketDto.TicketPageResponse> content = new ArrayList<>();

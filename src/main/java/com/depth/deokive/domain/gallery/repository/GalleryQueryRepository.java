@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.gallery.repository;
 
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.gallery.dto.GalleryDto;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.depth.deokive.domain.archive.entity.QArchive.archive;
 import static com.depth.deokive.domain.file.entity.QFile.file;
@@ -26,19 +28,28 @@ public class GalleryQueryRepository {
 
     private final JPAQueryFactory queryFactory;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<GalleryDto.Response> searchGalleriesByArchive(Long archiveId, Pageable pageable) {
 
-        // STEP 1. 커버링 인덱스 활용 (ID만 조회)
-        // created_at 정렬 인덱스를 타므로 매우 빠름. 데이터 블록 접근 X
-        List<Long> ids = queryFactory
-                .select(gallery.id)
-                .from(gallery)
-                .where(gallery.archiveId.eq(archiveId)) // 반정규화된 컬럼 사용
-                .orderBy(getOrderSpecifiers(pageable))
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        // STEP 1. 커버링 인덱스 활용 (ID만 조회) - Redis 캐싱
+        String sortKey = pageable.getSort().stream()
+                .map(o -> o.getProperty() + "_" + o.getDirection())
+                .collect(Collectors.joining(","));
+        String idsCacheKey = "gallery:" + archiveId
+                + ":" + (sortKey.isEmpty() ? "default" : sortKey)
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
+        List<Long> ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                queryFactory
+                        .select(gallery.id)
+                        .from(gallery)
+                        .where(gallery.archiveId.eq(archiveId))
+                        .orderBy(getOrderSpecifiers(pageable))
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize())
+                        .fetch()
+        );
 
         // STEP 2. 데이터 조회 (WHERE IN)
         // 찾아낸 소수의 ID에 대해서만 File 조인 수행
