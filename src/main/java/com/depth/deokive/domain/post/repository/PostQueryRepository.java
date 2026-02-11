@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.post.repository;
 
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.post.dto.PostDto;
 
 
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -32,18 +34,28 @@ public class PostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<PostDto.PostPageResponse> searchPostFeed(Category category, Pageable pageable) {
 
-        // STEP 1. 커버링 인덱스 활용 (ID 조회)
-        List<Long> ids = queryFactory
-                .select(postStats.id)
-                .from(postStats)
-                .where(eqCategory(category)) // postStats.category 사용
-                .orderBy(getOrderSpecifiers(pageable)) // postStats 기준 정렬
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        // STEP 1. 커버링 인덱스 활용 (ID 조회) - Redis 캐싱
+        String sortKey = pageable.getSort().stream()
+                .map(o -> o.getProperty() + "_" + o.getDirection())
+                .collect(Collectors.joining(","));
+        String idsCacheKey = "post:feed:" + (category != null ? category.name() : "ALL")
+                + ":" + (sortKey.isEmpty() ? "default" : sortKey)
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
+        List<Long> ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                queryFactory
+                        .select(postStats.id)
+                        .from(postStats)
+                        .where(eqCategory(category))
+                        .orderBy(getOrderSpecifiers(pageable))
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize())
+                        .fetch()
+        );
 
         // STEP 2. 데이터 조회 (Post + PostStats + User Fetch Join)
         List<PostDto.PostPageResponse> sortedContent = new ArrayList<>();
@@ -72,7 +84,7 @@ public class PostQueryRepository {
             Map<Long, PostDto.PostPageResponse> contentMap = content.stream()
                     .collect(Collectors.toMap(PostDto.PostPageResponse::getPostId, Function.identity()));
 
-            sortedContent = ids.stream().map(contentMap::get).toList();
+            sortedContent = ids.stream().map(contentMap::get).filter(Objects::nonNull).toList();
         }
 
         // Count Query (PostStats 기준) - Caffeine L1 캐싱으로 동시 요청 시 DB 부하 제거

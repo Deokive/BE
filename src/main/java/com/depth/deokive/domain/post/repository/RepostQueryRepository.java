@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.repository;
 
 
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.post.dto.RepostDto;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -25,18 +26,24 @@ public class RepostQueryRepository {
 
     private final JPAQueryFactory queryFactory;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<RepostDto.RepostElementResponse> findByTabId(Long tabId, Pageable pageable) {
 
-        // SEQ 1. ID로 조회
-        List<Long> ids = queryFactory
-                .select(repost.id)
-                .from(repost)
-                .where(repost.repostTab.id.eq(tabId))
-                .orderBy(repost.createdAt.desc(), repost.id.desc())
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        // SEQ 1. ID로 조회 - Redis 캐싱 (정렬 고정)
+        String idsCacheKey = "repost:" + tabId
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
+        List<Long> ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                queryFactory
+                        .select(repost.id)
+                        .from(repost)
+                        .where(repost.repostTab.id.eq(tabId))
+                        .orderBy(repost.createdAt.desc(), repost.id.desc())
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize())
+                        .fetch()
+        );
 
         List<RepostDto.RepostElementResponse> content = new ArrayList<>();
 
