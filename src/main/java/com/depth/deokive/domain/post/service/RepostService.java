@@ -2,6 +2,7 @@ package com.depth.deokive.domain.post.service;
 
 import com.depth.deokive.common.service.ArchiveGuard;
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.TextUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
@@ -46,6 +47,7 @@ public class RepostService {
 
     private final RepostOgProducer repostOgProducer;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     /**
      * Repost 생성 - 비동기 OG 추출 (RabbitMQ)
@@ -97,8 +99,9 @@ public class RepostService {
         // SEQ 5. RabbitMQ 발행 (트랜잭션 커밋 후 실제 전송, SSE 알림용 userId 포함)
         repostOgProducer.requestOgExtraction(repost.getId(), userPrincipal.getUserId(), url);
 
-        // SEQ 6. 페이지네이션 COUNT 캐시 무효화 (탭별)
+        // SEQ 6. 페이지네이션 캐시 무효화 (탭별)
         paginationCountCacheService.evict("repost:" + tabId);
+        paginationIdCacheService.evictByPrefix("repost:" + tabId);
 
         // SEQ 7. 즉시 201 Created 응답
         return RepostDto.Response.of(repost);
@@ -130,8 +133,9 @@ public class RepostService {
         // SEQ 3. Repost 삭제
         repostRepository.delete(repost);
 
-        // SEQ 4. 페이지네이션 COUNT 캐시 무효화 (해당 탭)
+        // SEQ 4. 페이지네이션 캐시 무효화 (해당 탭)
         paginationCountCacheService.evict("repost:" + repost.getRepostTab().getId());
+        paginationIdCacheService.evictByPrefix("repost:" + repost.getRepostTab().getId());
     }
 
     @Transactional
@@ -188,8 +192,9 @@ public class RepostService {
         repostRepository.deleteAllByRepostTabId(tabId); // Bulk로 Repost 명시적 삭제 (성능을 위해)
         repostTabRepository.delete(tab);
 
-        // SEQ 4. 페이지네이션 COUNT 캐시 무효화
+        // SEQ 4. 페이지네이션 캐시 무효화
         paginationCountCacheService.evict("repost:" + tabId);
+        paginationIdCacheService.evictByPrefix("repost:" + tabId);
     }
 
     @ExecutionTime
