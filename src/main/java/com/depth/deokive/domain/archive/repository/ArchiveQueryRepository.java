@@ -1,6 +1,7 @@
 package com.depth.deokive.domain.archive.repository;
 
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.archive.dto.ArchiveDto;
 import com.depth.deokive.domain.archive.dto.QArchiveDto_ArchivePageResponse;
 import com.depth.deokive.common.enums.Visibility;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -31,6 +33,7 @@ public class ArchiveQueryRepository {
 
     private final JPAQueryFactory queryFactory;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<ArchiveDto.ArchivePageResponse> searchArchiveFeed(
             Long filterUserId,
@@ -51,22 +54,32 @@ public class ArchiveQueryRepository {
                 .collect(Collectors.joining(","));
         String countCacheKey;
 
+        // 정렬 키 (ID 캐시용)
+        String sortKey = pageable.getSort().stream()
+                .map(o -> o.getProperty() + "_" + o.getDirection())
+                .collect(Collectors.joining(","));
+        String pageKey = ":" + (sortKey.isEmpty() ? "default" : sortKey)
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
         // STEP 2. 커버링 인덱스 활용 (ID만 조회) && 정렬 조건 분기 : My Archives vs Global Archives
         if (isOptimizedPath) {
             // Case 1. My Archives(Me or Friends) -> Archive Table Scan
             countCacheKey = "archive:opt:" + filterUserId + ":" + visKey;
+            String idsCacheKey = countCacheKey + pageKey;
 
-            ids = queryFactory
-                    .select(archive.id)
-                    .from(archive)
-                    .where(
-                            archive.user.id.eq(filterUserId),
-                            inVisibilitiesForArchive(allowedVisibilities) // Archive 엔티티 조건 사용
-                    )
-                    .orderBy(getArchiveOrderSpecifiers(pageable)) // Archive 컬럼 기준 정렬
-                    .offset(pageable.getOffset())
-                    .limit(pageable.getPageSize())
-                    .fetch();
+            ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                    queryFactory
+                            .select(archive.id)
+                            .from(archive)
+                            .where(
+                                    archive.user.id.eq(filterUserId),
+                                    inVisibilitiesForArchive(allowedVisibilities)
+                            )
+                            .orderBy(getArchiveOrderSpecifiers(pageable))
+                            .offset(pageable.getOffset())
+                            .limit(pageable.getPageSize())
+                            .fetch()
+            );
 
             countQuery = queryFactory
                     .select(archive.count())
@@ -78,24 +91,26 @@ public class ArchiveQueryRepository {
         } else {
             // Case 2. Global Archives -> ArchiveStats 기반 조회
             countCacheKey = "archive:global:" + (filterUserId != null ? filterUserId : "all") + ":" + visKey;
+            String idsCacheKey = countCacheKey + pageKey;
 
-            JPAQuery<Long> idsQuery = queryFactory
-                    .select(archiveStats.id)
-                    .from(archiveStats)
-                    .where(
-                            eqUserIdForStats(filterUserId),
-                            inVisibilitiesForStats(allowedVisibilities)
-                    )
-                    .orderBy(getStatsOrderSpecifiers(pageable))
-                    .offset(pageable.getOffset())
-                    .limit(pageable.getPageSize());
+            ids = paginationIdCacheService.getIds(idsCacheKey, () -> {
+                JPAQuery<Long> idsQuery = queryFactory
+                        .select(archiveStats.id)
+                        .from(archiveStats)
+                        .where(
+                                eqUserIdForStats(filterUserId),
+                                inVisibilitiesForStats(allowedVisibilities)
+                        )
+                        .orderBy(getStatsOrderSpecifiers(pageable))
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize());
 
-            // 필터 유저가 있으면 조인 필요
-            if (filterUserId != null) {
-                idsQuery.join(archiveStats.archive, archive);
-            }
+                if (filterUserId != null) {
+                    idsQuery.join(archiveStats.archive, archive);
+                }
 
-            ids = idsQuery.fetch();
+                return idsQuery.fetch();
+            });
 
             // Count Query (ArchiveStats 테이블 대상)
             countQuery = queryFactory
@@ -141,6 +156,7 @@ public class ArchiveQueryRepository {
 
             sortedContent = ids.stream()
                     .map(contentMap::get)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
 

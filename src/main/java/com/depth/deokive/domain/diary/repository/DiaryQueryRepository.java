@@ -2,6 +2,7 @@ package com.depth.deokive.domain.diary.repository;
 
 import com.depth.deokive.common.enums.Visibility;
 import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.diary.dto.DiaryDto;
 import com.depth.deokive.domain.diary.dto.QDiaryDto_DiaryPageResponse;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -23,24 +24,34 @@ public class DiaryQueryRepository {
 
     private final JPAQueryFactory queryFactory;
     private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<DiaryDto.DiaryPageResponse> findDiaries(
             Long bookId,
             List<Visibility> allowedVisibilities,
             Pageable pageable
     ) {
-        // SEQ 1. Covering Index
-        List<Long> ids = queryFactory
-                .select(diary.id)
-                .from(diary)
-                .where(
-                        diary.diaryBook.id.eq(bookId),
-                        eqVisibility(allowedVisibilities) // 친구 사이여도 Private는 안옴
-                )
-                .orderBy(diary.recordedAt.desc(), diary.id.desc()) // Tie-Breaker 추가
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        // SEQ 1. Covering Index - Redis 캐싱
+        String visKey = allowedVisibilities.stream()
+                .map(Visibility::name)
+                .sorted()
+                .collect(java.util.stream.Collectors.joining(","));
+        String idsCacheKey = "diary:" + bookId + ":" + visKey
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
+        List<Long> ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                queryFactory
+                        .select(diary.id)
+                        .from(diary)
+                        .where(
+                                diary.diaryBook.id.eq(bookId),
+                                eqVisibility(allowedVisibilities)
+                        )
+                        .orderBy(diary.recordedAt.desc(), diary.id.desc())
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize())
+                        .fetch()
+        );
 
         List<DiaryDto.DiaryPageResponse> content = new ArrayList<>();
 
@@ -61,10 +72,6 @@ public class DiaryQueryRepository {
         }
 
         // SEQ 3. Count Query - Redis 캐싱
-        String visKey = allowedVisibilities.stream()
-                .map(Visibility::name)
-                .sorted()
-                .collect(java.util.stream.Collectors.joining(","));
         String countCacheKey = "diary:" + bookId + ":" + visKey;
 
         return PageableExecutionUtils.getPage(content, pageable,
