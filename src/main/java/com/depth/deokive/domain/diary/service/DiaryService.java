@@ -2,6 +2,8 @@ package com.depth.deokive.domain.diary.service;
 
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.common.util.ThumbnailUtils;
 import com.depth.deokive.common.enums.Visibility;
@@ -38,6 +40,8 @@ public class DiaryService {
     private final DiaryFileMapRepository diaryFileMapRepository;
     private final FileService fileService;
     private final DiaryQueryRepository diaryQueryRepository;
+    private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     @Transactional
     public DiaryDto.Response createDiary(UserPrincipal userPrincipal, Long archiveId, DiaryDto.CreateRequest request) {
@@ -57,6 +61,10 @@ public class DiaryService {
 
         // SEQ 5. 썸네일 업데이트
         updateDiaryThumbnail(diary, maps);
+
+        // SEQ 6. 페이지네이션 캐시 무효화
+        paginationCountCacheService.evictByPrefix("diary:" + archiveId);
+        paginationIdCacheService.evictByPrefix("diary:" + archiveId);
 
         return DiaryDto.Response.of(diary, maps);
     }
@@ -117,6 +125,10 @@ public class DiaryService {
         // SEQ 3. Diary와 관련된 모든 매핑 제거 -> 다이어리 제거 (Cascade가 아닌 명시적 제거)
         diaryFileMapRepository.deleteAllByDiaryId(diaryId);
         diaryRepository.delete(diary);
+
+        // SEQ 4. 페이지네이션 캐시 무효화
+        paginationCountCacheService.evictByPrefix("diary:" + diary.getDiaryBook().getId());
+        paginationIdCacheService.evictByPrefix("diary:" + diary.getDiaryBook().getId());
     }
 
     @Transactional

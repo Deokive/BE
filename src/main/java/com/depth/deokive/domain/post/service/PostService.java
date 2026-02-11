@@ -3,6 +3,8 @@ package com.depth.deokive.domain.post.service;
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.common.service.LikeRedisService;
+import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.common.service.RedisViewService;
 import com.depth.deokive.common.util.ClientUtils;
 import com.depth.deokive.common.util.PageUtils;
@@ -50,6 +52,8 @@ public class PostService {
     private final LikeRedisService likeRedisService;
     private final CommentCountRedisService commentCountRedisService;
     private final CommentRepository commentRepository;
+    private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     @Transactional
     public PostDto.Response createPost(UserPrincipal userPrincipal, PostDto.CreateRequest request) {
@@ -68,7 +72,11 @@ public class PostService {
         // SEQ 4. 파일 연결
         List<PostFileMap> maps = connectFilesToPost(post, request.getFiles(), userPrincipal.getUserId());
 
-        // SEQ 5. Response (생성 시점에는 좋아요 없음)
+        // SEQ 5. 페이지네이션 캐시 무효화
+        paginationCountCacheService.evictByPrefix("post");
+        paginationIdCacheService.evictByPrefix("post");
+
+        // SEQ 6. Response (생성 시점에는 좋아요 없음)
         return PostDto.Response.of(post, stats, maps, false);
     }
 
@@ -129,6 +137,7 @@ public class PostService {
         // SEQ 4. 카테고리가 변경되었다면 PostStats도 동기화 (커버링 인덱스용)
         if (request.getCategory() != null) {
             postStatsRepository.syncUpdateCategory(postId, request.getCategory());
+            paginationIdCacheService.evictByPrefix("post");
         }
 
         // SEQ 5. 기존 파일 매핑 삭제 후 재생성 (🧐 파일의 순서, 파일 자체, 미디어 역할 등이 변경될 수 있음 -> 일괄 삭제 후 재매핑이 나음)
@@ -179,9 +188,11 @@ public class PostService {
         // SEQ 7. 게시글 삭제
         postRepository.delete(post);
 
-        // SEQ 8. 캐시 삭제 (좋아요 + 댓글 수)
+        // SEQ 8. 캐시 삭제 (좋아요 + 댓글 수 + 페이지네이션)
         likeRedisService.deleteLikeData(ViewLikeDomain.POST, postId);
         commentCountRedisService.deleteCache(postId);
+        paginationCountCacheService.evictByPrefix("post");
+        paginationIdCacheService.evictByPrefix("post");
     }
 
     @ExecutionTime
@@ -202,7 +213,6 @@ public class PostService {
         return PageDto.PageListResponse.of(title, page);
     }
 
-    @Transactional
     public PostDto.LikeResponse toggleLike(UserPrincipal userPrincipal, Long postId) {
         boolean isLiked = likeRedisService.toggleLike(
                 ViewLikeDomain.POST,

@@ -1,6 +1,5 @@
 package com.depth.deokive.common.service;
 
-import com.depth.deokive.common.dto.LikeMessageDto;
 import com.depth.deokive.common.enums.ViewLikeDomain;
 import com.depth.deokive.system.exception.model.ErrorCode;
 import com.depth.deokive.system.exception.model.RestException;
@@ -8,10 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,9 +21,9 @@ import java.util.function.Supplier;
 public class LikeRedisService {
 
     private final RedisTemplate<String, Long> longRedisTemplate;
-    private final RabbitTemplate rabbitTemplate;
     private final RedissonClient redissonClient;
     private final DefaultRedisScript<Long> likeScript;
+    private final LikeMessagePublisher likeMessagePublisher;
 
     private static final String DUMMY_VALUE = "dummy";
     private static final String TTL_SECONDS = "259200"; // 3일
@@ -64,8 +61,8 @@ public class LikeRedisService {
 
         boolean isLiked = (result != null && result == 1);
 
-        // 3. MQ 전송
-        sendToQueue(domain, targetId, userId, isLiked);
+        // 3. MQ 비동기 전송 (별도 Bean 호출로 @Async 프록시 정상 동작)
+        likeMessagePublisher.sendToQueue(domain, targetId, userId, isLiked);
 
         return isLiked;
     }
@@ -128,13 +125,6 @@ public class LikeRedisService {
                 lock.unlock();
             }
         }
-    }
-
-    @Async("messagingTaskExecutor")
-    public void sendToQueue(ViewLikeDomain domain, Long targetId, Long userId, boolean isLiked) {
-        LikeMessageDto message = new LikeMessageDto(targetId, userId, isLiked);
-        rabbitTemplate.convertAndSend(domain.getExchangeName(), domain.getRoutingKey(), message);
-        log.info("🐇 [MQ Send] Domain: {}, TargetId: {}, Action: {}", domain, targetId, isLiked ? "LIKE" : "UNLIKE");
     }
 
     public void deleteLikeData(ViewLikeDomain domain, Long targetId) {

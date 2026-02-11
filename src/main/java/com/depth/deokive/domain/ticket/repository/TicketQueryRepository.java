@@ -1,10 +1,11 @@
 package com.depth.deokive.domain.ticket.repository;
 
+import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.domain.ticket.dto.TicketDto;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
-import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.depth.deokive.domain.ticket.entity.QTicket.ticket;
 
@@ -23,18 +25,29 @@ import static com.depth.deokive.domain.ticket.entity.QTicket.ticket;
 public class TicketQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+    private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     public Page<TicketDto.TicketPageResponse> searchTicketsByBook(Long ticketBookId, Pageable pageable) {
 
-        // SEQ 1. 커버링 인덱스 활용
-        List<Long> ids = queryFactory
-                .select(ticket.id)
-                .from(ticket)
-                .where(ticket.ticketBook.id.eq(ticketBookId))
-                .orderBy(getOrderSpecifiers(pageable))
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        // SEQ 1. 커버링 인덱스 활용 - Redis 캐싱
+        String sortKey = pageable.getSort().stream()
+                .map(o -> o.getProperty() + "_" + o.getDirection())
+                .collect(Collectors.joining(","));
+        String idsCacheKey = "ticket:" + ticketBookId
+                + ":" + (sortKey.isEmpty() ? "default" : sortKey)
+                + ":" + pageable.getPageNumber() + ":" + pageable.getPageSize();
+
+        List<Long> ids = paginationIdCacheService.getIds(idsCacheKey, () ->
+                queryFactory
+                        .select(ticket.id)
+                        .from(ticket)
+                        .where(ticket.ticketBook.id.eq(ticketBookId))
+                        .orderBy(getOrderSpecifiers(pageable))
+                        .offset(pageable.getOffset())
+                        .limit(pageable.getPageSize())
+                        .fetch()
+        );
 
         // SEQ 2. 데이터 조회
         List<TicketDto.TicketPageResponse> content = new ArrayList<>();
@@ -60,13 +73,16 @@ public class TicketQueryRepository {
                     .fetch();
         }
 
-        // SEQ 3. Count Query
-        JPAQuery<Long> countQuery = queryFactory
-                .select(ticket.count())
-                .from(ticket)
-                .where(ticket.ticketBook.id.eq(ticketBookId));
+        // SEQ 3. Count Query - Redis 캐싱
+        String countCacheKey = "ticket:" + ticketBookId;
 
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+        return PageableExecutionUtils.getPage(content, pageable,
+                () -> paginationCountCacheService.getCount(countCacheKey, () ->
+                        queryFactory.select(ticket.count())
+                                .from(ticket)
+                                .where(ticket.ticketBook.id.eq(ticketBookId))
+                                .fetchOne()
+                ));
     }
 
     private OrderSpecifier<?>[] getOrderSpecifiers(Pageable pageable) {

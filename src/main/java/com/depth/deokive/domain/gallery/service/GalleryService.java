@@ -2,6 +2,8 @@ package com.depth.deokive.domain.gallery.service;
 
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.archive.entity.Archive;
 import com.depth.deokive.domain.archive.repository.ArchiveRepository;
@@ -36,6 +38,8 @@ public class GalleryService {
     private final ArchiveRepository archiveRepository;
     private final GalleryRepository galleryRepository;
     private final FileService fileService;
+    private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     @ExecutionTime
     @Transactional(readOnly = true)
@@ -81,6 +85,9 @@ public class GalleryService {
 
         galleryRepository.saveAll(galleries);
 
+        paginationCountCacheService.evict("gallery:" + archiveId);
+        paginationIdCacheService.evictByPrefix("gallery:" + archiveId);
+
         return GalleryDto.CreateResponse.builder()
                 .createdCount(galleries.size())
                 .archiveId(archiveId)
@@ -113,5 +120,8 @@ public class GalleryService {
 
         archiveGuard.checkOwner(archive.getUser().getId(), userPrincipal);
         galleryRepository.deleteByIdsAndArchiveId(request.getGalleryIds(), archiveId);
+
+        paginationCountCacheService.evict("gallery:" + archiveId);
+        paginationIdCacheService.evictByPrefix("gallery:" + archiveId);
     }
 }

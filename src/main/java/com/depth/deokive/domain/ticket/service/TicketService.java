@@ -2,6 +2,8 @@ package com.depth.deokive.domain.ticket.service;
 
 import com.depth.deokive.common.dto.PageDto;
 import com.depth.deokive.common.service.ArchiveGuard;
+import com.depth.deokive.common.service.PaginationCountCacheService;
+import com.depth.deokive.common.service.PaginationIdCacheService;
 import com.depth.deokive.common.util.PageUtils;
 import com.depth.deokive.domain.file.entity.File;
 import com.depth.deokive.domain.file.service.FileService;
@@ -31,6 +33,8 @@ public class TicketService {
     private final TicketBookRepository ticketBookRepository;
     private final FriendMapRepository friendMapRepository;
     private final TicketQueryRepository ticketQueryRepository;
+    private final PaginationCountCacheService paginationCountCacheService;
+    private final PaginationIdCacheService paginationIdCacheService;
 
     @Transactional
     public TicketDto.Response createTicket(UserPrincipal userPrincipal, Long archiveId, TicketDto.CreateRequest request) {
@@ -48,6 +52,9 @@ public class TicketService {
         // SEQ 3. 저장 (Entity에 File 바로 꽂기)
         Ticket ticket = request.toEntity(ticketBook, file);
         ticketRepository.save(ticket);
+
+        paginationCountCacheService.evict("ticket:" + archiveId);
+        paginationIdCacheService.evictByPrefix("ticket:" + archiveId);
 
         return TicketDto.Response.of(ticket);
     }
@@ -106,6 +113,9 @@ public class TicketService {
         archiveGuard.checkOwner(ticket.getTicketBook().getArchive().getUser().getId(), userPrincipal);
 
         ticketRepository.delete(ticket);
+
+        paginationCountCacheService.evict("ticket:" + ticket.getTicketBook().getId());
+        paginationIdCacheService.evictByPrefix("ticket:" + ticket.getTicketBook().getId());
     }
 
     @Transactional
