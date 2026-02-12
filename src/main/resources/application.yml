@@ -179,6 +179,12 @@ scheduler:
   post-like-cron: "10 * * * * *"
   archive-like-cron: "40 * * * * *"
 
+  # MQ 전송 실패 fallback: 매분 50초 (LikeCount 스케줄러와 간격 벌림)
+  like-fallback-cron: "50 * * * * *"
+
+  # FriendMap 만료 레코드 정리: 매월 1일, 15일 새벽 4시
+  friend-cleanup-cron: "0 0 4 1,15 * *"
+
   view-cooldown-minutes: 10
 
 ratelimit:

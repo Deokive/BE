@@ -30,6 +30,7 @@ public class SystemSchedulerController {
     private final HotScoreScheduler hotScoreScheduler;
     private final ViewCountScheduler viewCountScheduler;
     private final LikeCountScheduler likeCountScheduler;
+    private final FriendCleanupScheduler friendCleanupScheduler;
 
 
     private final JobLauncher jobLauncher;
@@ -107,5 +108,17 @@ public class SystemSchedulerController {
         likeCountScheduler.syncArchiveLikes();
 
         return ResponseEntity.ok("🟢 Like Count Sync Completed! (PostLikeCount -> PostStats)");
+    }
+
+    @ExecutionTime
+    @PostMapping("/friend-cleanup")
+    @RateLimit(type = RateLimitType.IP, capacity = 10, refillTokens = 10, refillPeriodSeconds = 3600, failClosed = true)
+    @Operation(summary = "친구 관계 정리 강제 실행", description = "CANCELED/REJECTED 상태의 2주 경과 레코드 일괄 삭제")
+    public ResponseEntity<String> triggerFriendCleanup() {
+        log.info("Manual Trigger: Friend Cleanup");
+
+        friendCleanupScheduler.cleanupExpiredFriendRecords();
+
+        return ResponseEntity.ok("🟢 Friend Cleanup Completed! (CANCELED/REJECTED records deleted)");
     }
 }

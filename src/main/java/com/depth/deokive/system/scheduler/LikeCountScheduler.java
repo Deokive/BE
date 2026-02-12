@@ -9,7 +9,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.function.BiConsumer;
 
@@ -26,11 +25,26 @@ public class LikeCountScheduler {
     @Scheduled(cron = "${scheduler.post-like-cron}")
     public void syncPostLikes() {
         log.info("🔥 [Scheduler] Starting Post Like Count Sync (Redis -> DB)...");
+
+        int synced = 0;
         try {
-            syncLikeCounts("like:post:count:*", postStatsRepository::updateLikeCount);
-            log.info("✅ [Scheduler] Post Like Count Sync Finished.");
+            synced = syncLikeCounts("like:post:count:*", postStatsRepository::updateLikeCount);
         } catch (Exception e) {
-            log.error("🔴 [Scheduler] Post Sync Failed", e);
+            log.error("🔴 [Scheduler] Redis Scan Failed for Post", e);
+        }
+
+        if (synced > 0) {
+            log.info("✅ [Scheduler] Post Like Count Sync Finished. (synced from Redis: {})", synced);
+            return;
+        }
+
+        // Redis 키 없음 또는 Redis 장애 → PostLike 테이블에서 직접 재계산
+        try {
+            log.warn("⚠️ [Scheduler] Redis count 키 없음 → PostLike 테이블에서 직접 재계산");
+            postStatsRepository.reconcileLikeCountsFromDb();
+            log.info("✅ [Scheduler] Post Like Count Reconciled from DB.");
+        } catch (Exception e) {
+            log.error("🔴 [Scheduler] Post DB Reconciliation Failed", e);
         }
     }
 
@@ -38,15 +52,32 @@ public class LikeCountScheduler {
     @Scheduled(cron = "${scheduler.archive-like-cron}")
     public void syncArchiveLikes() {
         log.info("🔥 [Scheduler] Starting Archive Like Count Sync (Redis -> DB)...");
+
+        int synced = 0;
         try {
-            syncLikeCounts("like:archive:count:*", archiveStatsRepository::updateLikeCount);
-            log.info("✅ [Scheduler] Archive Like Count Sync Finished.");
+            synced = syncLikeCounts("like:archive:count:*", archiveStatsRepository::updateLikeCount);
         } catch (Exception e) {
-            log.error("🔴 [Scheduler] Archive Sync Failed", e);
+            log.error("🔴 [Scheduler] Redis Scan Failed for Archive", e);
+        }
+
+        if (synced > 0) {
+            log.info("✅ [Scheduler] Archive Like Count Sync Finished. (synced from Redis: {})", synced);
+            return;
+        }
+
+        // Redis 키 없음 또는 Redis 장애 → ArchiveLike 테이블에서 직접 재계산
+        try {
+            log.warn("⚠️ [Scheduler] Redis count 키 없음 → ArchiveLike 테이블에서 직접 재계산");
+            archiveStatsRepository.reconcileLikeCountsFromDb();
+            log.info("✅ [Scheduler] Archive Like Count Reconciled from DB.");
+        } catch (Exception e) {
+            log.error("🔴 [Scheduler] Archive DB Reconciliation Failed", e);
         }
     }
 
-    private void syncLikeCounts(String pattern, BiConsumer<Long, Long> updater) {
+    private int syncLikeCounts(String pattern, BiConsumer<Long, Long> updater) {
+        int count = 0;
+
         // like:{domain}:count:* 패턴만 스캔
         ScanOptions options = ScanOptions.scanOptions().match(pattern).count(100).build();
 
@@ -62,8 +93,9 @@ public class LikeCountScheduler {
                     Object countObj = redisTemplate.opsForValue().get(key);
 
                     if (countObj != null) {
-                        Long count = Long.parseLong(countObj.toString());
-                        updater.accept(id, count);
+                        Long likeCount = Long.parseLong(countObj.toString());
+                        updater.accept(id, likeCount);
+                        count++;
                     }
                 } catch (NumberFormatException e) {
                     log.error("❌ [Scheduler] Error parsing targetId/count from key: {}", key, e);
@@ -71,9 +103,8 @@ public class LikeCountScheduler {
                     log.error("❌ [Scheduler] Error syncing key: {}", key, e);
                 }
             }
-        } catch (Exception e) {
-            log.error("❌ [Scheduler] Redis Scan Failed", e);
-            throw new RuntimeException(e);
         }
+
+        return count;
     }
 }
