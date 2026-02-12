@@ -41,4 +41,11 @@ public interface ArchiveStatsRepository extends JpaRepository<ArchiveStats, Long
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ArchiveStats s SET s.likeCount = :count WHERE s.id = :id")
     void updateLikeCount(@Param("id") Long id, @Param("count") Long count);
+
+    // [Fallback] Redis 유실 시 ArchiveLike 테이블에서 직접 likeCount 재계산
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE archive_stats s SET s.like_count = " +
+            "(SELECT COUNT(*) FROM archive_like al WHERE al.archive_id = s.id)", nativeQuery = true)
+    void reconcileLikeCountsFromDb();
 }

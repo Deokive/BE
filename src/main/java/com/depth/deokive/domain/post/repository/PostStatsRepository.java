@@ -28,6 +28,13 @@ public interface PostStatsRepository extends JpaRepository<PostStats, Long> {
     @Query("UPDATE PostStats ps SET ps.likeCount = :count WHERE ps.id = :postId")
     void updateLikeCount(@Param("postId") Long postId, @Param("count") Long count);
 
+    // [Fallback] Redis 유실 시 PostLike 테이블에서 직접 likeCount 재계산
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE post_stats ps SET ps.like_count = " +
+            "(SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = ps.id)", nativeQuery = true)
+    void reconcileLikeCountsFromDb();
+
     // Post 삭제 시 통계 테이블 삭제 (@MapsId 사용으로 인해 deleteById가 제대로 작동하지 않을 수 있어 명시적 쿼리 사용)
     @Modifying
     @Query("DELETE FROM PostStats ps WHERE ps.id = :postId")
