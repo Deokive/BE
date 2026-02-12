@@ -79,7 +79,8 @@ public class SecurityConfig {
                         // - SSE 경로에만 한정하여 최소 권한 원칙 적용
                         .requestMatchers(request ->
                             request.getDispatcherType() == DispatcherType.ASYNC
-                            && request.getRequestURI().startsWith("/api/v1/sse/")
+                            && (request.getRequestURI().startsWith("/api/v1/sse/")
+                                || request.getRequestURI().startsWith("/api/v1/notifications/"))
                         ).permitAll()
                         // 1. 비인증 경로들 (RequestMatcherHolder에서 관리)
                         .requestMatchers(requestMatcherHolder.getRequestMatchersByMinRole(null)).permitAll()
