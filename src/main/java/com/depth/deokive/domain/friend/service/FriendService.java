@@ -332,11 +332,24 @@ public class FriendService {
             throw new RestException(ErrorCode.FRIEND_SELF_BAD_REQUEST);
         }
 
-        // SEQ 2. 관계 데이터 조회 (나 -> 친구)
-        FriendMap friendMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId)
-                .orElseThrow(() -> new RestException(ErrorCode.FRIEND_NOT_FOUND)); // 404 에러
-
-        // SEQ 3. 상태 반환
-        return new FriendDto.FriendStatusResponse(friendMap.getFriendStatus());
+        // SEQ 2. 양방향 관계 데이터 조회
+        // 먼저 "나 -> 친구" 관계 조회
+        Optional<FriendMap> myToFriendMap = friendMapRepository.findByUserIdAndFriendId(userId, friendId);
+        
+        if (myToFriendMap.isPresent()) {
+            // "나 -> 친구" 관계가 있으면 해당 상태 반환
+            return new FriendDto.FriendStatusResponse(myToFriendMap.get().getFriendStatus());
+        }
+        
+        // "나 -> 친구" 관계가 없으면 "친구 -> 나" 관계 조회
+        Optional<FriendMap> friendToMyMap = friendMapRepository.findByUserIdAndFriendId(friendId, userId);
+        
+        if (friendToMyMap.isPresent()) {
+            // "친구 -> 나" 관계가 있으면 해당 상태 반환
+            return new FriendDto.FriendStatusResponse(friendToMyMap.get().getFriendStatus());
+        }
+        
+        // 둘 다 없으면 404 에러
+        throw new RestException(ErrorCode.FRIEND_NOT_FOUND);
     }
 }
